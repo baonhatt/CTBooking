@@ -189,7 +189,7 @@ export default function Footer() {
                   </div>
                   <a
                     href={`tel:${branchSettings.hotline || selectedBranch?.phone || '0366431179'}`}
-                    className="text-gray-300 hover:text-cyan-400 transition-colors font-medium text-sm"
+                    className="inline-flex items-center min-h-[44px] text-gray-300 hover:text-cyan-400 transition-colors font-medium text-sm"
                   >
                     {branchSettings.hotline || selectedBranch?.phone || '036.6431.179'}
                   </a>
@@ -203,7 +203,7 @@ export default function Footer() {
                   </div>
                   <a
                     href={`mailto:${selectedBranch?.email || 'cinesphere0629@gmail.com'}`}
-                    className="text-gray-300 hover:text-purple-400 transition-colors font-medium text-sm break-all"
+                    className="inline-flex items-center min-h-[44px] text-gray-300 hover:text-purple-400 transition-colors font-medium text-sm break-all"
                   >
                     {selectedBranch?.email || 'cinesphere0629@gmail.com'}
                   </a>

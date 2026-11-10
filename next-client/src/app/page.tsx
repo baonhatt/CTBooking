@@ -108,9 +108,10 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
         <Suspense fallback={<div className="min-h-[200px]" />}>
           {/* Pass initial data to the interactive Client Components */}
           <FilmCarousel initialFilms={activeMovies} initialBranchId={effectiveBranchId} />
-          <MovieScheduleSection />
-          <VRShowcase initialPackages={vrRes.items || []} initialBranchId={effectiveBranchId} />
+          {/* Prices come right after the films, then VR, then the day's schedule */}
           <PromotionShowcase initialCombos={ticketsRes.items || []} initialBranchId={effectiveBranchId} />
+          <VRShowcase initialPackages={vrRes.items || []} initialBranchId={effectiveBranchId} />
+          <MovieScheduleSection />
           <TechnologyBanner initialMainItem={techMainItem} initialListItems={techListItems} />
           {/* TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại. */}
           {/* <ProductSection initialProducts={toysRes.items || []} /> */}

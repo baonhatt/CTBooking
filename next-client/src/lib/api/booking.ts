@@ -88,12 +88,16 @@ export async function confirmBookingApi(body: {
   });
 }
 
-/** What the payment page may know about an order: the payment state and the deadline, nothing personal. */
+/**
+ * What the payment page may know about an order: the payment state and the deadline, nothing personal.
+ * The ticket code comes with it only once the order is paid.
+ */
 export interface BookingStatus {
   id: number;
   payment_status: string;
   payment_expires_at: string | null;
   server_now: string;
+  booking_code?: string | null;
 }
 
 /** `httpStatus` is null when the server could not be reached at all (offline, timeout). */

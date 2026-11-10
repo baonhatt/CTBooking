@@ -59,7 +59,8 @@ export default function Header({
     const searchParams = useSearchParams();
 
     // Custom hooks
-    const isScrolled = useScrollDetect(50);
+    // The solid background starts almost at once, so content never shows through the clear header on its way up
+    const isScrolled = useScrollDetect(8);
     const isPostsRoute = pathname === '/bai-viet' || pathname.startsWith('/bai-viet/');
     const isVrRoute = pathname === '/vr' || pathname.startsWith('/vr');
     const isBookingFlow = ['/booking', '/checkout', '/qr-payment', '/success-payment', '/vr-booking'].some((route) =>
@@ -163,6 +164,8 @@ export default function Header({
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
     const [isForgetPassOpen, setIsForgetPassOpen] = useState(false);
+    // Email put into the login dialog when it opens (right after registering)
+    const [loginPrefillEmail, setLoginPrefillEmail] = useState('');
     const [pendingBranch, setPendingBranch] = useState<any>(null);
     const [showBranchConfirm, setShowBranchConfirm] = useState(false);
     const [errorModal, setErrorModal] = useState<ErrorModalState>({
@@ -220,7 +223,9 @@ export default function Header({
         setIsLoginOpen(false);
     };
 
-    const openLogin = () => {
+    // A click handler also passes its event here, so only a text counts as the email to fill in
+    const openLogin = (prefillEmail?: unknown) => {
+        setLoginPrefillEmail(typeof prefillEmail === 'string' ? prefillEmail : '');
         setIsLoginOpen(true);
         setIsRegisterOpen(false);
     };
@@ -229,6 +234,23 @@ export default function Header({
         setIsForgetPassOpen(true);
         setIsLoginOpen(false);
     };
+
+    // Links such as /?login=1 (after a password reset) and /?forgot=1 (an expired reset link) open the dialog, then
+    // the parameter is dropped from the address
+    useEffect(() => {
+        const wantsLogin = searchParams.get('login') === '1';
+        const wantsForgot = searchParams.get('forgot') === '1';
+        if (!wantsLogin && !wantsForgot) return;
+        if (!isLoggedIn) {
+            if (wantsForgot) setIsForgetPassOpen(true);
+            else setIsLoginOpen(true);
+        }
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('login');
+        params.delete('forgot');
+        const query = params.toString();
+        router.replace(query ? `${pathname}?${query}` : pathname);
+    }, [searchParams]);
 
     const handleLogoClick = () => {
         const params = new URLSearchParams(searchParams.toString());
@@ -325,14 +347,14 @@ export default function Header({
                 </nav>
 
                 {/* Right Actions / Utilities Cluster */}
-                <div className="flex items-center gap-1.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
                     {/* Branch Selector Chip */}
                     {selectedBranch && branches.length > 1 && (
                         <DropdownMenu>
                             <DropdownMenuTrigger
                                 disabled={isBookingFlow}
                                 className={cn(
-                                    'group relative flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-[11px] sm:text-xs font-semibold text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
+                                    'group relative flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold before:absolute before:-inset-1.5 before:content-[""] text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
                                     isBookingFlow ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
                                 )}
                             >
@@ -345,7 +367,7 @@ export default function Header({
                                 align="end"
                                 className="bg-[#0b1226]/95 backdrop-blur-2xl border border-white/15 p-1.5 min-w-[200px] shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-in fade-in-0 zoom-in-95 rounded-2xl z-[100]"
                             >
-                                <div className="px-3 py-2 text-[10px] uppercase font-bold text-cyan-400/80 tracking-widest border-b border-white/5 mb-1 flex items-center justify-between">
+                                <div className="px-3 py-2 text-xs uppercase font-bold text-cyan-400/80 tracking-widest border-b border-white/5 mb-1 flex items-center justify-between">
                                     <span>Chọn Chi Nhánh</span>
                                     <MapPin className="w-3 h-3 text-cyan-400/60" />
                                 </div>
@@ -381,12 +403,12 @@ export default function Header({
                         type="button"
                         onClick={openCart}
                         aria-label="Giỏ hàng"
-                        className="relative flex items-center justify-center gap-1.5 text-slate-200 hover:text-white transition-all duration-200 font-semibold text-xs h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] touch-manipulation select-none active:scale-95 group"
+                        className="relative flex items-center justify-center gap-1.5 text-slate-200 hover:text-white transition-all duration-200 font-semibold text-xs h-8 sm:h-9 before:absolute before:-inset-1.5 before:content-[''] px-2.5 sm:px-3.5 rounded-full bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)] touch-manipulation select-none active:scale-95 group"
                     >
                         <ShoppingCart className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                         <span className="hidden sm:inline">Giỏ hàng</span>
                         {mounted && totalItemsCount > 0 && (
-                            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-1 text-[10px] font-black text-black shadow-md">
+                            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-1 text-xs font-black text-black shadow-md">
                                 {totalItemsCount}
                             </span>
                         )}
@@ -440,6 +462,7 @@ export default function Header({
                     onOpenChange={setIsLoginOpen}
                     onRegister={openRegister}
                     onForgetPassword={openForgetPass}
+                    initialEmail={loginPrefillEmail}
                     auth={auth}
                     setUserName={setUserName}
                     setErrorModal={setErrorModal}
@@ -450,7 +473,7 @@ export default function Header({
                 <RegisterDialog
                     isOpen={isRegisterOpen}
                     onOpenChange={setIsRegisterOpen}
-                    onLogin={openLogin}
+                    onLogin={(registeredEmail) => openLogin(registeredEmail)}
                     auth={auth}
                     setUserName={setUserName}
                     setErrorModal={setErrorModal}

@@ -2,7 +2,7 @@ import { Settings, Wrench } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Hệ thống đang bảo trì - CineSphere',
+  title: 'Hệ thống đang bảo trì - Cinesphere',
   description: 'Hệ thống đang được nâng cấp và bảo trì'
 };
 

@@ -9,13 +9,26 @@ import Link from 'next/link';
 import UserLayout from '@/layouts/UserLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, CheckCircle2, Clock, Copy, Lock, Mars, ShieldCheck, Ticket, User, Venus, XCircle } from 'lucide-react';
+import { Calendar, CheckCircle2, Clock, Copy, Lock, MapPin, Mars, ShieldCheck, Ticket, User, Venus, XCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { copyText } from '@/lib/clipboard';
+import { cancelBookingByToken } from '@/lib/api/booking';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { PASSWORD_PATTERN, PASSWORD_RULE_TEXT } from '@/components/constants';
 import { updateUserProfileApi, changePasswordApi, getUserTransactionsApi, getUserProfileByEmailApi } from '@/lib/api';
 import { getCookie, setCookie } from '@/lib/cookies';
 import {
@@ -121,9 +134,18 @@ export default function Account() {
     const [oldPwd, setOldPwd] = useState('');
     const [newPwd, setNewPwd] = useState('');
     const [confirmPwd, setConfirmPwd] = useState('');
+    const [isSavingPwd, setIsSavingPwd] = useState(false);
 
     const [transactions, setTransactions] = useState<UserTransactionItem[]>([]);
     const [isLoadingTx, setIsLoadingTx] = useState(true);
+    // True when the order list could not be loaded (so an empty list is not mistaken for "no orders")
+    const [txError, setTxError] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
+    // Ticks once a second while an order waits for payment, to count its deadline down
+    const [nowMs, setNowMs] = useState(() => Date.now());
+    const [cancelTarget, setCancelTarget] = useState<UserTransactionItem | null>(null);
+    const [isCancelling, setIsCancelling] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
     // Server clock minus this browser's clock. A payment deadline is counted on the server's time.
     const [serverClockOffset, setServerClockOffset] = useState(0);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -131,7 +153,6 @@ export default function Account() {
     const [currentPage, setCurrentPage] = useState(1);
     const [tab, setTab] = useState<'history' | 'info'>('history');
     const pageSize = 5;
-    const [detailCountdown, setDetailCountdown] = useState<string | null>(null);
     const PAYMENT_METHODS_DISPLAY: Record<string, string> = {
         vietqr: 'Chuyển khoản VietQR',
         card: 'Thẻ ngân hàng'
@@ -148,20 +169,10 @@ export default function Account() {
         }
     };
     const handleCopy = async (text: string) => {
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(text);
-            } else {
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            }
-            toast.success('Đã sao chép nội dung: ' + text);
-        } catch (err) {
-            console.error('Lỗi copy:', err);
+        if (await copyText(text)) {
+            toast.success('Đã sao chép');
+        } else {
+            toast.error('Không sao chép được, hãy nhấn giữ vào mã để chọn');
         }
     };
 
@@ -233,10 +244,15 @@ export default function Account() {
         let isMounted = true;
         setIsLoadingTx(true);
 
+        let txFailed = false;
+        setTxError(false);
         // Parallel fetch profile details and transactions
         Promise.all([
             getUserProfileByEmailApi(email).catch(() => null),
-            getUserTransactionsApi({ email, status: 'all' }).catch(() => ({ items: [] }))
+            getUserTransactionsApi({ email, status: 'all' }).catch(() => {
+                txFailed = true;
+                return { items: [] };
+            })
         ]).then(([data, txRes]) => {
             if (!isMounted) return;
 
@@ -316,13 +332,14 @@ export default function Account() {
             });
 
             setTransactions(mapped);
+            setTxError(txFailed);
             setIsLoadingTx(false);
         });
 
         return () => {
             isMounted = false;
         };
-    }, [profile.email]);
+    }, [profile.email, reloadKey]);
 
     useEffect(() => {
         setCurrentPage(1);
@@ -339,42 +356,48 @@ export default function Account() {
         return () => window.removeEventListener('hashchange', readHash);
     }, []);
 
+    const hasWaitingOrder = useMemo(() => transactions.some((t) => t.payment_status === 'pending'), [transactions]);
+
     useEffect(() => {
-        if (!isDetailOpen) {
-            setDetailCountdown(null);
-            return;
-        }
-        const expirySrc = selectedTx?.expiry_date;
-        const expired = Boolean(selectedTx?.expired);
-        const isUsed = Boolean(selectedTx?.is_used);
-        if (!expirySrc || expired || isUsed) {
-            setDetailCountdown(null);
-            return;
-        }
-        let expiry = 0;
-        try {
-            expiry = new Date(expirySrc as any).getTime();
-        } catch {
-            expiry = 0;
-        }
-        if (!expiry) {
-            setDetailCountdown(null);
-            return;
-        }
-        const update = () => {
-            const now = Date.now();
-            const diff = Math.max(0, expiry - now);
-            const hours = Math.floor(diff / 3600000);
-            const minutes = Math.floor((diff % 3600000) / 60000);
-            const seconds = Math.floor((diff % 60000) / 1000);
-            setDetailCountdown(
-                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        if (!hasWaitingOrder) return;
+        const timerId = setInterval(() => setNowMs(Date.now()), 1000);
+        return () => clearInterval(timerId);
+    }, [hasWaitingOrder]);
+
+    // Seconds left to pay an order, on the server's clock; null when the order carries no deadline
+    const secondsLeftToPay = (t: UserTransactionItem): number | null => {
+        const deadlineMs = localDeadlineMs(t.payment_expires_at, serverClockOffset);
+        if (deadlineMs === null) return null;
+        return Math.max(0, Math.floor((deadlineMs - nowMs) / 1000));
+    };
+
+    const formatCountdown = (totalSeconds: number) =>
+        `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
+
+    // The customer cancels an order that is still waiting for payment (the server checks the order is theirs)
+    const handleCancelOrder = async () => {
+        const target = cancelTarget;
+        if (!target?.order_token) return;
+        setIsCancelling(true);
+        const { httpStatus } = await cancelBookingByToken(Number(target.booking_id || target.id), String(target.order_token));
+        setIsCancelling(false);
+        setCancelTarget(null);
+
+        if (httpStatus === 200) {
+            toast.success('Đã hủy đơn');
+            setTransactions((previous) =>
+                previous.map((item) => (item.id === target.id ? { ...item, payment_status: 'failed' } : item))
             );
-        };
-        update();
-        const id = setInterval(update, 1000);
-        return () => clearInterval(id);
-    }, [isDetailOpen, selectedTx?.expiry_date, selectedTx?.expired, selectedTx?.is_used]);
+        } else if (httpStatus === 409) {
+            toast.info('Đơn này đã được thanh toán');
+            setReloadKey((value) => value + 1);
+        } else if (httpStatus === 404) {
+            toast.error('Không tìm thấy đơn này');
+            setReloadKey((value) => value + 1);
+        } else {
+            toast.error('Chưa kết nối được máy chủ để hủy đơn. Đơn sẽ tự hết hạn sau ít phút.');
+        }
+    };
 
     const handleTabChange = (val: string) => {
         const value = val === 'info' ? 'info' : 'history';
@@ -454,6 +477,7 @@ export default function Account() {
         tx?.cover_image || tx?.coverImage || tx?.poster || tx?.poster_url || tx?.thumbnail || tx?.image || '';
 
     const handleSaveProfile = async () => {
+        setIsSavingProfile(true);
         try {
             await updateUserProfileApi({
                 email: profile.email,
@@ -474,14 +498,29 @@ export default function Account() {
             toast.success('Cập nhật thành công');
         } catch (e: any) {
             toast.error('Cập nhật thất bại', { description: e?.message || '' });
+        } finally {
+            setIsSavingProfile(false);
         }
     };
 
     const handleUpdatePassword = async () => {
-        if (!newPwd || newPwd !== confirmPwd) {
+        if (!oldPwd) {
+            toast.error('Vui lòng nhập mật khẩu hiện tại');
+            return;
+        }
+        if (!PASSWORD_PATTERN.test(newPwd)) {
+            toast.error('Mật khẩu mới chưa đủ mạnh', { description: PASSWORD_RULE_TEXT });
+            return;
+        }
+        if (newPwd !== confirmPwd) {
             toast.error('Mật khẩu mới không khớp');
             return;
         }
+        if (newPwd === oldPwd) {
+            toast.error('Mật khẩu mới phải khác mật khẩu hiện tại');
+            return;
+        }
+        setIsSavingPwd(true);
         try {
             await changePasswordApi({
                 email: profile.email,
@@ -495,6 +534,8 @@ export default function Account() {
             setConfirmPwd('');
         } catch (e: any) {
             toast.error('Đổi mật khẩu thất bại', { description: e?.message || '' });
+        } finally {
+            setIsSavingPwd(false);
         }
     };
 
@@ -515,8 +556,8 @@ export default function Account() {
                     </div>
                     <div className="relative z-10 max-w-3xl mx-auto px-3 sm:px-4 pb-16 pt-28 md:pt-36 w-full overflow-x-hidden">
                         <div className="flex items-center pt-2 gap-2 text-sm text-gray-300 mb-6">
-                            <Link href="/" className="text-blue-300 hover:text-blue-200">
-                                Home
+                            <Link href="/" className="inline-flex items-center min-h-[44px] text-blue-300 hover:text-blue-200">
+                                Trang chủ
                             </Link>
                             <span className="text-gray-400">›</span>
                             <span className="text-white font-medium">Tài Khoản</span>
@@ -529,13 +570,13 @@ export default function Account() {
                                 <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
                                     <TabsList className="bg-white/5 border border-white/10 rounded-full px-1">
                                         <TabsTrigger
-                                            className="data-[state=active]:bg-blue-500/20 data-[state=active]:text-white rounded-full"
+                                            className="min-h-[44px] data-[state=active]:bg-blue-500/20 data-[state=active]:text-white rounded-full"
                                             value="history"
                                         >
                                             Lịch Sử Giao Dịch
                                         </TabsTrigger>
                                         <TabsTrigger
-                                            className="data-[state=active]:bg-blue-500/20 data-[state=active]:text-white rounded-full"
+                                            className="min-h-[44px] data-[state=active]:bg-blue-500/20 data-[state=active]:text-white rounded-full"
                                             value="info"
                                         >
                                             Thông Tin Cá Nhân
@@ -543,19 +584,19 @@ export default function Account() {
                                     </TabsList>
 
                                     <TabsContent value="info" className="mt-6 outline-none">
-                                        <div className="space-y-8 bg-[#1e2536]/50 p-6 rounded-2xl border border-white/5">
+                                        <div className="space-y-8 bg-[#1e2536]/50 p-4 sm:p-6 rounded-2xl border border-white/5">
                                             {/* Section 1: Thông tin cá nhân */}
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                                                     <User size={16} className="text-blue-400" />
-                                                    <h1 className="text-sm font-bold text-white uppercase tracking-wider">Thông tin cá nhân</h1>
+                                                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Thông tin cá nhân</h2>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                     <div className="space-y-2">
-                                                        <Label className="text-xs font-semibold text-gray-400 ml-1">Họ và tên</Label>
+                                                        <Label htmlFor="profile-name" className="text-xs font-semibold text-gray-400 ml-1">Họ và tên</Label>
                                                         <Input
-                                                            className="h-11 bg-[#0f172a] border-white/10 text-white focus:border-blue-500/50 transition-all"
+                                                            id="profile-name" autoComplete="name" className="h-11 bg-[#0f172a] border-white/10 text-white focus:border-blue-500/50 transition-all"
                                                             value={profile.name}
                                                             onChange={(e) =>
                                                                 setProfile((p) => ({
@@ -587,7 +628,7 @@ export default function Account() {
                                                         <div className="flex gap-4">
                                                             {['male', 'female'].map((gender) => (
                                                                 <button
-                                                                    key={gender}
+                                                                    type="button" key={gender}
                                                                     onClick={() => setProfile((p) => ({ ...p, gender }))}
                                                                     className={`flex-1 h-11 rounded-md border transition-all flex items-center justify-center gap-2 text-sm ${profile.gender === gender
                                                                             ? 'bg-blue-600/20 border-blue-500 text-blue-300'
@@ -607,7 +648,7 @@ export default function Account() {
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                                                     <ShieldCheck size={16} className="text-blue-400" />
-                                                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Tài khoản & Bảo mật</h3>
+                                                    <h2 className="text-sm font-bold text-white uppercase tracking-wider">Tài khoản & Bảo mật</h2>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -624,9 +665,9 @@ export default function Account() {
                                                     </div>
 
                                                     <div className="space-y-2">
-                                                        <Label className="text-xs font-semibold text-gray-400 ml-1">Số điện thoại</Label>
+                                                        <Label htmlFor="profile-phone" className="text-xs font-semibold text-gray-400 ml-1">Số điện thoại</Label>
                                                         <Input
-                                                            className="h-11 bg-[#0f172a] border-white/10 text-white"
+                                                            id="profile-phone" type="tel" inputMode="numeric" autoComplete="tel" className="h-11 bg-[#0f172a] border-white/10 text-white"
                                                             value={profile.phone}
                                                             onChange={(e) =>
                                                                 setProfile((p) => ({
@@ -637,14 +678,31 @@ export default function Account() {
                                                         />
                                                     </div>
                                                 </div>
+
+                                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white/5 border border-white/10 p-4">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-white">Mật khẩu</p>
+                                                        <p className="text-xs text-gray-400">Nên đổi mật khẩu định kỳ để giữ tài khoản an toàn.</p>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => setIsPwdOpen(true)}
+                                                        className="h-11 border-white/20 bg-transparent text-white hover:bg-white/10"
+                                                    >
+                                                        <Lock size={14} className="mr-2" />
+                                                        Đổi mật khẩu
+                                                    </Button>
+                                                </div>
                                             </div>
 
                                             <div className="flex justify-end pt-4 border-t border-white/5">
                                                 <Button
                                                     onClick={handleSaveProfile}
+ disabled={isSavingProfile}
                                                     className="bg-blue-600 hover:bg-blue-500 text-white px-10 h-11 rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all active:scale-95"
                                                 >
-                                                    Lưu thay đổi
+                                                    {isSavingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
                                                 </Button>
                                             </div>
                                         </div>
@@ -656,9 +714,27 @@ export default function Account() {
                                                 <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                                                 Đang tải lịch sử giao dịch...
                                             </div>
+                                                                                ) : txError ? (
+                                            <div className="text-center py-10 px-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl space-y-4">
+                                                <div className="text-sm text-rose-200">Không tải được lịch sử giao dịch. Vui lòng kiểm tra kết nối và thử lại.</div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="h-11 border-white/20 bg-transparent text-white hover:bg-white/10"
+                                                    onClick={() => setReloadKey((value) => value + 1)}
+                                                >
+                                                    Thử lại
+                                                </Button>
+                                            </div>
                                         ) : groups.length === 0 ? (
-                                            <div className="text-center py-12 bg-white/5 border border-white/5 rounded-2xl">
-                                                <div className="text-sm text-gray-400">Chưa có giao dịch nào</div>
+                                            <div className="text-center py-12 px-4 bg-white/5 border border-white/5 rounded-2xl space-y-4">
+                                                <div className="text-sm text-gray-300">Bạn chưa có giao dịch nào.</div>
+                                                <Button asChild className="h-11 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl">
+                                                    <Link href="/#promotions">Đặt vé ngay</Link>
+                                                </Button>
+                                                <div className="text-xs text-gray-400">
+                                                    Đơn mua khi chưa đăng nhập không hiện ở đây. Mã vé của các đơn đó nằm trong email xác nhận.
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="space-y-8">
@@ -666,6 +742,7 @@ export default function Account() {
                                                     <div className="text-xs text-gray-400 italic">
                                                         * Chỉ hiển thị {limitedTransactions.length} giao dịch gần nhất
                                                         <br />* Các giao dịch chờ thanh toán sẽ tự động hết hạn sau 10 phút nếu chưa hoàn tất
+                                                        <br />* Đơn mua khi chưa đăng nhập không hiện ở đây, mã vé nằm trong email xác nhận
                                                     </div>
                                                 </div>
 
@@ -685,6 +762,14 @@ export default function Account() {
                                                                 const movieCount = getMovieCountFromCombo(t.combo);
                                                                 const isVietQR = t.method?.toLowerCase() === 'vietqr';
                                                                 const isPaid = t.payment_status === 'paid';
+                                                                const bookingCodeText = getBookingCode(t);
+                                                                // An order waiting for payment counts its deadline down; at zero it can no longer be paid
+                                                                const secondsLeft = !isPaid && t.payment_status === 'pending' ? secondsLeftToPay(t) : null;
+                                                                const isLapsed = secondsLeft !== null && secondsLeft <= 0;
+                                                                const isWaiting = !isPaid && t.payment_status === 'pending' && !isLapsed && !t.isExpired && !t.is_used;
+                                                                const canPay = isWaiting && isVietQR;
+                                                                const canCancel = isWaiting && Boolean(t.order_token);
+
 
                                                                 return (
                                                                     <div
@@ -707,15 +792,15 @@ export default function Account() {
                                                                                             const badge = bookingTypeBadge(t.booking_type, t.vr_items);
                                                                                             if (badge === 'Phim') return null;
                                                                                             return (
-                                                                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20 uppercase tracking-wider">
+                                                                                                <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-purple-500/10 text-purple-300 border border-purple-500/20 uppercase tracking-wider">
                                                                                                     {badge}
                                                                                                 </span>
                                                                                             );
                                                                                         })()}
                                                                                         {Number(t.discount_amount) > 0 && (
-                                                                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 uppercase tracking-wider">
+                                                                                            <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 uppercase tracking-wider">
                                                                                                 {t.voucher_code ? `${t.voucher_code} ` : ''}
-                                                                                                −{formatMoney(t.discount_amount)}₫
+                                                                                                −{formatMoney(t.discount_amount)} ₫
                                                                                             </span>
                                                                                         )}
                                                                                     </div>
@@ -724,6 +809,12 @@ export default function Account() {
                                                                                             <Calendar size={12} />
                                                                                             {formatDateTime(t.created_at)}
                                                                                         </span>
+                                                                                        {t.branch_name && (
+                                                                                            <span className="flex items-center gap-1.5 text-gray-400">
+                                                                                                <MapPin size={12} />
+                                                                                                {t.branch_name}
+                                                                                            </span>
+                                                                                        )}
                                                                                         {(() => {
                                                                                             const moviePkgs = parseMoviePackages(t.ticket_package, {
                                                                                                 quantity: t.quantity
@@ -761,7 +852,7 @@ export default function Account() {
                                                                                                         >
                                                                                                             <Ticket size={12} className="opacity-70 shrink-0" />
                                                                                                             <span>{item.name}</span>
-                                                                                                            <span className="font-bold text-white/90 bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
+                                                                                                            <span className="font-bold text-white/90 bg-white/10 px-1.5 py-0.5 rounded text-xs leading-none">
                                                                                                                 x{item.qty}
                                                                                                             </span>
                                                                                                         </span>
@@ -799,6 +890,10 @@ export default function Account() {
                                                                                             <span className="text-rose-400 font-medium flex items-center gap-2 px-2 py-1 bg-rose-400/5 rounded-lg border border-rose-400/20">
                                                                                                 <XCircle size={14} /> Đã hủy thanh toán
                                                                                             </span>
+                                                                                        ) : isLapsed ? (
+                                                                                            <span className="text-slate-400 font-medium flex items-center gap-2 px-2 py-1 bg-slate-400/5 rounded-lg border border-slate-400/20">
+                                                                                                <Clock size={14} /> Hết hạn thanh toán
+                                                                                            </span>
                                                                                         ) : (
                                                                                             <span
                                                                                                 className={`px-2 py-1 rounded-lg border flex items-center gap-2 font-medium ${isVietQR
@@ -806,11 +901,28 @@ export default function Account() {
                                                                                                         : 'text-amber-500 bg-amber-500/5 border-amber-500/20'
                                                                                                     }`}
                                                                                             >
-                                                                                                <Clock size={14} className={isVietQR ? 'animate-spin-slow' : ''} />
-                                                                                                {isVietQR ? 'Đang chờ xác nhận...' : 'Chờ thanh toán'}
+                                                                                                <Clock size={14} />
+                                                                                                {secondsLeft !== null
+                                                                                                    ? `Chờ thanh toán · còn ${formatCountdown(secondsLeft)}`
+                                                                                                    : isVietQR
+                                                                                                        ? 'Đang chờ xác nhận...'
+                                                                                                        : 'Chờ thanh toán'}
                                                                                             </span>
                                                                                         )}
                                                                                     </div>
+
+                                                                                    {isPaid && bookingCodeText !== '--' && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleCopy(bookingCodeText)}
+                                                                                            aria-label={`Sao chép mã đặt vé ${bookingCodeText}`}
+                                                                                            className={`inline-flex items-center gap-3 min-h-[44px] rounded-xl bg-black/20 border border-white/10 px-4 text-left hover:border-blue-500/30 hover:bg-black/40 transition-all ${t.is_used || t.isExpired ? 'opacity-60' : ''}`}
+                                                                                        >
+                                                                                            <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Mã đặt vé</span>
+                                                                                            <span className="text-base font-mono font-bold tracking-[0.15em] text-white">{bookingCodeText}</span>
+                                                                                            <Copy size={16} className="text-gray-500" />
+                                                                                        </button>
+                                                                                    )}
 
                                                                                     {isVietQR && !isPaid && t.pay_txt_code && (
                                                                                         <div
@@ -818,7 +930,7 @@ export default function Account() {
                                                                                             className="flex items-center justify-between max-w-[300px] bg-black/20 border border-white/5 rounded-xl px-4 py-2.5 cursor-pointer hover:border-blue-500/30 hover:bg-black/40 transition-all group/copy"
                                                                                         >
                                                                                             <div className="flex flex-col">
-                                                                                                <span className="text-[9px] text-gray-500 uppercase font-black tracking-tighter">
+                                                                                                <span className="text-xs text-gray-500 uppercase font-black tracking-tighter">
                                                                                                     Nội dung chuyển khoản
                                                                                                 </span>
                                                                                                 <span className="text-sm font-mono font-bold text-blue-300 tracking-[0.2em]">
@@ -842,56 +954,46 @@ export default function Account() {
                                                                                     </div>
                                                                                     <div className="flex flex-col items-end">
                                                                                         {Number(t.discount_amount) > 0 && (
-                                                                                            <div className="text-[10px] text-emerald-400/80 font-medium mt-0.5 line-through opacity-70">
-                                                                                                {formatMoney(t.original_amount)}₫
+                                                                                            <div className="text-xs text-emerald-400/80 font-medium mt-0.5 line-through opacity-70">
+                                                                                                {formatMoney(t.original_amount)} ₫
                                                                                             </div>
                                                                                         )}
-                                                                                        <div className="text-[10px] text-gray-500 font-bold mt-1 uppercase opacity-80">
-                                                                                            {(() => {
-                                                                                                const badge = bookingTypeBadge(t.booking_type, t.vr_items);
-                                                                                                if (badge === 'VR') {
-                                                                                                    const vrQty = (t.vr_items || []).reduce(
-                                                                                                        (s: number, it: any) => s + Number(it.quantity || 0),
-                                                                                                        0
-                                                                                                    );
-                                                                                                    return `${vrQty || t.quantity} lượt VR`;
-                                                                                                }
-                                                                                                if (badge === 'Combo') {
-                                                                                                    const moviePkgs = parseMoviePackages(t.ticket_package, {
-                                                                                                        quantity: t.quantity
-                                                                                                    });
-                                                                                                    const movieQty = moviePackagesTotalQty(moviePkgs);
-                                                                                                    const vrQty = (t.vr_items || []).reduce(
-                                                                                                        (s: number, it: any) => s + Number(it.quantity || 0),
-                                                                                                        0
-                                                                                                    );
-                                                                                                    return `${movieQty} vé + ${vrQty} VR`;
-                                                                                                }
-                                                                                                return `${t.quantity} Vé`;
-                                                                                            })()}
-                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
 
                                                                                 <div className="flex flex-col gap-2 w-full sm:w-auto">
-                                                                                    {isVietQR && !isPaid && !t.isExpired && !t.is_used && t.payment_status === 'pending' ? (
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            className="w-full sm:w-auto bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-900/20 h-10 px-6 sm:px-8 rounded-xl font-bold transition-all active:scale-95"
-                                                                                            onClick={() => handleContinuePayment(t)}
-                                                                                        >
-                                                                                            Thanh Toán Ngay
-                                                                                        </Button>
+{canPay || canCancel ? (
+                                                                                        <>
+                                                                                            {canPay && (
+                                                                                                <Button
+                                                                                                    size="sm"
+                                                                                                    className="w-full sm:w-auto bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-900/20 h-11 px-6 sm:px-8 rounded-xl font-bold transition-all active:scale-95"
+                                                                                                    onClick={() => handleContinuePayment(t)}
+                                                                                                >
+                                                                                                    Thanh toán ngay
+                                                                                                </Button>
+                                                                                            )}
+                                                                                            {canCancel && (
+                                                                                                <Button
+                                                                                                    size="sm"
+                                                                                                    variant="outline"
+                                                                                                    className="w-full sm:w-auto h-11 px-6 sm:px-8 rounded-xl font-bold border-white/20 bg-transparent text-gray-200 hover:bg-white/10 hover:text-white"
+                                                                                                    onClick={() => setCancelTarget(t)}
+                                                                                                >
+                                                                                                    Hủy đơn
+                                                                                                </Button>
+                                                                                            )}
+                                                                                        </>
                                                                                     ) : (
                                                                                         <Button
                                                                                             size="sm"
-                                                                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 h-10 px-6 sm:px-8 rounded-xl font-bold transition-all active:scale-95"
+                                                                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 h-11 px-6 sm:px-8 rounded-xl font-bold transition-all active:scale-95"
                                                                                             onClick={() => {
                                                                                                 setSelectedTx(t);
                                                                                                 setIsDetailOpen(true);
                                                                                             }}
                                                                                         >
-                                                                                            Xem Vé
+                                                                                            {isPaid ? 'Xem vé' : 'Xem chi tiết'}
                                                                                         </Button>
                                                                                     )}
                                                                                 </div>
@@ -958,6 +1060,43 @@ export default function Account() {
                     </div>
                 </div>
 
+                                <AlertDialog
+                    open={Boolean(cancelTarget)}
+                    onOpenChange={(open) => {
+                        if (!open && !isCancelling) setCancelTarget(null);
+                    }}
+                >
+                    <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-xl font-bold text-white text-center">Hủy đơn này?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-gray-300 text-center">
+                                Đơn đang chờ thanh toán sẽ bị hủy và bạn cần đặt lại.
+                                <span className="block mt-2 text-amber-300">
+                                    Nếu bạn vừa chuyển khoản, hãy chọn "Giữ đơn" và chờ xác nhận.
+                                </span>
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel
+                                disabled={isCancelling}
+                                className="h-11 bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white"
+                            >
+                                Giữ đơn
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                disabled={isCancelling}
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    handleCancelOrder();
+                                }}
+                                className="h-11 bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                {isCancelling ? 'Đang hủy...' : 'Hủy đơn'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
                 <Dialog open={isPwdOpen} onOpenChange={setIsPwdOpen}>
                     <DialogContent className="bg-[rgba(11,29,58,0.92)] border border-white/20 text-white max-w-md">
                         <DialogHeader>
@@ -968,35 +1107,42 @@ export default function Account() {
                         </DialogHeader>
                         <div className="space-y-3">
                             <div>
-                                <Label className="text-white">Mật khẩu hiện tại</Label>
+                                <Label htmlFor="account-old-password" className="text-white">Mật khẩu hiện tại</Label>
                                 <Input
-                                    className="bg-white/10 border-white/20 text-white"
+                                    id="account-old-password"
+                                    autoComplete="current-password"
+                                    className="h-11 bg-white/10 border-white/20 text-white"
                                     type="password"
                                     value={oldPwd}
                                     onChange={(e) => setOldPwd(e.target.value)}
                                 />
                             </div>
                             <div>
-                                <Label className="text-white">Mật khẩu mới</Label>
+                                <Label htmlFor="account-new-password" className="text-white">Mật khẩu mới</Label>
                                 <Input
-                                    className="bg-white/10 border-white/20 text-white"
+                                    id="account-new-password"
+                                    autoComplete="new-password"
+                                    className="h-11 bg-white/10 border-white/20 text-white"
                                     type="password"
                                     value={newPwd}
                                     onChange={(e) => setNewPwd(e.target.value)}
                                 />
+                                <p className="mt-1 text-xs text-gray-400">{PASSWORD_RULE_TEXT}</p>
                             </div>
                             <div>
-                                <Label className="text-white">Xác nhận mật khẩu mới</Label>
+                                <Label htmlFor="account-confirm-password" className="text-white">Xác nhận mật khẩu mới</Label>
                                 <Input
-                                    className="bg-white/10 border-white/20 text-white"
+                                    id="account-confirm-password"
+                                    autoComplete="new-password"
+                                    className="h-11 bg-white/10 border-white/20 text-white"
                                     type="password"
                                     value={confirmPwd}
                                     onChange={(e) => setConfirmPwd(e.target.value)}
                                 />
                             </div>
                             <div className="flex justify-end">
-                                <Button onClick={handleUpdatePassword} className="bg-blue-600 hover:bg-blue-700">
-                                    Cập nhật
+                                <Button onClick={handleUpdatePassword} disabled={isSavingPwd} className="h-11 bg-blue-600 hover:bg-blue-700">
+                                    {isSavingPwd ? 'Đang cập nhật...' : 'Cập nhật'}
                                 </Button>
                             </div>
                         </div>
@@ -1004,25 +1150,15 @@ export default function Account() {
                 </Dialog>
 
                 <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-                    <DialogContent className="bg-[#0b1426] border border-white/10 text-white w-[95vw] sm:max-w-md rounded-[2.5rem] p-[1px] overflow-hidden max-h-[92vh] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] focus:outline-none duration-500 animate-in fade-in zoom-in-95 slide-in-from-bottom-10">
+                    <DialogContent className="bg-[#0b1426] border border-white/10 text-white w-[95vw] sm:max-w-md rounded-[2.5rem] p-[1px] overflow-hidden max-h-[92dvh] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] focus:outline-none duration-500 animate-in fade-in zoom-in-95 slide-in-from-bottom-10">
                         <DialogHeader className="sr-only">
                             <DialogTitle>Chi tiết vé</DialogTitle>
                             <DialogDescription>Chi tiết thông tin vé và mã xác nhận của bạn.</DialogDescription>
                         </DialogHeader>
-                        <div className="overflow-y-auto max-h-[92vh] custom-scrollbar rounded-[2.5rem]">
+                        <div className="overflow-y-auto max-h-[92dvh] custom-scrollbar rounded-[2.5rem]">
                             <style
                                 dangerouslySetInnerHTML={{
                                     __html: `
-    button[data-radix-collection-item] { 
-      top: 1.25rem !important; 
-      right: 1.25rem !important; 
-      opacity: 0.6;
-      transition: all 0.2s;
-    }
-    button[data-radix-collection-item]:hover {
-      opacity: 1;
-      background: rgba(255,255,255,0.1) !important;
-    }
     .custom-scrollbar::-webkit-scrollbar {
       width: 6px;
     }
@@ -1058,31 +1194,78 @@ export default function Account() {
 
                                             {selectedTx.payment_status === 'paid' ? (
                                                 <span
-                                                    className={`text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight ${selectedTx.is_used
+                                                    className={`text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight ${selectedTx.is_used
                                                             ? 'border-gray-500/30 text-gray-500 bg-gray-500/5'
                                                             : selectedTx.isExpired
                                                                 ? 'border-rose-500/30 text-rose-500 bg-rose-500/5'
                                                                 : 'border-green-500/50 text-green-400 bg-green-500/10 animate-pulse'
                                                         }`}
                                                 >
-                                                    {selectedTx.is_used ? 'ĐÃ DÙNG' : selectedTx.isExpired ? 'ĐÃ HẾT HẠN' : 'KHẢ DỤNG'}
+                                                    {selectedTx.is_used ? 'Đã dùng' : selectedTx.isExpired ? 'Đã hết hạn' : 'Còn hiệu lực'}
                                                 </span>
                                             ) : selectedTx.payment_status === 'expired' ? (
-                                                <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight border-slate-500/30 text-slate-400 bg-slate-500/5">
-                                                    ĐÃ HẾT HẠN TT
+                                                <span className="text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight border-slate-500/30 text-slate-400 bg-slate-500/5">
+                                                    Hết hạn thanh toán
                                                 </span>
                                             ) : selectedTx.payment_status === 'failed' || selectedTx.payment_status === 'cancelled' ? (
-                                                <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight border-rose-500/30 text-rose-400 bg-rose-500/5">
-                                                    ĐÃ HỦY TT
+                                                <span className="text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight border-rose-500/30 text-rose-400 bg-rose-500/5">
+                                                    Đã hủy thanh toán
                                                 </span>
                                             ) : (
-                                                <span className="text-[10px] px-2.5 py-1 rounded-full border font-bold tracking-tight border-amber-500/30 text-amber-400 bg-amber-500/5">
-                                                    CHỜ TT
+                                                <span className="text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight border-amber-500/30 text-amber-400 bg-amber-500/5">
+                                                    Chờ thanh toán
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <div className="px-5 sm:px-8 pb-10 space-y-5 sm:space-y-6">
+                                        <div>
+                                            <div
+                                                className={`rounded-[1.5rem] p-[1px] bg-gradient-to-b ${selectedTx.is_used ? 'from-white/20 to-white/5' : 'from-blue-500/50 to-blue-500/20'}`}
+                                            >
+                                                <div className="bg-[#0b1426] rounded-[1.4rem] p-6 text-center">
+                                                    <p className="text-xs text-gray-500 uppercase font-bold mb-4 tracking-[0.3em]">
+                                                        Mã đặt vé: đưa mã này cho nhân viên tại rạp
+                                                    </p>
+
+                                                    <div className="flex items-center justify-center gap-4 relative">
+                                                        {selectedTx.is_used && (
+                                                            <div className="absolute rotate-[-12deg] border-4 border-red-500/40 text-red-500/40 px-4 py-1 font-black text-2xl z-20 pointer-events-none rounded-xl">
+                                                                ĐÃ DÙNG
+                                                            </div>
+                                                        )}
+
+                                                        <span
+                                                            onClick={() => {
+                                                                if (selectedTx.payment_status === 'paid' && !selectedTx.is_used) {
+                                                                    handleCopy(getBookingCode(selectedTx));
+                                                                }
+                                                            }}
+                                                            className={`text-2xl sm:text-4xl font-mono font-black tracking-[0.2em] transition-all ${selectedTx.is_used ? 'text-gray-800 line-through blur-[1px]' : 'text-white text-glow-blue cursor-pointer hover:opacity-80'}`}
+                                                            title={selectedTx.payment_status === 'paid' && !selectedTx.is_used ? 'Bấm để sao chép' : ''}
+                                                        >
+                                                            {selectedTx.payment_status === 'paid' ? getBookingCode(selectedTx) : '••••••'}
+                                                        </span>
+
+                                                        {selectedTx.payment_status === 'paid' && !selectedTx.is_used && (
+                                                            <button
+                                                                onClick={() => handleCopy(getBookingCode(selectedTx))}
+                                                                aria-label="Sao chép mã đặt vé"
+                                                                className="h-11 w-11 shrink-0 flex items-center justify-center bg-blue-500 hover:bg-blue-400 text-white rounded-xl shadow-lg shadow-blue-500/20 active:scale-90 transition-all"
+                                                            >
+                                                                <Copy size={20} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="mt-6 text-xs text-gray-500 font-medium italic">
+                                                        {selectedTx.is_used
+                                                            ? 'Cảm ơn bạn đã sử dụng dịch vụ!'
+                                                            : 'Vui lòng không chia sẻ mã này với bất kỳ ai.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div className="relative">
                                             <div className="absolute top-1/2 -left-3 w-6 h-6 bg-[#0b1426] rounded-full -translate-y-1/2 z-10 border-r border-white/10" />
                                             <div className="absolute top-1/2 -right-3 w-6 h-6 bg-[#0b1426] rounded-full -translate-y-1/2 z-10 border-l border-white/10" />
@@ -1104,7 +1287,7 @@ export default function Account() {
                                                         <>
                                                             <div className="flex justify-between items-end mb-4">
                                                                 <div>
-                                                                    <p className="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1 opacity-70">
+                                                                    <p className="text-xs text-blue-400 uppercase font-bold tracking-widest mb-1 opacity-70">
                                                                         Chi tiết đơn
                                                                     </p>
                                                                     <h3 className="text-lg sm:text-xl font-black text-white">
@@ -1112,8 +1295,8 @@ export default function Account() {
                                                                     </h3>
                                                                 </div>
                                                                 <div className="text-right">
-                                                                    <p className="text-[10px] text-gray-400 uppercase font-bold mb-1 opacity-70">
-                                                                        Tổng SL
+                                                                    <p className="text-xs text-gray-400 uppercase font-bold mb-1 opacity-70">
+                                                                        Số lượng
                                                                     </p>
                                                                     <p className="text-lg sm:text-xl font-black text-white leading-none">
                                                                         × {selectedTx.quantity}
@@ -1123,7 +1306,7 @@ export default function Account() {
 
                                                             {!isVrOnly && (
                                                                 <div className="space-y-2 mt-2">
-                                                                    <p className="text-[10px] text-blue-400 uppercase font-bold tracking-wider">
+                                                                    <p className="text-xs text-blue-400 uppercase font-bold tracking-wider">
                                                                         Gói vé phim
                                                                     </p>
                                                                     <div className="space-y-1.5">
@@ -1143,7 +1326,7 @@ export default function Account() {
                                                                                     <span className="text-gray-200 font-medium">
                                                                                         {pkg.name}
                                                                                         {discounted ? (
-                                                                                            <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
+                                                                                            <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-xs font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
                                                                                                 ĐƯỢC GIẢM
                                                                                             </span>
                                                                                         ) : null}
@@ -1151,7 +1334,7 @@ export default function Account() {
                                                                                     <div className="flex items-center gap-3">
                                                                                         <span className="text-gray-500">x{pkg.quantity}</span>
                                                                                         <span className="text-white font-bold">
-                                                                                            {formatMoney(moviePackageLineTotal(pkg))}₫
+                                                                                            {formatMoney(moviePackageLineTotal(pkg))} ₫
                                                                                         </span>
                                                                                     </div>
                                                                                 </div>
@@ -1163,14 +1346,14 @@ export default function Account() {
 
                                                             {parseData(selectedTx.movie).length > 0 && (
                                                                 <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
-                                                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                                                                    <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">
                                                                         Danh sách phim:
                                                                     </p>
                                                                     <div className="flex flex-wrap gap-1.5">
                                                                         {Array.from(new Set(parseData(selectedTx.movie))).map((m: any, idx: number) => (
                                                                             <span
                                                                                 key={idx}
-                                                                                className="px-2 py-1 bg-white/5 border border-white/5 rounded-md text-[10px] text-gray-400"
+                                                                                className="px-2 py-1 bg-white/5 border border-white/5 rounded-md text-xs text-gray-400"
                                                                             >
                                                                                 {m}
                                                                             </span>
@@ -1181,7 +1364,7 @@ export default function Account() {
 
                                                             {showVr && (
                                                                 <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
-                                                                    <p className="text-[10px] text-purple-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
+                                                                    <p className="text-xs text-purple-400 uppercase font-bold tracking-wider flex items-center gap-1.5">
                                                                         <span>Trải nghiệm VR:</span>
                                                                     </p>
                                                                     {selectedTx.vr_items && selectedTx.vr_items.length > 0 ? (
@@ -1202,13 +1385,13 @@ export default function Account() {
                                                                                         <span className="text-purple-200 font-medium">
                                                                                             {vr.package_name} (x{vr.quantity})
                                                                                             {discounted ? (
-                                                                                                <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
+                                                                                                <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-xs font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded">
                                                                                                     ĐƯỢC GIẢM
                                                                                                 </span>
                                                                                             ) : null}
                                                                                         </span>
                                                                                         <span className="text-purple-300 font-bold">
-                                                                                            {formatMoney(vrLineTotal(vr))}₫
+                                                                                            {formatMoney(vrLineTotal(vr))} ₫
                                                                                         </span>
                                                                                     </div>
                                                                                 );
@@ -1227,9 +1410,19 @@ export default function Account() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-y-5 px-2 text-sm">
+                                                                                <div className="grid grid-cols-2 gap-y-5 px-2 text-sm">
+                                            {selectedTx.branch_name && (
+                                                <div className="col-span-2 space-y-1">
+                                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter">Chi nhánh</p>
+                                                    <p className="text-white font-medium">{selectedTx.branch_name}</p>
+                                                    {selectedTx.branch_address && (
+                                                        <p className="text-xs text-gray-400 leading-snug">{selectedTx.branch_address}</p>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             <div className="space-y-1">
-                                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
+                                                <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter opacity-60">
                                                     {selectedTx.payment_status === 'paid' ? 'Ngày thanh toán' : 'Ngày đặt vé'}
                                                 </p>
                                                 <p className="text-white font-medium">
@@ -1241,17 +1434,17 @@ export default function Account() {
 
                                             {selectedTx.is_used ? (
                                                 <div className="space-y-1 text-right">
-                                                    <p className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">
+                                                    <p className="text-xs text-blue-400 font-bold uppercase tracking-tighter">
                                                         Đã dùng vào lúc
                                                     </p>
                                                     <p className="text-blue-300 font-bold italic">{formatDateTime(selectedTx.updated_at)}</p>
                                                 </div>
                                             ) : selectedTx.expiry_date ? (
                                                 <div className="space-y-1 text-right">
-                                                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter opacity-60">
+                                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter opacity-60">
                                                         Ngày hết hạn
                                                     </p>
-                                                    <p className="text-red-400 font-bold">{formatDateTime(selectedTx.expiry_date)}</p>
+                                                    <p className={selectedTx.isExpired ? 'text-red-400 font-bold' : 'text-white font-medium'}>{formatDateTime(selectedTx.expiry_date)}</p>
                                                 </div>
                                             ) : null}
 
@@ -1260,19 +1453,19 @@ export default function Account() {
                                                     <>
                                                         <div className="flex justify-between items-center text-xs">
                                                             <span className="text-gray-400 font-bold uppercase">Tổng tiền chưa giảm:</span>
-                                                            <span className="text-gray-300 font-medium">{formatMoney(selectedTx.original_amount)}₫</span>
+                                                            <span className="text-gray-300 font-medium">{formatMoney(selectedTx.original_amount)} ₫</span>
                                                         </div>
                                                         <div className="flex justify-between items-center text-xs">
                                                             <span className="text-emerald-400 font-bold uppercase">
                                                                 {voucherScopeLabel(selectedTx.voucher_details?.scope)}
                                                                 {selectedTx.voucher_code ? ` (${selectedTx.voucher_code})` : ''}:
                                                             </span>
-                                                            <span className="text-emerald-400 font-medium">-{formatMoney(selectedTx.discount_amount)}₫</span>
+                                                            <span className="text-emerald-400 font-medium">-{formatMoney(selectedTx.discount_amount)} ₫</span>
                                                         </div>
                                                     </>
                                                 )}
                                                 <div className="flex justify-between items-center mt-2">
-                                                    <span className="text-xs font-bold text-gray-400 uppercase">Thực tế thanh toán:</span>
+                                                    <span className="text-xs font-bold text-gray-400 uppercase">Số tiền thanh toán:</span>
                                                     <span className="text-3xl font-black text-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">
                                                         {formatMoney(selectedTx.amount)}
                                                         <span className="text-lg ml-0.5 text-blue-400/80">₫</span>
@@ -1281,59 +1474,13 @@ export default function Account() {
                                             </div>
                                         </div>
 
-                                        <div className="mt-4">
-                                            <div
-                                                className={`rounded-[1.5rem] p-[1px] bg-gradient-to-b ${selectedTx.is_used ? 'from-white/20 to-white/5' : 'from-blue-500/50 to-blue-500/20'}`}
-                                            >
-                                                <div className="bg-[#0b1426] rounded-[1.4rem] p-6 text-center">
-                                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-[0.3em]">
-                                                        Mã xác nhận tại rạp
-                                                    </p>
-
-                                                    <div className="flex items-center justify-center gap-4 relative">
-                                                        {selectedTx.is_used && (
-                                                            <div className="absolute rotate-[-12deg] border-4 border-red-500/40 text-red-500/40 px-4 py-1 font-black text-2xl z-20 pointer-events-none rounded-xl">
-                                                                ĐÃ DÙNG
-                                                            </div>
-                                                        )}
-
-                                                        <span
-                                                            onClick={() => {
-                                                                if (selectedTx.payment_status === 'paid' && !selectedTx.is_used) {
-                                                                    handleCopy(getBookingCode(selectedTx));
-                                                                }
-                                                            }}
-                                                            className={`text-2xl sm:text-4xl font-mono font-black tracking-[0.2em] transition-all ${selectedTx.is_used ? 'text-gray-800 line-through blur-[1px]' : 'text-white text-glow-blue cursor-pointer hover:opacity-80'}`}
-                                                            title={selectedTx.payment_status === 'paid' && !selectedTx.is_used ? 'Click to copy' : ''}
-                                                        >
-                                                            {selectedTx.payment_status === 'paid' ? getBookingCode(selectedTx) : '••••••'}
-                                                        </span>
-
-                                                        {selectedTx.payment_status === 'paid' && !selectedTx.is_used && (
-                                                            <button
-                                                                onClick={() => handleCopy(getBookingCode(selectedTx))}
-                                                                className="p-2.5 bg-blue-500 hover:bg-blue-400 text-white rounded-xl shadow-lg shadow-blue-500/20 active:scale-90 transition-all"
-                                                            >
-                                                                <Copy size={20} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    <p className="mt-6 text-[10px] text-gray-500 font-medium italic">
-                                                        {selectedTx.is_used
-                                                            ? 'Cảm ơn bạn đã sử dụng dịch vụ!'
-                                                            : 'Vui lòng không chia sẻ mã này với bất kỳ ai.'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="p-32 flex flex-col items-center gap-4">
                                     <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
                                     <span className="text-sm font-bold text-blue-400 animate-pulse uppercase tracking-widest">
-                                        Loading...
+                                        Đang tải...
                                     </span>
                                 </div>
                             )}

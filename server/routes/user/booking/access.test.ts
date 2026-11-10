@@ -128,11 +128,33 @@ describe('findBookingForOwner: a signed-in owner', () => {
 });
 
 describe('bookingStatusPayload', () => {
-  it('holds only the payment state, the deadline and the server clock', () => {
+  it('holds only the payment state, the deadline and the server clock while the order is not paid', () => {
     const payload = bookingStatusPayload(booking({ name: 'Nguyen Van A', phone: '0900000000', booking_code: 'ABCD2345' }) as any);
 
     expect(Object.keys(payload).sort()).toEqual(['id', 'payment_expires_at', 'payment_status', 'server_now', 'status']);
     expect(JSON.stringify(payload)).not.toMatch(/Nguyen|0900000000|guest@example|ABCD2345|CS482913057741/);
+  });
+
+  it('adds the ticket code once the order is paid, and still no personal data', () => {
+    const payload = bookingStatusPayload(
+      booking({ payment_status: 'paid', name: 'Nguyen Van A', phone: '0900000000', booking_code: 'ABCD2345' }) as any
+    );
+
+    expect(payload.booking_code).toBe('ABCD2345');
+    expect(Object.keys(payload).sort()).toEqual([
+      'booking_code',
+      'id',
+      'payment_expires_at',
+      'payment_status',
+      'server_now',
+      'status'
+    ]);
+    expect(JSON.stringify(payload)).not.toMatch(/Nguyen|0900000000|guest@example|CS482913057741/);
+  });
+
+  it('gives no ticket code for a paid order that has none yet', () => {
+    const payload = bookingStatusPayload(booking({ payment_status: 'paid', booking_code: null }) as any);
+    expect('booking_code' in payload).toBe(false);
   });
 
   it('lower-cases the status and defaults a missing one to pending', () => {

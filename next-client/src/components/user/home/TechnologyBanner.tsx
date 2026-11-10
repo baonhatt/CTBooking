@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, Sparkles, Monitor, Zap, Camera } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -28,8 +28,8 @@ export default function TechnologyBanner({
     return initialListItems.map((it: any) => ({
       src: optimizeCloudinaryVideoUrl(it.url as string, 480),
       thumbnail: getCloudinaryThumbnail(it.url as string, 300),
-      title: it.title || 'Công nghệ Cinesphere',
-      description: it.description || 'Trải nghiệm đỉnh cao'
+      title: it.title || '',
+      description: it.description || ''
     }));
   }, [initialListItems]);
 
@@ -238,7 +238,7 @@ export default function TechnologyBanner({
   return (
     <section
       id="technology"
-      className="relative py-20 bg-gradient-to-b from-[#060915] via-[#080d21] to-[#050915] overflow-hidden"
+      className="relative py-12 sm:py-20 bg-gradient-to-b from-[#060915] via-[#080d21] to-[#050915] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise opacity-50 pointer-events-none" />
       <div className="absolute -left-10 top-16 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
@@ -250,7 +250,7 @@ export default function TechnologyBanner({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="text-center mb-16 max-w-3xl mx-auto space-y-3"
+          className="text-center mb-10 sm:mb-16 max-w-3xl mx-auto space-y-3"
         >
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(59,130,246,0.2)]">
             <Sparkles className="w-4 h-4 text-blue-400" />
@@ -276,7 +276,7 @@ export default function TechnologyBanner({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="max-w-6xl mx-auto mb-16"
+          className="max-w-6xl mx-auto mb-10 sm:mb-16"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             <div className="w-full md:basis-5/12 lg:basis-5/12 xl:max-w-[480px]">
@@ -385,28 +385,42 @@ export default function TechnologyBanner({
                 )}
               </div>
             </div>
-            <div className="w-full md:basis-7/12 lg:basis-7/12 space-y-8">
-              <h3 className="text-3xl md:text-4xl font-bold text-white">✨ Tại sao bạn không nên bỏ lỡ?</h3>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Trải Nghiệm Đắm Chìm Không Giới Hạn:</span> Với hệ thống màn
-                hình đa diện bao quanh, chúng tôi tái tạo những khung cảnh vĩ đại, từ sự tĩnh lặng của vũ trụ bao la đến
-                nhịp sống sôi động của những thành phố tương lai, tất cả gói gọn trong một không gian tinh tế.
-              </p>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Siêu Định Dạng 8K+8K:</span> Hãy chuẩn bị để ngỡ ngàng trước
-                những thước phim CG siêu phân giải 8K. Mọi chi tiết đều chân thực đến mức khó tin, cho phép bạn đắm mình
-                vào cảnh vật mà không cần đeo bất kỳ thiết bị hỗ trợ nào.
-              </p>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Xuyên Không Trong Chớp Mắt:</span> Chỉ một cái chạm, bối cảnh
-                sẽ thay đổi tức thì. Bạn có thể đang dạo bước giữa rừng nguyên sinh rồi ngay lập tức lao vút qua những
-                thiên hà xa xôi với tốc độ và cảm giác chân thực tuyệt đối.
-              </p>
-              <p className="text-lg text-gray-300 leading-relaxed">
-                <span className="text-white font-semibold">Thánh Địa "Check-in" Nghệ Thuật:</span> Không chỉ để xem,
-                Huyễn Cảnh Không Gian còn là studio hoàn hảo để bạn sở hữu những thước phim TikTok "triệu view" hay
-                những bức ảnh nghệ thuật đầy ảo diệu, khẳng định phong cách riêng trên mạng xã hội.
-              </p>
+            <div className="w-full md:basis-7/12 lg:basis-7/12 space-y-6">
+              <h3 className="text-2xl md:text-3xl font-bold text-white">Tại sao bạn không nên bỏ lỡ?</h3>
+              <ul className="space-y-4">
+                {[
+                  {
+                    icon: Monitor,
+                    title: 'Đắm chìm không giới hạn',
+                    text: 'Màn hình đa diện bao quanh tái tạo những khung cảnh vĩ đại, từ vũ trụ bao la đến những thành phố tương lai.'
+                  },
+                  {
+                    icon: Sparkles,
+                    title: 'Siêu định dạng 8K+8K',
+                    text: 'Thước phim CG siêu phân giải, chân thực đến khó tin, không cần đeo thiết bị hỗ trợ.'
+                  },
+                  {
+                    icon: Zap,
+                    title: 'Xuyên không trong chớp mắt',
+                    text: 'Chỉ một cái chạm, bối cảnh thay đổi tức thì, từ rừng nguyên sinh đến những thiên hà xa xôi.'
+                  },
+                  {
+                    icon: Camera,
+                    title: 'Thánh địa check-in nghệ thuật',
+                    text: 'Studio hoàn hảo để có những thước phim TikTok và bức ảnh nghệ thuật đậm phong cách riêng.'
+                  }
+                ].map(({ icon: Icon, title, text }) => (
+                  <li key={title} className="flex items-start gap-3">
+                    <span className="shrink-0 w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-cyan-300" />
+                    </span>
+                    <div>
+                      <p className="text-white font-semibold">{title}</p>
+                      <p className="text-sm text-gray-300 leading-relaxed">{text}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </motion.div>
@@ -419,7 +433,7 @@ export default function TechnologyBanner({
         >
           <div className="flex flex-col items-center md:flex-row md:items-end md:justify-between gap-4 mb-6 md:mb-11">
             <h3 className="text-3xl md:text-3xl font-bold text-white text-center md:text-left">
-              Khám phá không gian CineSphere
+              Khám phá không gian Cinesphere
             </h3>
             {videoPreviewsMerged.length > 1 && (
               <div className="hidden md:flex items-center justify-center gap-3">
@@ -479,7 +493,7 @@ export default function TechnologyBanner({
                                     ? getCloudinaryThumbnail(item.src || item.thumbnail, 360)
                                     : item.thumbnail || getCloudinaryThumbnail(item.src, 360)
                                 }
-                                alt={item.title}
+                                alt={item.title || `Video giới thiệu số ${gi + 1}`}
                                 className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105"
                                 loading="lazy"
                               />
@@ -527,12 +541,14 @@ export default function TechnologyBanner({
                             </motion.div>
                           )}
                         </AnimatePresence>
-                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-20 pointer-events-none transition-transform duration-300">
-                          <h4 className="text-white font-semibold text-sm md:text-base line-clamp-1">{item.title}</h4>
-                          <p className="text-gray-300 text-xs mt-1 line-clamp-2 hidden sm:block delay-100">
-                            {item.description}
-                          </p>
-                        </div>
+                        {(item.title || item.description) && (
+                          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-20 pointer-events-none transition-transform duration-300">
+                            {item.title && <h4 className="text-white font-semibold text-sm md:text-base line-clamp-1">{item.title}</h4>}
+                            {item.description && (
+                              <p className="text-gray-300 text-xs mt-1 line-clamp-2 hidden sm:block delay-100">{item.description}</p>
+                            )}
+                          </div>
+                        )}
                       </motion.div>
                     </div>
                   ))

@@ -2,11 +2,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { AuthField } from '@/components/AuthField';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PASSWORD_PATTERN } from '@/components/constants';
+import { EMAIL_PATTERN, AUTH_DIALOG_CLASS } from '@/components/constants';
 import { useRouter } from 'next/navigation';
 import { OTPDialog } from './OTPDialog';
 import { setCookie } from '@/lib/cookies';
@@ -16,6 +16,8 @@ interface LoginDialogProps {
   onOpenChange: (open: boolean) => void;
   onRegister: () => void;
   onForgetPassword: () => void;
+  // Filled into the email field when the dialog opens (for example right after registering)
+  initialEmail?: string;
   auth: any;
   setUserName: (name: string) => void;
   setErrorModal: (modal: { open: boolean; title: string; message: string }) => void;
@@ -26,6 +28,7 @@ export function LoginDialog({
   onOpenChange,
   onRegister,
   onForgetPassword,
+  initialEmail,
   auth,
   setUserName,
   setErrorModal
@@ -36,9 +39,6 @@ export function LoginDialog({
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [submitError, setSubmitError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isEmailFocused, setIsEmailFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
@@ -99,14 +99,11 @@ export function LoginDialog({
   // Ensure all states are clean when the dialog opens or closes
   useEffect(() => {
     if (isOpen) {
-      setIsEmailFocused(false);
-      setIsPasswordFocused(false);
-      setEmail('');
+      setEmail(initialEmail || '');
       setPassword('');
       setEmailError('');
       setPasswordError('');
       setSubmitError('');
-      setShowPassword(false);
       setShowOTPDialog(false);
       setTempAccountId(null);
       setOtpEmail('');
@@ -120,10 +117,6 @@ export function LoginDialog({
   }, [isOpen]);
 
   const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      setIsEmailFocused(false);
-      setIsPasswordFocused(false);
-    }
     onOpenChange(open);
   };
 
@@ -134,16 +127,14 @@ export function LoginDialog({
     setSubmitError('');
 
     // Validate email
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!emailOk) {
+    if (!EMAIL_PATTERN.test(email)) {
       setEmailError('Vui lòng nhập email hợp lệ');
       return;
     }
 
-    // Validate password
-    const passOk = PASSWORD_PATTERN.test(password);
-    if (!passOk) {
-      setPasswordError('Mật khẩu ít nhất 6 ký tự gồm chữ và số');
+    // Only "not empty" is checked: the account may hold an older, simpler password, and the server says "wrong password"
+    if (!password) {
+      setPasswordError('Vui lòng nhập mật khẩu');
       return;
     }
 
@@ -220,16 +211,21 @@ export function LoginDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="bg-gradient-to-br z-[9999] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+        <DialogContent
+          className={cn(
+            'bg-gradient-to-br z-[9999] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]',
+            AUTH_DIALOG_CLASS
+          )}
+        >
           <DialogHeader>
             <div className="flex justify-center mb-4">
-              <img src="/icon.svg" alt="CINESPHERE" className="h-20 w-20" />
+              <img src="/icon.svg" alt="Cinesphere" className="h-14 w-14 sm:h-20 sm:w-20" />
             </div>
             <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">
               Đăng Nhập Tài Khoản
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Đăng nhập vào tài khoản CTBooking của bạn để tiếp tục đặt vé.
+              Đăng nhập vào tài khoản Cinesphere của bạn để tiếp tục đặt vé.
             </DialogDescription>
           </DialogHeader>
 
@@ -237,98 +233,62 @@ export function LoginDialog({
             key={isOpen ? 'login-dialog-active' : 'login-dialog-inactive'}
             className="space-y-4"
             onSubmit={handleSubmit}
+            noValidate
           >
-            {/* Decoy inputs to trap Chrome's initial autofill attempt */}
-            <input type="text" name="email" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
-            <input type="password" name="password" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
-            {/* Email Input */}
-            <div>
-              <label className="text-sm text-gray-300 mb-1 block">Email</label>
-              <Input
-                type="email"
-                className={cn(
-                  'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
-                  emailError && 'border-yellow-500 focus-visible:ring-yellow-500'
-                )}
-                value={email}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setEmail(val);
-                  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-                  if (ok) setEmailError('');
-                  else if (val.length > 0) setEmailError('Vui lòng nhập email hợp lệ');
-                  if (submitError) setSubmitError('');
-                }}
-                maxLength={50}
-                autoComplete={isEmailFocused ? 'email' : 'new-password'}
-                onFocus={() => setIsEmailFocused(true)}
-                readOnly={!isEmailFocused}
-                disabled={isLoading}
-                required
-              />
-              {emailError && (
-                <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">{emailError}</div>
-              )}
-            </div>
+            <AuthField
+              id="login-email"
+              name="email"
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(value) => {
+                setEmail(value);
+                if (emailError && EMAIL_PATTERN.test(value)) setEmailError('');
+                if (submitError) setSubmitError('');
+              }}
+              onBlur={() => {
+                if (email && !EMAIL_PATTERN.test(email)) setEmailError('Vui lòng nhập email hợp lệ');
+              }}
+              error={emailError}
+              autoComplete="email"
+              inputMode="email"
+              maxLength={50}
+              disabled={isLoading}
+            />
 
-            {/* Password Input */}
-            <div>
-              <label className="text-sm text-gray-300 mb-1 block">Mật khẩu</label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  className={cn(
-                    'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg pr-10',
-                    passwordError && 'border-yellow-500 focus-visible:ring-yellow-500'
-                  )}
-                  value={password}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setPassword(val);
-                    const ok = PASSWORD_PATTERN.test(val);
-                    if (ok) setPasswordError('');
-                    else if (val.length > 0) setPasswordError('Mật khẩu ít nhất 6 ký tự gồm chữ và số');
-                    if (submitError) setSubmitError('');
-                  }}
-                  maxLength={50}
-                  autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  readOnly={!isPasswordFocused}
-                  disabled={isLoading}
-                  required
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {passwordError && (
-                <div className="mt-1 rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
-                  {passwordError}
-                </div>
-              )}
-            </div>
+            <AuthField
+              id="login-password"
+              name="password"
+              label="Mật khẩu"
+              type="password"
+              value={password}
+              onChange={(value) => {
+                setPassword(value);
+                if (passwordError && value) setPasswordError('');
+                if (submitError) setSubmitError('');
+              }}
+              error={passwordError}
+              autoComplete="current-password"
+              maxLength={50}
+              disabled={isLoading}
+            />
 
             {submitError && (
-              <div className="mt-2 rounded-md bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+              <div role="alert" className="rounded-md bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
                 {submitError}
               </div>
             )}
 
             {/* Cloudflare Turnstile */}
-            <div className="flex justify-center mt-2">
-               <div ref={turnstileRef} className="cf-turnstile"></div>
+            <div className="flex justify-center">
+              <div ref={turnstileRef} className="cf-turnstile"></div>
             </div>
 
             {/* Submit Button */}
             <Button
               type="submit"
               disabled={isLoading || !turnstileToken}
-              className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
+              className="w-full h-11 bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -336,28 +296,22 @@ export function LoginDialog({
                   Đang đăng nhập...
                 </span>
               ) : (
-                'ĐĂNG NHẬP'
+                'Đăng nhập'
               )}
             </Button>
 
-            {/* Forget Password Link */}
-            <div className="flex justify-between items-center">
-              <div></div>
+            <div className="flex flex-col items-center">
               <Button
                 variant="link"
-                className="text-sm text-cyan-300 hover:text-cyan-200"
+                className="h-11 text-sm text-cyan-300 hover:text-cyan-200"
                 type="button"
                 onClick={onForgetPassword}
               >
                 Quên mật khẩu?
               </Button>
-            </div>
-
-            {/* Register Link */}
-            <div className="flex justify-center mt-4">
               <Button
                 variant="link"
-                className="text-sm text-cyan-300 hover:text-cyan-200 pt-6"
+                className="h-11 text-sm text-cyan-300 hover:text-cyan-200"
                 type="button"
                 onClick={onRegister}
               >

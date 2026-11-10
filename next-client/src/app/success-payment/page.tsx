@@ -1,33 +1,48 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import UserLayout from '@/layouts/UserLayout';
+
+// If the jump to the result page has not happened after this long, a link is offered
+const SLOW_REDIRECT_MS = 5000;
 
 export default function SuccessPayment() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [showLink, setShowLink] = useState(false);
+
+  // Passes every query parameter on to /checkout, the result page
+  const queryString = searchParams.toString();
+  const target = `/checkout${queryString ? `?${queryString}` : ''}`;
 
   useEffect(() => {
-    // Lấy tất cả query params từ URL và redirect về /checkout với các params đó
-    const params = new URLSearchParams();
+    router.replace(target);
+  }, [router, target]);
 
-    // Copy tất cả params từ URL hiện tại
-    searchParams.forEach((value, key) => {
-      params.set(key, value);
-    });
+  useEffect(() => {
+    const timer = setTimeout(() => setShowLink(true), SLOW_REDIRECT_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
-    // Redirect về /checkout với tất cả query params
-    const queryString = params.toString();
-    router.replace(`/checkout${queryString ? `?${queryString}` : ''}`);
-  }, [router, searchParams]);
-
-  // Hiển thị loading trong khi redirect
   return (
-    <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-white text-lg">Đang xử lý thanh toán...</p>
-      </div>
-    </div>
+    <UserLayout className="bg-[#0f172a] border-none" hideFooter>
+      <section className="min-h-screen flex items-center justify-center px-4 pt-28 pb-10">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-white text-lg">Đang chuyển tới kết quả thanh toán...</p>
+          {showLink && (
+            <p className="text-sm text-slate-300">
+              Nếu trang chưa tự chuyển,{' '}
+              <Link href={target} className="text-blue-400 underline">
+                bấm vào đây
+              </Link>
+              .
+            </p>
+          )}
+        </div>
+      </section>
+    </UserLayout>
   );
 }

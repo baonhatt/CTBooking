@@ -178,7 +178,7 @@ export default function VRShowcase({
       <div className="container mx-auto px-3 sm:px-4 relative z-10">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-3">
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(168,85,247,0.2)]">
             <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 animate-pulse" />
             <span>Thực Tế Ảo 8K / 9D Siêu Thực</span>
           </div>
@@ -204,7 +204,7 @@ export default function VRShowcase({
               type="button"
               onClick={() => setSelectedGenre('all')}
               className={cn(
-                'px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold transition-all duration-200 backdrop-blur-md border',
+                'px-3 min-h-[44px] sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 backdrop-blur-md border',
                 selectedGenre === 'all'
                   ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border-purple-400/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] scale-105'
                   : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border-white/10 hover:border-purple-500/30'
@@ -218,7 +218,7 @@ export default function VRShowcase({
                 type="button"
                 onClick={() => setSelectedGenre(genre)}
                 className={cn(
-                  'px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-sm font-bold transition-all duration-200 backdrop-blur-md border',
+                  'px-3 min-h-[44px] sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 backdrop-blur-md border',
                   selectedGenre === genre
                     ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border-purple-400/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] scale-105'
                     : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border-white/10 hover:border-purple-500/30'
@@ -232,7 +232,7 @@ export default function VRShowcase({
 
         {/* VR Package Grid (2 columns on mobile, 3 on desktop) */
         filteredPackages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-2.5 sm:gap-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-6 max-w-7xl mx-auto">
             {filteredPackages.map((pkg: any) => {
               const imageUrl = resolveImageUrl(pkg.cover_image);
               const hasImage = Boolean(pkg.cover_image);
@@ -243,7 +243,7 @@ export default function VRShowcase({
                   className="bg-slate-900/80 border border-white/10 backdrop-blur-md overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_35px_rgba(168,85,247,0.25)] transition-all duration-300 group flex flex-col h-full rounded-xl sm:rounded-2xl"
                 >
                   {/* Package Cover Image Header */}
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                  <div className="relative aspect-[4/5] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                     {hasImage ? (
                       <>
                         <div
@@ -266,8 +266,8 @@ export default function VRShowcase({
                         <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-300">
                           <Gamepad2 className="w-6 h-6 sm:w-9 sm:h-9" />
                         </div>
-                        <span className="text-[11px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                          CineSphere VR
+                        <span className="text-xs sm:text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          Cinesphere VR
                         </span>
                       </div>
                     )}
@@ -276,65 +276,58 @@ export default function VRShowcase({
 
                     {/* Genre Tag */}
                     {pkg.vr_genre && (
-                      <span className="absolute top-2 left-2 sm:top-3 sm:left-3 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-purple-600/90 text-white text-[11px] sm:text-[11px] font-extrabold uppercase tracking-wider shadow-md border border-purple-400/30 backdrop-blur-md">
+                      <span className="absolute top-2 left-2 sm:top-3 sm:left-3 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-purple-600/90 text-white text-xs sm:text-xs font-extrabold uppercase tracking-wider shadow-md border border-purple-400/30 backdrop-blur-md">
                         {pkg.vr_genre}
                       </span>
                     )}
 
                     {/* Duration badge */}
-                    <span className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 flex items-center gap-1 text-[11px] sm:text-xs text-purple-200 font-bold bg-slate-950/85 backdrop-blur-md py-0.5 px-1.5 sm:py-1 sm:px-2.5 rounded sm:rounded-lg border border-purple-500/30 shadow-md">
+                    <span className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 flex items-center gap-1 text-xs sm:text-xs text-purple-200 font-bold bg-slate-950/85 backdrop-blur-md py-0.5 px-1.5 sm:py-1 sm:px-2.5 rounded sm:rounded-lg border border-purple-500/30 shadow-md">
                       <Clock className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-purple-400" /> {pkg.duration_min || 30}p
                     </span>
 
-                    {/* Player capacity badge */}
-                    <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 flex items-center gap-1 text-[11px] sm:text-[11px] text-slate-300 font-medium bg-slate-950/80 backdrop-blur-md py-0.5 px-1.5 sm:py-1 sm:px-2 rounded sm:rounded-lg border border-white/10">
-                      <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400" />{' '}
-                      {pkg.min_players === pkg.max_players
-                        ? `${pkg.min_players || 1}N`
-                        : `${pkg.min_players || 1}-${pkg.max_players || 1}N`}
-                    </span>
+                    {/* Player capacity badge: only when the admin entered a number (the name often says it already) */}
+                    {(Number(pkg.min_players) > 0 || Number(pkg.max_players) > 0) && (
+                      <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 flex items-center gap-1 text-xs text-slate-300 font-medium bg-slate-950/80 backdrop-blur-md py-0.5 px-1.5 sm:py-1 sm:px-2 rounded sm:rounded-lg border border-white/10">
+                        <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400" />{' '}
+                        {(() => {
+                          // One missing number follows the other; a range shows only when the two really differ
+                          const fewest = Number(pkg.min_players) || Number(pkg.max_players);
+                          const most = Number(pkg.max_players) || fewest;
+                          return fewest === most ? `${fewest} người` : `${fewest}-${most} người`;
+                        })()}
+                      </span>
+                    )}
                   </div>
 
                   {/* Body Content */}
                   <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between space-y-2.5 sm:space-y-4">
                     <div className="space-y-1.5 sm:space-y-3">
-                      <h3 className="font-extrabold text-white text-xs sm:text-base tracking-tight line-clamp-1 group-hover:text-purple-300 transition-colors">
+                      <h3 className="font-extrabold text-white text-sm sm:text-base tracking-tight line-clamp-2 group-hover:text-purple-300 transition-colors">
                         {pkg.name}
                       </h3>
 
-                      <p className="text-slate-400 text-[11px] sm:text-xs leading-relaxed line-clamp-2 min-h-0 sm:min-h-[2.5rem]">
-                        {pkg.description ||
-                          'Trải nghiệm không gian ảo hóa 3D chân thực cao với trang bị xúc giác tiên tiến bậc nhất.'}
-                      </p>
+                      {pkg.description && (
+                        <p className="text-slate-400 text-xs leading-relaxed line-clamp-2">{pkg.description}</p>
+                      )}
 
                       {/* Feature Highlights (Desktop only to save mobile space) */}
                       <div className="space-y-1 pt-1 hidden sm:block">
                         {Array.isArray(pkg.features) && pkg.features.length > 0 ? (
                           pkg.features.slice(0, 2).map((feat: string, idx: number) => (
-                            <div key={idx} className="flex items-center gap-2 text-[11px] text-slate-300">
+                            <div key={idx} className="flex items-center gap-2 text-xs text-slate-300">
                               <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                               <span className="line-clamp-1">{feat}</span>
                             </div>
                           ))
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-300">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <span>Kính thực tế ảo Ultra HD + Âm thanh vòm</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-300">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <span>Áo rung phản hồi Haptic Vest</span>
-                            </div>
-                          </>
-                        )}
+                        ) : null}
                       </div>
                     </div>
 
                     {/* Price & Action Buttons */}
                     <div className="pt-2 sm:pt-4 border-t border-white/10 space-y-2 sm:space-y-3">
                       <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <span className="text-xs sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
                           Giá vé
                         </span>
                         <span className="text-sm sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-pink-300 to-white">
@@ -346,7 +339,7 @@ export default function VRShowcase({
                         type="button"
                         size="sm"
                         onClick={() => handleBookNow(pkg, 1)}
-                        className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:to-purple-600 text-white text-[11px] sm:text-sm font-bold rounded-lg sm:rounded-xl h-8 sm:h-10 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
+                        className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:to-purple-600 text-white text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl h-11 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
                       >
                         <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
                         ĐẶT NGAY
@@ -358,8 +351,9 @@ export default function VRShowcase({
                           variant="outline"
                           size="sm"
                           onClick={() => openDetailModal(pkg)}
-                          className="w-full bg-white/[0.05] hover:bg-white/[0.12] text-slate-300 hover:text-white border-white/10 text-[11px] sm:text-xs font-semibold rounded-lg sm:rounded-xl h-7 sm:h-8 transition-all px-1 flex items-center justify-center"
+                          className="w-full bg-white/[0.05] hover:bg-white/[0.12] text-slate-300 hover:text-white border-white/10 text-xs font-semibold rounded-lg sm:rounded-xl h-11 transition-all px-1 flex items-center justify-center"
                           title="Chi tiết"
+                          aria-label={`Chi tiết ${pkg.name}`}
                         >
                           <Info className="w-3.5 h-3.5 sm:mr-1 text-purple-400" />
                           <span className="hidden sm:inline">Chi tiết</span>
@@ -370,8 +364,9 @@ export default function VRShowcase({
                           variant="outline"
                           size="sm"
                           onClick={() => handleAddToCart(pkg, 1)}
-                          className="w-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/20 text-[11px] sm:text-xs font-semibold rounded-lg sm:rounded-xl h-7 sm:h-8 transition-all px-1 flex items-center justify-center"
+                          className="w-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/20 text-xs font-semibold rounded-lg sm:rounded-xl h-11 transition-all px-1 flex items-center justify-center"
                           title="Thêm vào giỏ"
+                          aria-label={`Thêm ${pkg.name} vào giỏ hàng`}
                         >
                           <ShoppingCart className="w-3.5 h-3.5 sm:mr-1" />
                           <span className="hidden sm:inline">Thêm giỏ</span>
@@ -388,7 +383,7 @@ export default function VRShowcase({
 
       {/* Package Detail Modal */}
       <Dialog open={!!selectedDetailPkg} onOpenChange={(open) => !open && setSelectedDetailPkg(null)}>
-        <DialogContent className="max-w-2xl bg-slate-950/95 border border-purple-500/30 text-white rounded-2xl p-0 overflow-hidden backdrop-blur-2xl shadow-[0_0_50px_rgba(168,85,247,0.3)] max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-2xl bg-slate-950/95 border border-purple-500/30 text-white rounded-2xl p-0 overflow-hidden backdrop-blur-2xl shadow-[0_0_50px_rgba(168,85,247,0.3)] max-h-[90dvh] flex flex-col">
           {selectedDetailPkg && (
             <>
               {/* Modal Image Header */}
@@ -408,7 +403,7 @@ export default function VRShowcase({
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-purple-950 via-slate-900 to-fuchsia-950 flex flex-col items-center justify-center gap-2">
                     <Gamepad2 className="w-12 h-12 text-purple-400" />
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">CineSphere VR</span>
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cinesphere VR</span>
                   </div>
                 )}
 
@@ -417,7 +412,7 @@ export default function VRShowcase({
                 <div className="absolute bottom-4 left-6 right-6 flex items-end justify-between">
                   <div className="space-y-1">
                     {selectedDetailPkg.vr_genre && (
-                      <span className="px-3 py-1 rounded-full bg-purple-600 text-white text-[11px] font-extrabold uppercase tracking-widest border border-purple-400/40">
+                      <span className="px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-extrabold uppercase tracking-widest border border-purple-400/40">
                         {selectedDetailPkg.vr_genre}
                       </span>
                     )}
@@ -438,14 +433,14 @@ export default function VRShowcase({
                 {/* Key Specs Row */}
                 <div className="grid grid-cols-3 gap-3 p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/20 text-center">
                   <div>
-                    <span className="text-[11px] uppercase font-bold text-slate-400 block">Thời lượng</span>
+                    <span className="text-xs uppercase font-bold text-slate-400 block">Thời lượng</span>
                     <span className="text-sm font-bold text-purple-300 flex items-center justify-center gap-1 mt-0.5">
                       <Clock className="w-3.5 h-3.5 text-purple-400" /> {selectedDetailPkg.duration_min || 30} Phút
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[11px] uppercase font-bold text-slate-400 block">Số người chơi</span>
+                    <span className="text-xs uppercase font-bold text-slate-400 block">Số người chơi</span>
                     <span className="text-sm font-bold text-cyan-300 flex items-center justify-center gap-1 mt-0.5">
                       <Users className="w-3.5 h-3.5 text-cyan-400" />{' '}
                       {selectedDetailPkg.min_players === selectedDetailPkg.max_players
@@ -455,23 +450,22 @@ export default function VRShowcase({
                   </div>
 
                   <div>
-                    <span className="text-[11px] uppercase font-bold text-slate-400 block">Thiết bị</span>
+                    <span className="text-xs uppercase font-bold text-slate-400 block">Thiết bị</span>
                     <span className="text-sm font-bold text-fuchsia-300 flex items-center justify-center gap-1 mt-0.5">
                       <Award className="w-3.5 h-3.5 text-fuchsia-400" /> Haptic 9D
                     </span>
                   </div>
                 </div>
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" /> Mô tả trải nghiệm
-                  </h4>
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    {selectedDetailPkg.description ||
-                      'Khám phá thế giới thực tế ảo đỉnh cao với công nghệ mô phỏng không gian đa chiều, âm thanh định vị và phản hồi xúc giác rung lực toàn thân.'}
-                  </p>
-                </div>
+                {/* Description: only what the admin wrote */}
+                {selectedDetailPkg.description && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" /> Mô tả trải nghiệm
+                    </h4>
+                    <p className="text-sm text-slate-300 leading-relaxed">{selectedDetailPkg.description}</p>
+                  </div>
+                )}
 
                 {/* Package Highlights */}
                 <div className="space-y-2">
@@ -499,7 +493,7 @@ export default function VRShowcase({
                   <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                     <ShieldAlert className="w-3.5 h-3.5" /> Lưu ý an toàn sức khỏe
                   </h4>
-                  <ul className="text-[11px] text-slate-300 space-y-1.5 list-disc list-inside">
+                  <ul className="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
                     {safetyGuidelines.map((guide, idx) => (
                       <li key={idx}>{guide}</li>
                     ))}

@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import UserLayout from '@/layouts/UserLayout';
 import { buildUrl } from '@/lib/api/http';
+import { copyText } from '@/lib/clipboard';
 import { fetchBookingStatus, cancelBookingByToken } from '@/lib/api/booking';
 import {
     isValidPayCode,
@@ -59,6 +60,11 @@ interface BankInfo {
     bankCode: string;
     qrCodeUrl: string;
 }
+
+// Same hotline as the other pages
+const HOTLINE = '036 643 1179';
+// The countdown turns red and warns when this many seconds are left
+const LOW_TIME_SECONDS = 120;
 
 const EMPTY_BANK_INFO: BankInfo = { bankName: '', accountNumber: '', accountName: '', bankCode: '', qrCodeUrl: '' };
 
@@ -148,6 +154,9 @@ export default function QRPaymentPage() {
     const [closedReason, setClosedReason] = useState<'expired' | 'closed'>('expired');
     const [bankConfigMissing, setBankConfigMissing] = useState(false);
     const [bankInfo, setBankInfo] = useState<BankInfo>(EMPTY_BANK_INFO);
+    const [qrFailed, setQrFailed] = useState(false);
+    // Bottom edge of the fixed site header, so the countdown bar sticks right under it whatever its height is
+    const [headerOffset, setHeaderOffset] = useState(85);
 
     const paymentDataRef = useRef<any>(null);
     // Set when the payment is over (paid, cancelled, expired): the countdown and the status checks stop.
@@ -298,6 +307,22 @@ export default function QRPaymentPage() {
         };
     }, [router]);
 
+    useEffect(() => {
+        const measure = () => {
+            const header = document.querySelector('header');
+            setHeaderOffset(header ? Math.round(header.getBoundingClientRect().bottom) : 85);
+        };
+        measure();
+        const settleTimer = setTimeout(measure, 500);
+        window.addEventListener('resize', measure);
+        window.addEventListener('scroll', measure, { passive: true });
+        return () => {
+            clearTimeout(settleTimer);
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('scroll', measure);
+        };
+    }, []);
+
     // --- Auto polling: ask the server for the payment status until the payment is over ---
     useEffect(() => {
         const bookingId = Number(paymentData?.bookingId || paymentData?.booking_id) || 0;
@@ -372,9 +397,13 @@ export default function QRPaymentPage() {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')} `;
     };
 
+    const isLowTime = timeLeft > 0 && timeLeft <= LOW_TIME_SECONDS;
+    const amountNumber = Number(paymentData?.totalAmount || paymentData?.amount || 0);
+    const amountText = `${amountNumber.toLocaleString('vi-VN')} ₫`;
+
     const copyToClipboard = async (text: string, label: string) => {
-        try {
-            await navigator.clipboard.writeText(text);
+        const copied = await copyText(text);
+        if (copied) {
             setCopiedText(text);
 
             toast.success(`Đã sao chép ${label}`, {
@@ -384,8 +413,8 @@ export default function QRPaymentPage() {
             });
 
             setTimeout(() => setCopiedText(null), 2000);
-        } catch (err) {
-            toast.error('Lỗi sao chép dữ liệu');
+        } else {
+            toast.error('Không sao chép được, hãy nhấn giữ vào nội dung để chọn');
         }
     };
 
@@ -442,7 +471,7 @@ export default function QRPaymentPage() {
         if (httpStatus === null) {
             toast.info('Chưa kết nối được máy chủ để hủy đơn. Đơn sẽ tự hết hạn sau ít phút.');
         } else {
-            toast.info('Đã hủy giao dịch thành công');
+            toast.info('Đã hủy thanh toán');
         }
         router.replace('/booking');
     };
@@ -452,12 +481,12 @@ export default function QRPaymentPage() {
         return (
             <UserLayout className="bg-[#0f172a]" hideFooter>
                 <div className="relative min-h-screen">
-                    <div className="relative z-10 max-w-md mx-auto px-4 pt-40 text-center text-white space-y-5">
+                    <div className="relative z-10 max-w-md mx-auto px-4 pt-28 text-center text-white space-y-5">
                         <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
                         <h1 className="text-xl font-bold">Chưa thể thanh toán chuyển khoản</h1>
                         <p className="text-gray-300 leading-relaxed">
                             Chi nhánh này chưa cấu hình tài khoản nhận tiền nên hệ thống không tạo mã QR để tránh chuyển nhầm.
-                            Vui lòng liên hệ hotline <span className="font-bold text-blue-400">036 643 1179</span>.
+                            Vui lòng liên hệ hotline <span className="font-bold text-blue-400">{HOTLINE}</span>.
                         </p>
                         <Button onClick={performCancelPayment} className="bg-red-600 hover:bg-red-500 text-white">
                             Hủy đơn và quay lại
@@ -479,37 +508,42 @@ export default function QRPaymentPage() {
                             <span className="hover:text-blue-400 cursor-pointer transition-colors" onClick={() => router.push('/')}>
                                 Trang chủ
                             </span>
-                            <span className="text-white/10 text-[10px]">&gt;</span>
-                            <span className="text-blue-400 font-black">Thanh toán QR</span>
+                            <span className="text-white/10 text-xs">&gt;</span>
+                            <span className="text-blue-400 font-black">Thanh toán VietQR</span>
                         </div>
                     </div>
 
-                    {/* Countdown Display */}
-                    <div className="sticky top-[85px] lg:top-[115px] z-50 mb-6 -mx-1 px-1">
-                        <div className="flex items-center justify-between gap-3 bg-[#0f172a]/90 backdrop-blur-xl border border-white/15 px-4 md:px-6 py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-500">
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center justify-center relative">
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    {/* Countdown and status: sticks under the site header */}
+                    <div className="sticky z-50 mb-4 -mx-1 px-1" style={{ top: headerOffset }}>
+                        <div className="bg-[#0f172a]/90 backdrop-blur-xl border border-white/15 px-4 py-2 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Loader2 className="w-4 h-4 animate-spin text-blue-400 shrink-0" />
+                                    <span className="text-xs font-bold text-gray-300">Đang chờ thanh toán...</span>
+                                </div>
+                                <div
+                                    className={`flex items-center gap-2 px-3 py-1 rounded-xl border ${isLowTime ? 'bg-red-500/10 border-red-500/30' : 'bg-white/5 border-white/15'}`}
+                                >
+                                    <span className="text-xs text-gray-400">Còn</span>
+                                    <span
+                                        className={`font-mono text-lg font-black tabular-nums ${isLowTime ? 'text-red-400 animate-pulse' : 'text-white'}`}
+                                    >
+                                        {formatTime(timeLeft)}
                                     </span>
                                 </div>
-                                <span className="text-[10px] md:text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                                    Hết hạn sau
-                                </span>
                             </div>
-
-                            <div className="flex items-center gap-2 bg-red-500/10 px-3 py-1 rounded-xl border border-red-500/20">
-                                <span className="font-mono text-red-500 text-lg md:text-xl font-black tracking-tighter tabular-nums drop-shadow-[0_0_8px_rgba(239,68,68,0.4)]">
-                                    {formatTime(timeLeft)}
-                                </span>
-                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Trang tự cập nhật khi nhận được tiền</p>
+                            {isLowTime && (
+                                <p className="text-xs text-red-300 mt-1">
+                                    Sắp hết thời gian thanh toán. Nếu đã chuyển khoản, hãy giữ trang này mở để chờ xác nhận.
+                                </p>
+                            )}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-                        {/* CỘT TRÁI: MÃ QR */}
-                        <div className="lg:col-span-2 space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+                        {/* CỘT TRÁI: SỐ TIỀN + MÃ QR */}
+                        <div className="lg:col-span-2 space-y-4">
                             <Card className="bg-white/10 border-white/15 text-white overflow-hidden shadow-2xl rounded-2xl">
                                 <CardHeader className="bg-white/5 border-b border-white/5 py-4">
                                     <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wide">
@@ -517,74 +551,105 @@ export default function QRPaymentPage() {
                                         Quét mã VietQR
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="pt-6 pb-6 px-5">
-                                    <div className="bg-white p-3 rounded-2xl mb-5 shadow-[0_0_40px_rgba(255,255,255,0.05)] border-4 border-white/10">
-                                        {qrCodeUrl ? (
-                                            <img src={qrCodeUrl} alt="QR" className="w-full h-auto rounded-lg" />
+                                <CardContent className="pt-5 pb-5 px-5">
+                                    <div className="text-center mb-4">
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Số tiền cần chuyển</p>
+                                        <p className="text-3xl font-black text-emerald-400 tabular-nums tracking-tight">{amountText}</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-2xl mb-4 shadow-[0_0_40px_rgba(255,255,255,0.05)] border-4 border-white/10">
+                                        {qrFailed ? (
+                                            <div className="aspect-square flex items-center justify-center text-center text-sm text-gray-700 p-4">
+                                                Không tải được mã QR. Hãy chuyển khoản thủ công theo phần "Thông tin chuyển khoản" bên dưới.
+                                            </div>
+                                        ) : qrCodeUrl ? (
+                                            <img
+                                                src={qrCodeUrl}
+                                                alt="Mã QR chuyển khoản VietQR"
+                                                onError={() => setQrFailed(true)}
+                                                className="w-full h-auto rounded-lg"
+                                            />
                                         ) : (
                                             <div className="aspect-square bg-gray-800 animate-pulse rounded-lg" />
                                         )}
                                     </div>
-                                    <div className="space-y-3">
-                                        <p className="text-center text-[13px] text-gray-400 leading-relaxed font-medium"></p>
-                                        <div className="flex items-center justify-center gap-2.5 text-[11px] text-amber-200/90 bg-amber-500/10 py-3 px-4 rounded-xl border border-amber-500/20 shadow-sm">
-                                            <Info className="w-4 h-4 text-amber-400 shrink-0" />
-                                            <span className="font-bold tracking-tight">
-                                                Vui lòng giữ nguyên nội dung chuyển khoản mặc định.
-                                            </span>
-                                        </div>
+                                    <div className="flex items-center justify-center gap-2.5 text-xs text-amber-200/90 bg-amber-500/10 py-3 px-4 rounded-xl border border-amber-500/20 shadow-sm">
+                                        <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                                        <span className="font-bold tracking-tight">
+                                            Vui lòng giữ nguyên số tiền và nội dung chuyển khoản.
+                                        </span>
                                     </div>
                                 </CardContent>
                             </Card>
-
-                            {/* REASSURING PAYMENT STEPS */}
-                            <div className="bg-gradient-to-br from-blue-500/10 to-emerald-500/5 border border-white/10 rounded-2xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                <div className="p-4 space-y-4">
-                                    <div className="flex gap-4 items-start">
-                                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/20 text-blue-400 font-black text-sm">
-                                            1
-                                        </div>
-                                        <div className="text-[13px] text-gray-300 leading-relaxed pt-1">
-                                            <strong className="text-white">Thanh toán tự động:</strong> Hệ thống sẽ xác nhận và gửi vé ngay
-                                            khi nhận được tiền.
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-4 items-start relative">
-                                        <div className="absolute left-4 -top-3 w-[1px] h-3 bg-white/10" />
-                                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/20 text-emerald-400 font-black text-sm">
-                                            2
-                                        </div>
-                                        <div className="text-[13px] text-gray-300 leading-relaxed pt-1">
-                                            <strong className="text-white">Ưu tiên xử lý:</strong> Nếu muốn nhận vé nhanh hơn, hãy ấn nút{' '}
-                                            <span className="text-emerald-400 font-bold">"Xác nhận chuyển"</span> bên dưới.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="bg-white/5 px-4 py-2.5 border-t border-white/5 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] text-gray-500 font-medium">Hỗ trợ 24/7:</span>
-                                        <span className="text-[11px] text-blue-400 font-black tracking-tight">036 643 1179</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-[9px] text-emerald-400 font-black uppercase tracking-wider">Sẵn sàng</span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         {/* CỘT PHẢI: CHI TIẾT & HÀNH ĐỘNG */}
                         <div className="lg:col-span-3 space-y-6">
+                            {/* THÔNG TIN CHUYỂN KHOẢN: always visible, for paying from a banking app on the same phone */}
+                            <div className="bg-white/10 border border-white/15 rounded-2xl p-4 shadow-xl space-y-3">
+                                <div>
+                                    <h2 className="text-sm font-black uppercase tracking-wider text-blue-400">
+                                        Thông tin chuyển khoản
+                                    </h2>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        Trả bằng app ngân hàng trên cùng điện thoại: sao chép từng dòng rồi dán vào app.
+                                    </p>
+                                </div>
+                                {[
+                                    { label: 'Ngân hàng', value: bankInfo.bankName || '—', copy: bankInfo.bankName },
+                                    { label: 'Số tài khoản', value: bankInfo.accountNumber || '—', copy: bankInfo.accountNumber, mono: true },
+                                    { label: 'Chủ tài khoản', value: bankInfo.accountName || '—', copy: bankInfo.accountName },
+                                    { label: 'Số tiền', value: amountText, copy: String(amountNumber), mono: true, bold: true },
+                                    {
+                                        label: 'Nội dung chuyển khoản',
+                                        value: `${paymentData?.pay_txt_code || ''}`,
+                                        copy: `${paymentData?.pay_txt_code || ''}`,
+                                        mono: true,
+                                        bold: true
+                                    }
+                                ].map((item) => (
+                                    <div
+                                        key={item.label}
+                                        className="flex justify-between items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-bold text-gray-400 uppercase tracking-tight mb-1">
+                                                {item.label}
+                                            </div>
+                                            <div
+                                                className={`text-sm break-all ${item.mono ? 'font-mono tracking-wider' : ''} font-bold ${item.bold ? 'text-blue-200' : 'text-white'}`}
+                                            >
+                                                {item.value}
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            aria-label={`Sao chép ${item.label.toLowerCase()}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                copyToClipboard(item.copy, item.label.toLowerCase());
+                                            }}
+                                            className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 text-gray-300 hover:bg-blue-500/10 hover:text-blue-400 transition-all rounded-full shrink-0"
+                                        >
+                                            {copiedText === item.copy ? (
+                                                <Check className="w-5 h-5 text-emerald-400 animate-in zoom-in" />
+                                            ) : (
+                                                <Copy className="w-5 h-5" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+
                             {/* Accordion Container */}
                             <div className="bg-white/10 border border-white/15 rounded-2xl overflow-hidden shadow-xl">
-                                <Accordion type="multiple" defaultValue={['item-1']} className="w-full">
+                                <Accordion type="multiple" defaultValue={[]} className="w-full">
                                     {/* 1. THÔNG TIN VÉ */}
                                     <AccordionItem value="item-1" className="border-white/10 px-4">
                                         <AccordionTrigger className="hover:no-underline py-4">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-black uppercase tracking-wider text-emerald-400">
-                                                    Thông tin vé
+                                                    Chi tiết đơn hàng
                                                 </span>
                                             </div>
                                         </AccordionTrigger>
@@ -621,10 +686,10 @@ export default function QRPaymentPage() {
                                                                 {!isVROnly && moviePkgs.length > 0 && (
                                                                     <div className="space-y-4 rounded-2xl bg-white/[0.03] border border-white/5 p-4">
                                                                         <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                                                                            <div className="text-[11px] text-gray-400 font-black uppercase tracking-widest">
+                                                                            <div className="text-xs text-gray-400 font-black uppercase tracking-widest">
                                                                                 Chi tiết gói vé
                                                                             </div>
-                                                                            <div className="text-[11px] text-white font-bold bg-white/10 px-2 py-0.5 rounded-full">
+                                                                            <div className="text-xs text-white font-bold bg-white/10 px-2 py-0.5 rounded-full">
                                                                                 {totalQty} VÉ
                                                                             </div>
                                                                         </div>
@@ -640,10 +705,10 @@ export default function QRPaymentPage() {
                                                                                 return (
                                                                                     <div key={idx} className="flex justify-between items-center">
                                                                                         <div className="flex items-start gap-2 max-w-[65%]">
-                                                                                            <span className="text-blue-400 mt-[3px] text-[10px]">●</span>
+                                                                                            <span className="text-blue-400 mt-[3px] text-xs">●</span>
                                                                                             <span className="text-sm font-bold text-gray-200 leading-tight">
                                                                                                 {pkg.name}
-                                                                                                {isDiscounted ? <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded shadow-sm">ĐƯỢC GIẢM</span> : null}
+                                                                                                {isDiscounted ? <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-xs font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded shadow-sm">ĐƯỢC GIẢM</span> : null}
                                                                                             </span>
                                                                                         </div>
                                                                                         <div className="flex items-center gap-4 text-right">
@@ -651,7 +716,7 @@ export default function QRPaymentPage() {
                                                                                                 x{pkg.quantity}
                                                                                             </span>
                                                                                             <span className="text-sm font-black text-white whitespace-nowrap tabular-nums">
-                                                                                                {moviePackageLineTotal(pkg).toLocaleString('vi-VN')}₫
+                                                                                                {moviePackageLineTotal(pkg).toLocaleString('vi-VN')} ₫
                                                                                             </span>
                                                                                         </div>
                                                                                     </div>
@@ -664,9 +729,9 @@ export default function QRPaymentPage() {
                                                                 {/* Danh sách gói VR nếu có */}
                                                                 {vrItems.length > 0 && (
                                                                     <div className="space-y-2 p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 shadow-inner">
-                                                                        <div className="text-[11px] text-purple-300 font-black uppercase tracking-widest flex items-center justify-between">
+                                                                        <div className="text-xs text-purple-300 font-black uppercase tracking-widest flex items-center justify-between">
                                                                             <span>Gói trải nghiệm VR</span>
-                                                                            <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded">
+                                                                            <span className="text-xs bg-purple-500/20 px-1.5 py-0.5 rounded">
                                                                                 {vrItems.length} gói
                                                                             </span>
                                                                         </div>
@@ -689,15 +754,15 @@ export default function QRPaymentPage() {
                                                                                                 {it.name || it.package_name || 'Gói VR'}
                                                                                             </span>
                                                                                             {it.duration_min && (
-                                                                                                <span className="text-[11px] text-gray-400">({it.duration_min}')</span>
+                                                                                                <span className="text-xs text-gray-400">({it.duration_min}')</span>
                                                                                             )}
-                                                                                            {isDiscounted ? <span className="inline-block px-1.5 py-[2px] align-middle text-[8px] font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded shadow-sm">ĐƯỢC GIẢM</span> : null}
+                                                                                            {isDiscounted ? <span className="inline-block px-1.5 py-[2px] align-middle text-xs font-black text-rose-400 bg-rose-400/10 border border-rose-400/20 rounded shadow-sm">ĐƯỢC GIẢM</span> : null}
                                                                                         </div>
                                                                                         <div className="flex items-center gap-2 text-right shrink-0">
                                                                                             <span className="text-gray-400 text-xs">x{it.quantity}</span>
                                                                                             {lineTotal > 0 && (
                                                                                                 <span className="text-purple-300 font-bold">
-                                                                                                    {lineTotal.toLocaleString('vi-VN')}₫
+                                                                                                    {lineTotal.toLocaleString('vi-VN')} ₫
                                                                                                 </span>
                                                                                             )}
                                                                                         </div>
@@ -743,10 +808,10 @@ export default function QRPaymentPage() {
                                                                                     <div className="flex flex-col">
                                                                                         <span className="text-gray-400 font-medium flex items-center gap-1.5">
                                                                                             Mã giảm giá
-                                                                                            <span className="text-[9px] font-bold bg-blue-500/20 text-blue-300 px-1.5 rounded uppercase uppercase">Phim</span>
+                                                                                            <span className="text-xs font-bold bg-blue-500/20 text-blue-300 px-1.5 rounded uppercase uppercase">Phim</span>
                                                                                         </span>
                                                                                         {voucherDesc && (
-                                                                                            <span className="text-[10px] text-emerald-400/90 whitespace-pre-line leading-relaxed max-w-[200px] mt-1">{voucherDesc}</span>
+                                                                                            <span className="text-xs text-emerald-400/90 whitespace-pre-line leading-relaxed max-w-[200px] mt-1">{voucherDesc}</span>
                                                                                         )}
                                                                                     </div>
                                                                                     <span className="text-rose-400 font-bold tabular-nums whitespace-nowrap mt-0.5">
@@ -770,10 +835,10 @@ export default function QRPaymentPage() {
                                                                                     <div className="flex flex-col">
                                                                                         <span className="text-gray-400 font-medium flex items-center gap-1.5">
                                                                                             Mã giảm giá
-                                                                                            <span className="text-[9px] font-bold bg-purple-500/20 text-purple-300 px-1.5 rounded uppercase">VR</span>
+                                                                                            <span className="text-xs font-bold bg-purple-500/20 text-purple-300 px-1.5 rounded uppercase">VR</span>
                                                                                         </span>
                                                                                         {voucherDesc && (
-                                                                                            <span className="text-[10px] text-emerald-400/90 whitespace-pre-line leading-relaxed max-w-[200px] mt-1">{voucherDesc}</span>
+                                                                                            <span className="text-xs text-emerald-400/90 whitespace-pre-line leading-relaxed max-w-[200px] mt-1">{voucherDesc}</span>
                                                                                         )}
                                                                                     </div>
                                                                                     <span className="text-rose-400 font-bold tabular-nums whitespace-nowrap mt-0.5">
@@ -789,10 +854,10 @@ export default function QRPaymentPage() {
                                                                             <div className="flex flex-col">
                                                                                 <span className="text-gray-400 font-medium flex items-center gap-1.5">
                                                                                     Mã giảm giá
-                                                                                    <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 rounded uppercase">{voucherText.replace('Giảm giá ', '').replace('(', '').replace(')', '')}</span>
+                                                                                    <span className="text-xs font-bold bg-emerald-500/20 text-emerald-300 px-1.5 rounded uppercase">{voucherText.replace('Giảm giá ', '').replace('(', '').replace(')', '')}</span>
                                                                                 </span>
                                                                                 {voucherDesc && (
-                                                                                    <span className="text-[10px] text-emerald-400/90 whitespace-pre-line leading-relaxed max-w-[200px] mt-1">{voucherDesc}</span>
+                                                                                    <span className="text-xs text-emerald-400/90 whitespace-pre-line leading-relaxed max-w-[200px] mt-1">{voucherDesc}</span>
                                                                                 )}
                                                                             </div>
                                                                             <span className="text-rose-400 font-bold tabular-nums whitespace-nowrap mt-0.5">
@@ -812,128 +877,42 @@ export default function QRPaymentPage() {
                                                         );
                                                     })()}
 
-                                                    {/* Danh sách phim trong gói -> Chuyển thành ghi chú (Chỉ hiện khi có đặt phim) */}
-                                                    {(() => {
-                                                        const bType = bookingDetails?.booking_type || paymentData?.bookingType || paymentData?.booking_type || '';
-                                                        const titleRaw = bookingDetails?.movie_title || paymentData?.movieTitle || '';
-                                                        const isVROnly = bType === 'vr' || titleRaw === 'Gói Trải Nghiệm VR' || paymentData?.ticketType === 'VR Booking (1 gói)';
-                                                        
-                                                        if (isVROnly || !titleRaw || titleRaw.toLowerCase().includes('gói trải nghiệm vr')) {
-                                                            return null;
-                                                        }
-
-                                                        const renderTitle = (title: string, idx: number) => (
-                                                            <div key={idx} className="flex items-center gap-1.5 text-center">
-                                                                <span className="text-cyan-500/50">•</span>
-                                                                <span>{title.trim()}</span>
-                                                            </div>
-                                                        );
-
-                                                        let titlesElement = null;
-                                                        try {
-                                                            if (titleRaw.startsWith('[')) {
-                                                                const parsed = JSON.parse(titleRaw);
-                                                                if (Array.isArray(parsed) && parsed.length > 0) {
-                                                                    titlesElement = parsed.map(renderTitle);
-                                                                }
-                                                            } else if (titleRaw.includes(' & ')) {
-                                                                titlesElement = titleRaw.split(' & ').map(renderTitle);
-                                                            } else {
-                                                                titlesElement = renderTitle(titleRaw, 0);
-                                                            }
-                                                        } catch {
-                                                            titlesElement = <span>{titleRaw}</span>;
-                                                        }
-
-                                                        if (!titlesElement) return null;
-
-                                                        return (
-                                                            <div className="space-y-2 p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 border-dashed mt-2 mx-1">
-                                                                <div className="text-[11px] text-gray-400 font-extrabold uppercase tracking-widest text-center">
-                                                                    Phim đang chiếu hôm nay
-                                                                </div>
-                                                                <div className="text-[12px] text-gray-300 font-medium leading-relaxed flex flex-wrap justify-center gap-x-4 gap-y-2">
-                                                                    {titlesElement}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })()}
-
                                                 </div>
                                             )}
                                         </AccordionContent>
                                     </AccordionItem>
 
-                                    {/* 2. CHI TIẾT CHUYỂN KHOẢN */}
-                                    <AccordionItem value="item-2" className="border-none px-4">
-                                        <AccordionTrigger className="hover:no-underline py-4">
-                                            <div className="flex flex-col items-start gap-1 text-left">
-                                                <span className="text-sm font-black uppercase tracking-wider text-blue-400">
-                                                    Chi tiết chuyển khoản
-                                                </span>
-                                                <div className="text-xs text-gray-400 font-medium">Xem số tài khoản & nội dung</div>
-                                            </div>
-                                        </AccordionTrigger>
-                                        <AccordionContent className="pt-2 pb-4 space-y-4">
-                                            {[
-                                                {
-                                                    label: 'Ngân hàng',
-                                                    value: bankInfo.bankName || '—',
-                                                    copy: bankInfo.bankName
-                                                },
-                                                {
-                                                    label: 'Số tài khoản',
-                                                    value: bankInfo.accountNumber || '—',
-                                                    copy: bankInfo.accountNumber,
-                                                    mono: true
-                                                },
-                                                {
-                                                    label: 'Chủ tài khoản',
-                                                    value: bankInfo.accountName || '—',
-                                                    copy: bankInfo.accountName
-                                                },
-                                                {
-                                                    label: 'Nội dung',
-                                                    value: `${paymentData?.pay_txt_code || ''}`,
-                                                    copy: `${paymentData?.pay_txt_code || ''}`,
-                                                    mono: true,
-                                                    bold: true
-                                                }
-                                            ].map((item, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="flex justify-between items-center p-3 rounded-xl bg-white/5 border border-white/5 hover:border-blue-500/20 hover:bg-white/10 transition-all duration-300 group"
-                                                >
-                                                    <div className="flex-1 min-w-0 mr-3">
-                                                        <div className="text-[11px] font-bold text-gray-500 uppercase tracking-tighter mb-1">
-                                                            {item.label}
-                                                        </div>
-                                                        <div
-                                                            className={`text-[13px] truncate ${item.mono ? 'font-mono tracking-wider' : ''} font-bold text-white ${item.bold ? 'text-blue-200 underline underline-offset-4 decoration-blue-500/30' : ''}`}
-                                                        >
-                                                            {item.value}
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            copyToClipboard(item.copy, item.label);
-                                                        }}
-                                                        className="h-10 w-10 p-0 text-gray-400 hover:bg-blue-500/10 hover:text-blue-400 transition-all rounded-full shrink-0"
-                                                    >
-                                                        {copiedText === item.copy ? (
-                                                            <Check className="w-5 h-5 text-emerald-400 animate-in zoom-in" />
-                                                        ) : (
-                                                            <Copy className="w-5 h-5" />
-                                                        )}
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </AccordionContent>
-                                    </AccordionItem>
                                 </Accordion>
+                            </div>
+
+                            {/* HOW IT WORKS */}
+                            <div className="bg-gradient-to-br from-blue-500/10 to-emerald-500/5 border border-white/10 rounded-2xl overflow-hidden shadow-lg">
+                                <div className="p-4 space-y-4">
+                                    <div className="flex gap-4 items-start">
+                                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/20 text-blue-400 font-black text-sm">
+                                            1
+                                        </div>
+                                        <div className="text-sm text-gray-300 leading-relaxed pt-1">
+                                            <strong className="text-white">Thanh toán tự động:</strong> hệ thống xác nhận và gửi vé ngay khi
+                                            nhận được tiền. Bạn không cần tải lại trang.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/20 text-emerald-400 font-black text-sm">
+                                            2
+                                        </div>
+                                        <div className="text-sm text-gray-300 leading-relaxed pt-1">
+                                            <strong className="text-white">Đã chuyển khoản mà chưa thấy xác nhận?</strong> Bấm{' '}
+                                            <span className="text-emerald-400 font-bold">"Kiểm tra thanh toán"</span> để kiểm tra lại ngay.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white/5 px-4 py-3 border-t border-white/5 flex items-center gap-2">
+                                    <span className="text-xs text-gray-400 font-medium">Hỗ trợ 24/7:</span>
+                                    <a href={`tel:${HOTLINE.replace(/\s/g, '')}`} className="text-sm text-blue-400 font-black tracking-tight">
+                                        {HOTLINE}
+                                    </a>
+                                </div>
                             </div>
 
                             {/* Action Bar for Desktop */}
@@ -944,13 +923,13 @@ export default function QRPaymentPage() {
                                     className="w-auto h-14 px-6 bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-red-400 rounded-2xl transition-all duration-300 flex items-center justify-center shrink-0 active:scale-95 shadow-none group"
                                 >
                                     <XCircle className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                                    <span className="font-bold text-sm">Hủy giao dịch</span>
+                                    <span className="font-bold text-sm">Hủy thanh toán</span>
                                 </Button>
 
                                 <Button
                                     onClick={handleCheckPayment}
                                     disabled={isChecking}
-                                    className="w-full lg:w-48 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white h-14 text-base font-bold rounded-2xl transition-all duration-300 shadow-none transform active:scale-95"
+                                    className="w-full lg:w-60 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white h-14 text-base font-bold rounded-2xl transition-all duration-300 shadow-none transform active:scale-95"
                                 >
                                     {isChecking ? (
                                         <>
@@ -959,7 +938,7 @@ export default function QRPaymentPage() {
                                         </>
                                     ) : (
                                         <span className="flex items-center justify-center gap-2">
-                                            Xác nhận chuyển <Check className="w-6 h-6" />
+                                            Kiểm tra thanh toán <Check className="w-6 h-6" />
                                         </span>
                                     )}
                                 </Button>
@@ -973,9 +952,11 @@ export default function QRPaymentPage() {
             <div className="sm:hidden fixed bottom-0 left-0 right-0 px-4 py-4 pb-7 bg-[#050915] border-t border-white/10 z-[60] flex items-center gap-3 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
                 <Button
                     onClick={openCancelDialog}
-                    className="w-14 h-14 bg-white/5 border border-white/10 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-2xl transition-all duration-300 flex items-center justify-center shrink-0 active:scale-95 shadow-none"
+                    aria-label="Hủy thanh toán"
+                    className="h-14 px-4 bg-white/5 border border-white/10 text-gray-300 hover:text-red-400 hover:bg-red-500/10 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 shrink-0 active:scale-95 shadow-none"
                 >
-                    <XCircle className="w-6 h-6" />
+                    <XCircle className="w-5 h-5" />
+                    <span className="font-bold text-sm">Hủy</span>
                 </Button>
 
                 <Button
@@ -990,7 +971,7 @@ export default function QRPaymentPage() {
                         </>
                     ) : (
                         <span className="flex items-center justify-center gap-2">
-                            Xác nhận chuyển <Check className="w-6 h-6" />
+                            Kiểm tra thanh toán <Check className="w-6 h-6" />
                         </span>
                     )}
                 </Button>
@@ -1004,29 +985,19 @@ export default function QRPaymentPage() {
                             Chưa nhận được thanh toán
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-gray-300 text-base leading-relaxed text-center">
-                            Chúng tôi chưa nhận được thanh toán của bạn.
+                            Ngân hàng đôi khi cần 1-2 phút để báo tiền về. Trang sẽ tự cập nhật ngay khi nhận được tiền.
                             <br />
                             <br />
-                            Nếu bạn đã chuyển khoản nhưng vẫn gặp lỗi,
-                            <br />
-                            vui lòng liên hệ hotline <span className="font-bold text-blue-400">036 643 1179</span>.
+                            Nếu bạn đã chuyển khoản mà sau 5 phút vẫn chưa thấy xác nhận, vui lòng liên hệ hotline{' '}
+                            <span className="font-bold text-blue-400">{HOTLINE}</span> và cung cấp nội dung chuyển khoản.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                        <AlertDialogCancel
-                            onClick={() => {
-                                setShowUnpaidDialog(false);
-                                performCancelPayment();
-                            }}
-                            className="bg-white/5 border-white/10 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-300"
-                        >
-                            Hủy thanh toán
-                        </AlertDialogCancel>
+                    <AlertDialogFooter>
                         <AlertDialogAction
                             onClick={() => setShowUnpaidDialog(false)}
-                            className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all duration-300 transform active:scale-95"
+                            className="w-full h-11 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-[0_4px_20px_rgba(16,185,129,0.3)] transition-all duration-300 transform active:scale-95"
                         >
-                            Thử lại
+                            Tiếp tục chờ
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1047,21 +1018,41 @@ export default function QRPaymentPage() {
                                         : 'Đơn hàng đã bị hủy hoặc đã hết hạn thanh toán.'}{' '}
                                     Vui lòng đặt vé lại nếu bạn muốn tiếp tục.
                                 </p>
-                                <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-left space-y-1">
+                                <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-left space-y-2">
                                     <p className="text-amber-300 font-bold">Nếu bạn đã chuyển khoản</p>
                                     <p>
-                                        Liên hệ hotline <span className="font-bold text-blue-400">036 643 1179</span> và cung cấp:
+                                        Liên hệ hotline <span className="font-bold text-blue-400">{HOTLINE}</span> và cung cấp thông tin
+                                        dưới đây, nhân viên sẽ kiểm tra và hỗ trợ bạn.
                                     </p>
-                                    <p>
-                                        Nội dung chuyển khoản:{' '}
-                                        <span className="font-mono font-bold text-white">{paymentData?.pay_txt_code}</span>
-                                    </p>
-                                    <p>
-                                        Số tiền:{' '}
-                                        <span className="font-bold text-white">
-                                            {new Intl.NumberFormat('vi-VN').format(Number(paymentData?.totalAmount || paymentData?.amount || 0))}₫
-                                        </span>
-                                    </p>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="min-w-0">
+                                            Nội dung chuyển khoản:{' '}
+                                            <span className="font-mono font-bold text-white break-all">{paymentData?.pay_txt_code}</span>
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            aria-label="Sao chép nội dung chuyển khoản"
+                                            onClick={() => copyToClipboard(String(paymentData?.pay_txt_code || ''), 'nội dung chuyển khoản')}
+                                            className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 shrink-0 border-white/20 bg-transparent text-gray-200"
+                                        >
+                                            <Copy className="w-5 h-5" />
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="min-w-0">
+                                            Số tiền: <span className="font-bold text-white">{amountText}</span>
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            aria-label="Sao chép số tiền"
+                                            onClick={() => copyToClipboard(String(amountNumber), 'số tiền')}
+                                            className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 shrink-0 border-white/20 bg-transparent text-gray-200"
+                                        >
+                                            <Copy className="w-5 h-5" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </AlertDialogDescription>
@@ -1072,7 +1063,7 @@ export default function QRPaymentPage() {
                                 setShowExpiredDialog(false);
                                 router.replace('/booking');
                             }}
-                            className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400"
+                            className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400"
                         >
                             Quay lại đặt vé
                         </AlertDialogAction>
@@ -1085,13 +1076,15 @@ export default function QRPaymentPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-bold text-white text-center">Hủy thanh toán?</AlertDialogTitle>
                         <AlertDialogDescription className="text-gray-300 text-center">
-                            Bạn có muốn hủy giao dịch này
+                            Bạn có muốn hủy thanh toán này
                             <br />
                             và quay lại trang đặt vé không?
+                            <br />
+                            <span className="text-amber-300">Nếu bạn vừa chuyển khoản, hãy chọn "Đóng" và chờ xác nhận.</span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white">
+                        <AlertDialogCancel className="h-11 bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white">
                             Đóng
                         </AlertDialogCancel>
                         <AlertDialogAction
@@ -1099,9 +1092,9 @@ export default function QRPaymentPage() {
                                 setShowCancelDialog(false);
                                 performCancelPayment();
                             }}
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            className="h-11 bg-red-600 hover:bg-red-700 text-white"
                         >
-                            Hủy giao dịch
+                            Hủy thanh toán
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

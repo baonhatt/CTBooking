@@ -179,14 +179,16 @@ export default function CartDrawer() {
                   <button
                     onClick={clearAll}
                     title="Xóa toàn bộ giỏ hàng"
-                    className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg text-xs transition-colors"
+                    aria-label="Xóa toàn bộ giỏ hàng"
+                    className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg text-xs transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   onClick={closeCart}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  aria-label="Đóng giỏ hàng"
+                  className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -196,7 +198,7 @@ export default function CartDrawer() {
             {/* Select All Bar (Shopee Style) */}
             {items.length > 0 && (
               <div className="px-4 sm:px-5 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between text-xs">
-                <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-300 hover:text-white">
+                <label className="flex items-center gap-2.5 min-h-[44px] cursor-pointer select-none text-slate-300 hover:text-white">
                   <Checkbox
                     checked={isAllSelected}
                     onCheckedChange={(checked) => selectAll(Boolean(checked))}
@@ -269,13 +271,14 @@ export default function CartDrawer() {
                     >
                       <div className="flex items-start gap-3">
                         {/* Checkbox */}
-                        <div className="pt-2">
+                        <label className="flex items-start justify-center w-11 h-11 -ml-3 pt-3.5 cursor-pointer shrink-0">
                           <Checkbox
+                            aria-label={`Chọn ${item.name}`}
                             checked={item.selected}
                             onCheckedChange={() => toggleSelect(item.id)}
                             className="border-white/30 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
                           />
-                        </div>
+                        </label>
 
                         {/* Thumbnail / Icon Badge */}
                         <div className="relative w-16 h-16 sm:w-18 sm:h-18 rounded-xl overflow-hidden bg-slate-900 border border-white/10 shrink-0 flex items-center justify-center">
@@ -297,7 +300,7 @@ export default function CartDrawer() {
                             </div>
                           )}
                           <span
-                            className={`absolute bottom-0 inset-x-0 text-[9px] font-extrabold text-center uppercase tracking-wider py-0.5 ${
+                            className={`absolute bottom-0 inset-x-0 text-xs font-extrabold text-center uppercase tracking-wider py-0.5 ${
                               isMovie ? 'bg-blue-600/90 text-white' : 'bg-purple-600/90 text-white'
                             }`}
                           >
@@ -313,8 +316,9 @@ export default function CartDrawer() {
                             </h4>
                             <button
                               onClick={() => removeItem(item.id)}
-                              className="text-slate-400 hover:text-rose-400 p-1 transition-colors"
+                              className="w-11 h-11 -mr-2 -mt-3 shrink-0 flex items-center justify-center text-slate-400 hover:text-rose-400 transition-colors"
                               title="Xóa"
+                              aria-label={`Xóa ${item.name}`}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -322,9 +326,9 @@ export default function CartDrawer() {
 
                           <div className="flex items-center gap-2 mt-1">
                             {isMovie ? (
-                              <span className="text-[11px] text-cyan-300 font-medium">Hologram 8K đa chiều</span>
+                              <span className="text-xs text-cyan-300 font-medium">Hologram 8K đa chiều</span>
                             ) : (
-                              <span className="text-[11px] text-purple-300 font-medium">
+                              <span className="text-xs text-purple-300 font-medium">
                                 {item.duration_min ? `${item.duration_min} phút • ` : ''}Thực tế ảo
                               </span>
                             )}
@@ -333,22 +337,22 @@ export default function CartDrawer() {
                           {/* Price & Quantity Controls */}
                           <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-white/5">
                             <div>
-                              <span className="text-xs text-slate-400">{formatMoney(item.price)}₫</span>
-                              <div className="text-sm font-extrabold text-white">{formatMoney(itemTotal)}₫</div>
+                              <span className="text-xs text-slate-400">{formatMoney(item.price)} ₫</span>
+                              <div className="text-sm font-extrabold text-white">{formatMoney(itemTotal)} ₫</div>
                             </div>
 
                             {/* Quantity buttons */}
                             <div className="flex items-center bg-white/10 border border-white/15 rounded-lg overflow-hidden">
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="w-7 h-7 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"
+                                className="w-11 h-11 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
                               <span className="w-8 text-center text-xs font-bold text-white">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-7 h-7 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"
+                                className="w-11 h-11 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"
                               >
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -379,7 +383,7 @@ export default function CartDrawer() {
                       Tổng thanh toán:
                     </span>
                     <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-cyan-300 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                      {formatMoney(selectedSubtotal)}₫
+                      {formatMoney(selectedSubtotal)} ₫
                     </span>
                   </div>
 

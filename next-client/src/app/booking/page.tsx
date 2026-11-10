@@ -60,12 +60,43 @@ import {
 } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 import { getCookie } from '@/lib/cookies';
+import { suggestEmailFix } from '@shared/email-hint';
+import { useAuthState } from '@/hooks/useAuthState';
+import { getPublicSchedule } from '@/lib/api/schedule';
 import { useCart, cartStore } from '@/store/cartStore';
 
 export default function BookingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { selectedBranch } = useBranch();
+  // A guest sees "log in to fill in your details"; the check waits for the first render so a signed-in customer never sees it flash
+  const { userName } = useAuthState();
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => setAuthChecked(true), []);
+
+  // Opening hours of the branch, shown with its address at the top
+  const [branchHours, setBranchHours] = useState<{ opensAt: string; closesAt: string } | null>(null);
+  useEffect(() => {
+    const branchId = Number(selectedBranch?.id);
+    if (!branchId) {
+      setBranchHours(null);
+      return;
+    }
+    let isCancelled = false;
+    getPublicSchedule(branchId)
+      .then((schedule) => {
+        if (isCancelled) return;
+        setBranchHours(
+          schedule.opens_at && schedule.closes_at ? { opensAt: schedule.opens_at, closesAt: schedule.closes_at } : null
+        );
+      })
+      .catch(() => {
+        if (!isCancelled) setBranchHours(null);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedBranch?.id]);
   const {
     items: allCartItems,
     selectedItems: cartSelectedItems,
@@ -80,6 +111,8 @@ export default function BookingPage() {
   const [phoneError, setPhoneError] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [emailError, setEmailError] = useState<string>('');
+  // "Did you mean gmail.com?" for a mistyped provider; it never blocks the order
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const paymentMethod = 'vietqr' as const;
   const [isProcessing, setIsProcessing] = useState(false);
   const isBookingSubmittingRef = useRef(false);
@@ -341,7 +374,6 @@ export default function BookingPage() {
     if (
       email &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
-      /@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email) &&
       formErrors.email
     ) {
       setFormErrors((prev) => ({ ...prev, email: '' }));
@@ -391,7 +423,7 @@ export default function BookingPage() {
       if (res?.valid) {
         setAppliedVoucher(res);
         toast.success('Áp mã thành công', {
-          description: `Tiết kiệm ${Number(res.discount_amount || 0).toLocaleString('vi-VN')}₫`
+          description: `Tiết kiệm ${Number(res.discount_amount || 0).toLocaleString('vi-VN')} ₫`
         });
       } else {
         setAppliedVoucher(null);
@@ -437,8 +469,6 @@ export default function BookingPage() {
       errors.email = 'Vui lòng nhập email nhận vé';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errors.email = 'Email không hợp lệ';
-    } else if (!/@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email)) {
-      errors.email = 'Vui lòng dùng Gmail, Outlook, Yahoo hoặc iCloud';
     } else if (emailError) {
       errors.email = emailError;
     }
@@ -447,21 +477,30 @@ export default function BookingPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const isFormValid = useMemo(() => {
-    if (selectedItems.length === 0) return false;
-    if (!name.trim() || name.trim().length < 2) return false;
-    if (!phone.trim() || phone.length !== 10 || !phone.startsWith('0') || Boolean(phoneError)) return false;
-    if (
-      !email.trim() ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-      !/@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(email) ||
-      Boolean(emailError)
-    ) {
-      return false;
+  // The first thing still missing, in the order of the form; '' when the order can be placed
+  const missingReason = useMemo(() => {
+    if (selectedItems.length === 0) return '';
+    if (!name.trim() || name.trim().length < 2) return 'họ và tên';
+    if (!phone.trim() || phone.length !== 10 || !phone.startsWith('0') || Boolean(phoneError)) {
+      return 'số điện thoại 10 số, bắt đầu bằng 0';
     }
-    if (!confirmChecked) return false;
-    return true;
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || Boolean(emailError)) return 'email nhận vé hợp lệ';
+    if (!confirmChecked) return 'tích đồng ý điều khoản đặt vé';
+    return '';
   }, [selectedItems.length, name, phone, phoneError, email, emailError, confirmChecked]);
+
+  // Scrolls to the field that still needs attention, so a tap on "pay" with a gap shows where it is
+  const focusFirstProblem = () => {
+    let targetId = '';
+    if (!name.trim() || name.trim().length < 2) targetId = 'booking-name';
+    else if (!phone.trim() || phone.length !== 10 || !phone.startsWith('0') || phoneError) targetId = 'booking-phone';
+    else if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || emailError) targetId = 'booking-email';
+    else if (!confirmChecked) targetId = 'agree-terms';
+    const element = targetId ? document.getElementById(targetId) : null;
+    if (!element) return;
+    element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    element.focus({ preventScroll: true });
+  };
 
   const handleCheckoutSubmit = () => {
     if (isProcessing) return;
@@ -475,12 +514,14 @@ export default function BookingPage() {
       toast.error('Vui lòng hoàn tất thông tin', {
         description: 'Kiểm tra lại các mục báo đỏ trên biểu mẫu'
       });
+      focusFirstProblem();
       return;
     }
     if (!confirmChecked) {
       toast.error('Chưa xác nhận điều khoản', {
         description: 'Vui lòng đánh dấu tick đồng ý điều khoản đặt vé'
       });
+      focusFirstProblem();
       return;
     }
 
@@ -701,14 +742,14 @@ export default function BookingPage() {
           <div className="absolute inset-0 neon-noise opacity-20" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 sm:pt-36 pb-28 sm:pb-20">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 sm:pt-36 pb-44 lg:pb-20">
           {/* Breadcrumb Navigation */}
           <div className="text-xs sm:text-sm pt-2 pb-6 flex items-center gap-2 text-slate-400">
-            <button onClick={() => router.push('/')} className="hover:text-cyan-400 transition-colors">
+            <button onClick={() => router.push('/')} className="inline-flex items-center min-h-[44px] hover:text-cyan-400 transition-colors">
               Trang chủ
             </button>
             <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-            <button onClick={openCart} className="hover:text-cyan-400 transition-colors">
+            <button onClick={openCart} className="inline-flex items-center min-h-[44px] hover:text-cyan-400 transition-colors">
               Giỏ hàng ({selectedItems.length})
             </button>
             <ChevronRight className="w-3.5 h-3.5 opacity-50" />
@@ -725,16 +766,22 @@ export default function BookingPage() {
                 <div className="space-y-1.5 sm:space-y-2">
                   <h1 className="text-xl sm:text-3xl font-black text-white tracking-wide flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 items-start">
                     <span>Xác Nhận Đơn Hàng</span>
-                    <span className="text-[10px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+                    <span className="text-xs sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
                       {selectedItems.length} dịch vụ đã chọn
                     </span>
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-400">
                     Chi nhánh:{' '}
                     <span className="text-cyan-300 font-semibold">
-                      {selectedBranch?.name || 'CineSphere Mega Mall'}
+                      {selectedBranch?.name || 'Cinesphere Mega Mall'}
                     </span>
                   </p>
+                  {selectedBranch?.address && (
+                    <p className="text-xs sm:text-sm text-slate-400">
+                      {selectedBranch.address}
+                      {branchHours ? ` · Mở cửa ${branchHours.opensAt} – ${branchHours.closesAt}` : ''}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -840,7 +887,7 @@ export default function BookingPage() {
                                     </div>
                                   )}
                                   {item.duration_min && (
-                                    <span className="absolute bottom-1 right-1 bg-black/80 backdrop-blur-xs text-[9px] font-bold text-white px-1 py-0.2 rounded">
+                                    <span className="absolute bottom-1 right-1 bg-black/80 backdrop-blur-xs text-xs font-bold text-white px-1 py-0.2 rounded">
                                       {item.duration_min}'
                                     </span>
                                   )}
@@ -852,7 +899,7 @@ export default function BookingPage() {
                                       {item.name}
                                     </h4>
                                     <span
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                      className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
                                         isMovie
                                           ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300'
                                           : 'bg-purple-500/15 border-purple-500/30 text-purple-300'
@@ -862,7 +909,7 @@ export default function BookingPage() {
                                     </span>
                                   </div>
                                   <p className="text-xs text-slate-400 flex items-center gap-2">
-                                    <span>Đơn giá: {item.price.toLocaleString('vi-VN')}₫</span>
+                                    <span>Đơn giá: {item.price.toLocaleString('vi-VN')} ₫</span>
                                   </p>
                                 </div>
                               </div>
@@ -885,7 +932,7 @@ export default function BookingPage() {
                                         updateQuantity(item.id, item.quantity - 1);
                                       }
                                     }}
-                                    className="w-7 h-7 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors disabled:opacity-30"
+                                    className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-colors disabled:opacity-30"
                                     disabled={item.quantity <= 1}
                                     title="Giảm số lượng"
                                   >
@@ -906,7 +953,7 @@ export default function BookingPage() {
                                         updateQuantity(item.id, item.quantity + 1);
                                       }
                                     }}
-                                    className="w-7 h-7 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 flex items-center justify-center transition-colors shadow-xs"
+                                    className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 flex items-center justify-center transition-colors shadow-xs"
                                     title="Tăng số lượng"
                                   >
                                     <Plus className="w-3.5 h-3.5" />
@@ -916,7 +963,7 @@ export default function BookingPage() {
                                 {/* Total Line Money */}
                                 <div className="text-right min-w-[100px]">
                                   <p className="text-sm sm:text-base font-black text-white">
-                                    {lineTotal.toLocaleString('vi-VN')}₫
+                                    {lineTotal.toLocaleString('vi-VN')} ₫
                                   </p>
                                 </div>
 
@@ -933,8 +980,9 @@ export default function BookingPage() {
                                       removeItem(item.id);
                                     }
                                   }}
-                                  className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  className="w-11 h-11 shrink-0 flex items-center justify-center text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                                   title="Xóa mục này"
+                                  aria-label="Xóa mục này"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -971,7 +1019,7 @@ export default function BookingPage() {
                             Xem lịch chiếu đầy đủ &rarr;
                           </button>
                           <div className="flex items-center gap-1.5 px-2 py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/20 group-hover:bg-cyan-500/15 transition-colors">
-                            <span className="text-[11px] sm:text-xs text-cyan-400 font-semibold">{availableMovies.length} phim</span>
+                            <span className="text-xs sm:text-xs text-cyan-400 font-semibold">{availableMovies.length} phim</span>
                             <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 lg:hidden transition-transform duration-300 ${isMoviesOpen ? 'rotate-180' : ''}`} />
                           </div>
                         </div>
@@ -1002,11 +1050,11 @@ export default function BookingPage() {
                                   {m.title}
                                 </p>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-[9px] text-cyan-300 font-bold border border-cyan-500/30">
+                                  <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-xs text-cyan-300 font-bold border border-cyan-500/30">
                                     {m.duration_min ? `${m.duration_min} Phút` : '8K'}
                                   </span>
                                   {m.genres && (
-                                    <span className="text-[9px] text-slate-400 truncate">
+                                    <span className="text-xs text-slate-400 truncate">
                                       {Array.isArray(m.genres)
                                         ? m.genres.map((g: any) => (typeof g === 'object' && g ? g.name : String(g))).join(', ')
                                         : String(m.genres)}
@@ -1037,6 +1085,7 @@ export default function BookingPage() {
               </div>
 
               {/* ================= RIGHT COLUMN: CUSTOMER, PAYMENT & SUMMARY (5 cols) ================= */}
+              {selectedItems.length > 0 && (
               <div className="contents lg:block lg:col-span-5 lg:space-y-6">
                 {/* 1. CUSTOMER INFO CARD */}
                 <Card className="order-2 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
@@ -1048,12 +1097,27 @@ export default function BookingPage() {
                   </CardHeader>
 
                   <CardContent className="p-5 space-y-4">
+                    {authChecked && !userName && (
+                      <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 text-xs text-slate-300 flex items-center justify-between gap-3">
+                        <span>Có tài khoản? Đăng nhập để tự điền thông tin và xem lại vé.</span>
+                        <button
+                          type="button"
+                          onClick={() => window.dispatchEvent(new CustomEvent('open-login-dialog'))}
+                          className="shrink-0 min-h-[44px] px-2 font-bold text-cyan-300 underline"
+                        >
+                          Đăng nhập
+                        </button>
+                      </div>
+                    )}
                     {/* Họ tên */}
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="booking-name" className="text-xs font-semibold text-slate-300">
                         Họ và Tên <span className="text-cyan-400">*</span>
                       </Label>
                       <Input
+                        id="booking-name"
+                        name="name"
+                        autoComplete="name"
                         value={name}
                         onChange={(e) => {
                           setName(e.target.value);
@@ -1062,21 +1126,25 @@ export default function BookingPage() {
                           }
                         }}
                         placeholder="Ví dụ: Nguyễn Văn A"
-                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-sm rounded-xl ${
+                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
                           formErrors.name ? 'border-orange-500/50' : ''
                         }`}
                       />
                       {formErrors.name && (
-                        <p className="text-orange-400 text-[11px] animate-pulse">{formErrors.name}</p>
+                        <p className="text-orange-400 text-xs animate-pulse">{formErrors.name}</p>
                       )}
                     </div>
 
                     {/* SĐT */}
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="booking-phone" className="text-xs font-semibold text-slate-300">
                         Số Điện Thoại <span className="text-cyan-400">*</span>
                       </Label>
                       <Input
+                        id="booking-phone"
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
                         value={phone}
                         maxLength={10}
                         inputMode="numeric"
@@ -1091,43 +1159,66 @@ export default function BookingPage() {
                           }
                         }}
                         placeholder="VD: 0912345678"
-                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-sm rounded-xl ${
+                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
                           phoneError || formErrors.phone ? 'border-orange-500/50' : ''
                         }`}
                       />
                       {(phoneError || formErrors.phone) && (
-                        <p className="text-orange-400 text-[11px] animate-pulse">{phoneError || formErrors.phone}</p>
+                        <p className="text-orange-400 text-xs animate-pulse">{phoneError || formErrors.phone}</p>
                       )}
                     </div>
 
                     {/* Email */}
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-300">
+                      <Label htmlFor="booking-email" className="text-xs font-semibold text-slate-300">
                         Email Nhận Mã Đặt Vé <span className="text-cyan-400">*</span>
                       </Label>
                       <Input
+                        id="booking-email"
+                        name="email"
                         type="email"
+                        autoComplete="email"
+                        inputMode="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
                         value={email}
                         onChange={(e) => {
                           const val = e.target.value;
                           setEmail(val);
                           if (!val) {
                             setEmailError('');
+                            setEmailSuggestion(null);
                           } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
                             setEmailError('Email không đúng định dạng');
-                          } else if (!/@(gmail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(val)) {
-                            setEmailError('Vui lòng dùng Gmail, Outlook, Yahoo hoặc iCloud');
+                            setEmailSuggestion(null);
                           } else {
                             setEmailError('');
+                            setEmailSuggestion(suggestEmailFix(val));
                           }
                         }}
                         placeholder="you@email.com"
-                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-sm rounded-xl ${
+                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
                           emailError || formErrors.email ? 'border-orange-500/50' : ''
                         }`}
                       />
                       {(emailError || formErrors.email) && (
-                        <p className="text-orange-400 text-[11px] animate-pulse">{emailError || formErrors.email}</p>
+                        <p className="text-orange-400 text-xs animate-pulse">{emailError || formErrors.email}</p>
+                      )}
+                      {!emailError && emailSuggestion && (
+                        <p className="text-xs text-amber-300 flex flex-wrap items-center gap-x-1">
+                          Có phải bạn muốn dùng
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEmail(emailSuggestion);
+                              setEmailSuggestion(null);
+                            }}
+                            className="min-h-[44px] font-bold underline break-all"
+                          >
+                            {emailSuggestion}
+                          </button>
+                          ?
+                        </p>
                       )}
                     </div>
                   </CardContent>
@@ -1156,11 +1247,11 @@ export default function BookingPage() {
                               <p className="font-bold text-white truncate">
                                 {appliedVoucher?.voucher_details?.code?.toUpperCase() || voucherCode.toUpperCase()}
                               </p>
-                              <p className="text-[11px] text-emerald-300 font-bold">
-                                Đã giảm: -{voucherDiscount.toLocaleString('vi-VN')}₫
+                              <p className="text-xs text-emerald-300 font-bold">
+                                Đã giảm: -{voucherDiscount.toLocaleString('vi-VN')} ₫
                               </p>
                               {appliedVoucher?.voucher_details?.description && (
-                                <p className="text-[10px] text-emerald-400 mt-1 line-clamp-2" title={appliedVoucher.voucher_details.description}>
+                                <p className="text-xs text-emerald-400 mt-1 line-clamp-2" title={appliedVoucher.voucher_details.description}>
                                   {appliedVoucher.voucher_details.description}
                                 </p>
                               )}
@@ -1170,7 +1261,8 @@ export default function BookingPage() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="text-slate-400 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+                            className="text-slate-400 hover:text-white hover:bg-white/10 h-11 w-11 p-0"
+                            aria-label="Bỏ mã giảm giá"
                             onClick={() => {
                               setAppliedVoucher(null);
                               setVoucherCode('');
@@ -1184,11 +1276,13 @@ export default function BookingPage() {
                         <div className="flex gap-2">
                           <Input
                             type="text"
+                            autoComplete="off"
+                            autoCapitalize="characters"
                             placeholder="NHẬP MÃ GIẢM GIÁ"
                             value={voucherCode}
                             onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
                             onKeyDown={(e) => e.key === 'Enter' && applyVoucher()}
-                            className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 uppercase font-mono font-bold text-xs rounded-xl"
+                            className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 uppercase font-mono font-bold text-base md:text-sm rounded-xl"
                           />
                           <Button
                             type="button"
@@ -1222,7 +1316,7 @@ export default function BookingPage() {
                           <Film className="w-3.5 h-3.5 text-cyan-400" />
                           Vé xem phim 8K ({totalMovieCount} vé)
                         </span>
-                        <span className="font-semibold text-white">{movieSubtotal.toLocaleString('vi-VN')}₫</span>
+                        <span className="font-semibold text-white">{movieSubtotal.toLocaleString('vi-VN')} ₫</span>
                       </div>
                     )}
 
@@ -1233,7 +1327,7 @@ export default function BookingPage() {
                           <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
                           Gói trải nghiệm VR ({totalVrCount} lượt)
                         </span>
-                        <span className="font-semibold text-white">{vrSubtotal.toLocaleString('vi-VN')}₫</span>
+                        <span className="font-semibold text-white">{vrSubtotal.toLocaleString('vi-VN')} ₫</span>
                       </div>
                     )}
 
@@ -1244,19 +1338,19 @@ export default function BookingPage() {
                           <Tag className="w-3.5 h-3.5" />
                           Giảm giá Voucher ({appliedVoucher?.voucher_details?.code?.toUpperCase()})
                         </span>
-                        <span className="font-bold">-{voucherDiscount.toLocaleString('vi-VN')}₫</span>
+                        <span className="font-bold">-{voucherDiscount.toLocaleString('vi-VN')} ₫</span>
                       </div>
                     )}
 
                     {/* Total Final Price */}
                     <div className="pt-3 border-t border-white/10 flex justify-between items-end">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Tổng thanh toán</p>
-                        <p className="text-[11px] text-slate-500">Đã bao gồm VAT &amp; dịch vụ</p>
+                        <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">Tổng thanh toán</p>
+                        <p className="text-xs text-slate-500">Đã bao gồm VAT &amp; dịch vụ</p>
                       </div>
                       <div className="text-right">
                         <p className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-cyan-300 via-cyan-400 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(6,182,212,0.35)]">
-                          {totalPrice.toLocaleString('vi-VN')}₫
+                          {totalPrice.toLocaleString('vi-VN')} ₫
                         </p>
                       </div>
                     </div>
@@ -1278,22 +1372,22 @@ export default function BookingPage() {
                           id="agree-terms"
                           checked={confirmChecked}
                           onCheckedChange={(c) => setConfirmChecked(c === true)}
-                          className="mt-0.5 border-white/30 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
+                          className="mt-0.5 h-5 w-5 border-white/30 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
                         />
                         <label
                           htmlFor="agree-terms"
-                          className="text-[11px] leading-relaxed text-slate-400 cursor-pointer select-none"
+                          className="text-xs leading-relaxed text-slate-400 cursor-pointer select-none py-1"
                         >
-                          Tôi đã kiểm tra kỹ thông tin đơn hàng và đồng ý với điều khoản đặt vé của CineSphere.
+                          Tôi đã kiểm tra kỹ thông tin đơn hàng và đồng ý với điều khoản đặt vé của Cinesphere.
                         </label>
                       </div>
                     </div>
 
                     {/* Action Submit Button */}
-                    <div className="pt-2">
+                    <div className="pt-2 hidden lg:block">
                       <Button
                         type="button"
-                        disabled={isProcessing || !isFormValid}
+                        disabled={isProcessing}
                         onClick={handleCheckoutSubmit}
                         className="w-full h-14 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 hover:from-cyan-300 hover:via-blue-400 hover:to-purple-500 text-black font-extrabold text-base rounded-xl shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(6,182,212,0.5)] transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
                       >
@@ -1309,36 +1403,40 @@ export default function BookingPage() {
                           </span>
                         )}
                       </Button>
-                      {!isFormValid && selectedItems.length > 0 && (
-                        <p className="text-[11px] text-amber-400/90 text-center mt-2 font-medium">
-                          💡 Vui lòng hoàn tất thông tin nhận vé & đồng ý điều khoản để thanh toán
+                      {missingReason && (
+                        <p className="text-xs text-amber-400/90 text-center mt-2 font-medium">
+                          Còn thiếu: {missingReason}
                         </p>
                       )}
                     </div>
                   </CardContent>
                 </Card>
               </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Sticky Bottom Action Bar on Mobile */}
         {selectedItems.length > 0 && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 p-4 bg-slate-950/95 backdrop-blur-xl border-t border-white/10 shadow-2xl">
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-slate-950/95 backdrop-blur-xl border-t border-white/10 shadow-2xl">
+            {missingReason && (
+              <p className="text-xs text-amber-300 text-center mb-2">Còn thiếu: {missingReason}</p>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[10px] text-slate-400 uppercase font-bold truncate">
+                <p className="text-xs text-slate-400 uppercase font-bold truncate">
                   Tổng ({selectedItems.reduce((s, i) => s + i.quantity, 0)} mục)
                 </p>
-                <p className="text-lg font-black text-cyan-300 leading-tight">{totalPrice.toLocaleString('vi-VN')}₫</p>
+                <p className="text-lg font-black text-cyan-300 leading-tight">{totalPrice.toLocaleString('vi-VN')} ₫</p>
               </div>
               <Button
                 type="button"
-                disabled={isProcessing || !isFormValid}
+                disabled={isProcessing}
                 onClick={handleCheckoutSubmit}
-                className="px-6 h-12 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-sm rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                className="px-5 h-12 shrink-0 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-sm rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
               >
-                Thanh toán
+                {isProcessing ? 'Đang xử lý...' : 'Xác nhận & thanh toán'}
               </Button>
             </div>
           </div>
@@ -1352,21 +1450,21 @@ export default function BookingPage() {
                 <CheckCircle2 className="w-5 h-5 text-cyan-400" />
                 Kiểm tra thông tin nhận vé
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-300 text-xs leading-relaxed space-y-3 pt-2">
+              <AlertDialogDescription className="text-slate-300 text-sm leading-relaxed space-y-3 pt-2">
                 <span className="block">Mã đặt vé và hướng dẫn check-in sẽ được gửi trực tiếp tới email của bạn:</span>
                 <span className="block p-3 rounded-xl bg-white/5 border border-white/10 font-bold text-cyan-300 text-sm break-all text-center">
                   {email}
                 </span>
-                <span className="block text-[11px] text-slate-400">
+                <span className="block text-xs text-slate-400">
                   Vui lòng đảm bảo email trên là chính xác để không bỏ lỡ mã vé.
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="flex gap-2 pt-3">
+            <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-3">
               <AlertDialogCancel
                 disabled={isProcessing}
                 onClick={() => setShowEmailConfirmDialog(false)}
-                className="border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 text-xs rounded-xl font-bold h-10 px-4 disabled:opacity-50"
+                className="border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 text-sm rounded-xl font-bold h-11 px-4 disabled:opacity-50"
               >
                 Đổi email khác
               </AlertDialogCancel>
@@ -1378,7 +1476,7 @@ export default function BookingPage() {
                   setShowEmailConfirmDialog(false);
                   performBooking();
                 }}
-                className="bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-xs rounded-xl h-10 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-black font-extrabold text-sm rounded-xl h-11 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isProcessing ? (
                   <>

@@ -42,14 +42,27 @@ export async function findBookingForOwner(
 /**
  * The only booking data the payment page may read: the payment state and the deadline, plus the server clock so the
  * browser can count down against the server's time instead of its own.
- * It never includes a name, phone, email, ticket code or any other personal data.
+ * It never includes a name, phone, email or any other personal data.
+ * The ticket code (booking_code) is added only once the order is paid. Callers reach this payload only after
+ * findBookingForOwner proved they placed the order (order token or owning account), and the same code goes to them
+ * by email, so the result page can show it.
  */
-export function bookingStatusPayload(booking: { id: number; payment_status?: string | null; payment_expires_at?: string | null }) {
-  return {
+export function bookingStatusPayload(booking: {
+  id: number;
+  payment_status?: string | null;
+  payment_expires_at?: string | null;
+  booking_code?: string | null;
+}) {
+  const paymentStatus = String(booking.payment_status || 'pending').toLowerCase();
+  const payload: Record<string, unknown> = {
     status: 'success',
     id: booking.id,
-    payment_status: String(booking.payment_status || 'pending').toLowerCase(),
+    payment_status: paymentStatus,
     payment_expires_at: booking.payment_expires_at || null,
     server_now: formatDateForDb(new Date())
   };
+  if (paymentStatus === 'paid' && booking.booking_code) {
+    payload.booking_code = booking.booking_code;
+  }
+  return payload;
 }

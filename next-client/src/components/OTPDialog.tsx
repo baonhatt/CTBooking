@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildUrl } from '@/lib/api/http';
+import { AUTH_DIALOG_CLASS } from '@/components/constants';
 import { setCookie } from '@/lib/cookies';
 
 interface OTPDialogProps {
@@ -32,6 +33,8 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
   const turnstileWidgetId = useRef<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // The code already sent for checking, so a complete code is submitted once, not on every render
+  const autoSubmitCodeRef = useRef('');
 
   // Handle Turnstile explicit render
   useEffect(() => {
@@ -135,22 +138,33 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
     return () => clearInterval(timer);
   }, [isOpen, resendCooldown]);
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      value = value[0];
+  // Puts digits into the boxes from startIndex on, and moves the focus after the last one
+  const fillBoxes = (startIndex: number, digits: string) => {
+    const newOtp = [...otp];
+    for (let offset = 0; offset < digits.length && startIndex + offset < 6; offset++) {
+      newOtp[startIndex + offset] = digits[offset];
     }
+    setOtp(newOtp);
+    setError('');
+    inputRefs.current[Math.min(startIndex + digits.length, 5)]?.focus();
+  };
 
-    if (!/^\d*$/.test(value)) {
+  const handleOtpChange = (index: number, value: string) => {
+    const digits = value.replace(/\D/g, '');
+
+    // The phone's SMS suggestion puts the whole code into one box
+    if (digits.length > 1) {
+      fillBoxes(digits.length >= 6 ? 0 : index, digits.slice(0, 6));
       return;
     }
 
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = digits;
     setOtp(newOtp);
     setError('');
 
     // Auto-focus next input
-    if (value && index < 5) {
+    if (digits && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
@@ -163,35 +177,17 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
-    if (!/^\d+$/.test(pastedData)) return;
-
-    const newOtp = [...otp];
-    for (let i = 0; i < pastedData.length; i++) {
-      newOtp[i] = pastedData[i];
-    }
-    setOtp(newOtp);
-
-    // Focus the next empty input or the last filled one
-    const nextEmptyIndex = newOtp.findIndex((val) => val === '');
-    if (nextEmptyIndex !== -1) {
-      inputRefs.current[nextEmptyIndex]?.focus();
-    } else {
-      inputRefs.current[5]?.focus();
-    }
+    const pastedDigits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pastedDigits) return;
+    fillBoxes(0, pastedDigits);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // The server does not ask for the CAPTCHA when a code is checked (only when a new one is sent), so none is demanded here
+  const submitOtp = async () => {
     const otpValue = otp.join('');
 
     if (otpValue.length !== 6) {
       setError('Vui lòng nhập đầy đủ 6 số OTP');
-      return;
-    }
-
-    if (!turnstileToken) {
-      setError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
       return;
     }
 
@@ -229,19 +225,32 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       console.error('OTP validation error:', err);
     } finally {
       setIsLoading(false);
-      // Reset turnstile on failure to require a new check
-      if ((window as any).turnstile && turnstileWidgetId.current) {
-         (window as any).turnstile.reset(turnstileWidgetId.current);
-         setTurnstileToken('');
-      }
     }
   };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitOtp();
+  };
+
+  // A complete code is checked at once, so the customer does not need to find the button
+  useEffect(() => {
+    const code = otp.join('');
+    if (code.length !== 6) {
+      autoSubmitCodeRef.current = '';
+      return;
+    }
+    if (autoSubmitCodeRef.current === code || isLoading || timeLeft === 0) return;
+    autoSubmitCodeRef.current = code;
+    submitOtp();
+  }, [otp]);
 
   const handleResend = async () => {
     if (!canResend) return;
 
+    // The server asks for a fresh security check when a new code is sent
     if (!turnstileToken) {
-      setError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
+      setError('Đang xác minh bảo mật, vui lòng thử lại sau vài giây.');
       return;
     }
 
@@ -293,10 +302,15 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gradient-to-br z-[10000] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+      <DialogContent
+        className={cn(
+          'bg-gradient-to-br z-[10000] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]',
+          AUTH_DIALOG_CLASS
+        )}
+      >
         <DialogHeader>
           <div className="flex justify-center mb-4">
-            <img src="/icon.svg" alt="CINESPHERE" className="h-16 w-16" />
+            <img src="/icon.svg" alt="Cinesphere" className="h-12 w-12 sm:h-16 sm:w-16" />
           </div>
           <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center text-xl">
             Xác Thực 2 Lớp
@@ -316,7 +330,7 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
           </div>
 
           {/* OTP Input */}
-          <div className="flex justify-center gap-2">
+          <div className="flex justify-center gap-1.5 sm:gap-2">
             {otp.map((digit, index) => (
               <Input
                 key={index}
@@ -325,13 +339,13 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
                 }}
                 type="text"
                 inputMode="numeric"
-                maxLength={1}
+                aria-label={`Chữ số thứ ${index + 1}`}
                 value={digit}
                 onChange={(e) => handleOtpChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
                 onPaste={handlePaste}
                 className={cn(
-                  'w-12 h-14 text-center text-2xl font-bold bg-white/10 border-white/20 text-white focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
+                  'w-11 sm:w-12 h-14 px-0 text-center text-2xl font-bold bg-white/10 border-white/20 text-white focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
                   error && 'border-red-500 focus-visible:ring-red-500'
                 )}
                 disabled={isLoading || timeLeft === 0}
@@ -354,8 +368,8 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
           {/* Submit Button */}
           <Button
             type="submit"
-            disabled={isLoading || timeLeft === 0 || otp.join('').length !== 6 || !turnstileToken}
-            className="w-full bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
+            disabled={isLoading || timeLeft === 0 || otp.join('').length !== 6}
+            className="w-full h-11 bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -375,7 +389,7 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
               onClick={handleResend}
               disabled={!canResend || isResending}
               className={cn(
-                'text-sm text-cyan-300 hover:text-cyan-200',
+                'h-11 text-sm text-cyan-300 hover:text-cyan-200',
                 !canResend && 'text-gray-500 cursor-not-allowed'
               )}
             >
@@ -399,7 +413,7 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-sm text-gray-400 hover:text-white"
+              className="h-11 text-sm text-gray-400 hover:text-white"
             >
               Hủy bỏ
             </Button>

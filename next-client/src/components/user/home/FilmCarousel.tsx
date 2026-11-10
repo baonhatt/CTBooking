@@ -11,6 +11,7 @@ import { optimizeCloudinaryUrl, generateCloudinarySrcSet, cn } from '@/lib/utils
 import { Button } from '@/components/ui/button';
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { formatDurationMinutes } from '@shared/duration';
 import { movieStore } from '@/store/movieStore';
 import useEmblaCarousel from 'embla-carousel-react';
 import type { EmblaCarouselType } from 'embla-carousel';
@@ -278,7 +279,8 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                       <div
-                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 transition-opacity duration-300 ${
+                        // A touch screen has no hover, so there the name and genre are always shown
+                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
                           hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
                         }`}
                       >
@@ -308,7 +310,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
           onCloseAutoFocus={(e) => {
             e.preventDefault();
           }}
-          className={cn("max-w-3xl flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)] overflow-hidden", isMobile ? "max-h-[96vh] w-[95vw] rounded-xl" : "max-h-[90vh]")}
+          className={cn("max-w-3xl flex z-[9999] flex-col bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white p-0 shadow-[0_0_50px_rgba(59,130,246,0.3)] overflow-hidden", isMobile ? "max-h-[92dvh] w-[95vw] rounded-xl" : "max-h-[90dvh]")}
         >
           <div className="overflow-y-auto scrollbar-neon flex-1 px-6 pt-6 pb-4">
             {/* Chỉ hiện header title trên desktop */}
@@ -360,7 +362,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                     <div
                       className={cn(
                         'relative rounded-xl overflow-hidden border border-cyan-500/30 shadow-[0_0_30px_rgba(59,130,246,0.2)]',
-                        isMobile ? 'aspect-[2/3] mx-auto w-[65%]' : 'aspect-[2/3]'
+                        isMobile ? 'aspect-[2/3] mx-auto w-[46%]' : 'aspect-[2/3]'
                       )}
                     >
                       <img
@@ -410,7 +412,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                             {movieDetails.duration_min && (
                               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
                                 <Clock className="h-3.5 w-3.5 text-cyan-400" />
-                                <span className="text-white font-medium text-xs">{movieDetails.duration_min} phút</span>
+                                <span className="text-white font-medium text-xs">{formatDurationMinutes(movieDetails.duration_min)}</span>
                               </div>
                             )}
                           </div>
@@ -439,7 +441,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                           {movieDetails.duration_min && (
                             <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10">
                               <Clock className="h-4 w-4 text-cyan-400" />
-                              <span className="text-white font-medium text-sm">{movieDetails.duration_min} phút</span>
+                              <span className="text-white font-medium text-sm">{formatDurationMinutes(movieDetails.duration_min)}</span>
                             </div>
                           )}
                         </div>
@@ -454,19 +456,12 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
             <div
               className={cn(
                 'flex gap-3 border-t border-white/10 bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#050915] shrink-0 z-10',
-                isMobile ? 'p-4 justify-between' : 'px-6 py-4 justify-end'
+                isMobile ? 'p-4' : 'px-6 py-4 justify-end'
               )}
             >
               <Button
-                variant="outline"
-                onClick={() => setIsModalOpen(false)}
-                className="border-white/20 text-white hover:bg-white/10 hover:text-white hover:border-cyan-400/50 transition-all flex-1 md:flex-none"
-              >
-                Đóng
-              </Button>
-              <Button
                 onClick={handleBookTicket}
-                className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105 flex-1 md:flex-none"
+                className="bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)] transition-all duration-300 hover:scale-105 w-full md:w-auto h-12"
               >
                 <Ticket className="h-4 w-4 mr-2" />
                 Đặt vé ngay
