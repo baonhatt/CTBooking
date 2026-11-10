@@ -24,7 +24,14 @@ dist-ssr
 *.sw?
 
 .config/
-!.env
+# Environment files with real values stay on this machine (the .example files are the templates)
+.env
+.env.preview
+.env.local
+!.env.example
+
+# Old database backups hold customer data
+db_backup/
 
 /generated/prisma
 
@@ -45,9 +52,12 @@ uploads/
 *.sqlite-wal
 *.sql
 !worker/migrations/*.sql
-!docs/create_local_manager_accounts.sql
 tmp/
 
 
 # Local manual-test accounts (never commit)
 .local-test/
+
+# Build artifacts
+*.tsbuildinfo
+.claude/

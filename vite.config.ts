@@ -35,16 +35,11 @@ export default defineConfig(({ mode }) => ({
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'motion-vendor': ['framer-motion'],
           'lucide-vendor': ['lucide-react'],
-          'antd-vendor': ['antd', '@ant-design/icons'],
           'query-vendor': ['@tanstack/react-query'],
-          'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-          'form-vendor': ['react-hook-form', 'zod'],
-          'embla-vendor': ['embla-carousel-react'],
           'radix-vendor': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',
             '@radix-ui/react-select',
-            '@radix-ui/react-toast',
             '@radix-ui/react-tooltip',
             '@radix-ui/react-slot'
           ],
@@ -139,7 +134,6 @@ export default defineConfig(({ mode }) => ({
   },
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
-    exclude: ['@react-three/fiber', '@react-three/drei'] // Lazy load these
+    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query']
   }
 }));

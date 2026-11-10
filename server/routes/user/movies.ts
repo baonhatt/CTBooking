@@ -1,4 +1,3 @@
-import type { RequestHandler } from 'express';
 import type { ActiveMoviesTodayResponse } from '@shared/api';
 import { eq, desc, asc, count, sql, and, inArray, isNull } from 'drizzle-orm';
 import {

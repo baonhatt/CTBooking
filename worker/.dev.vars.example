@@ -1,0 +1,38 @@
+# Local secrets and settings for `wrangler dev` (copy to worker/.dev.vars, which is git-ignored).
+# On Cloudflare set the secrets with:  npx wrangler secret put NAME --config worker/wrangler.toml
+# (add --env preview for the preview environment). Values below are placeholders.
+
+# Required to create bookings outside localhost. Use a different value per environment:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ORDER_TOKEN_SECRET=
+
+# Bank webhook (SePay): the webhook sends "Authorization: Apikey <SEPAY_API_KEY>"
+SEPAY_API_KEY=
+SEPAY_API_TOKEN=
+
+# Cloudinary (server side)
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_UPLOAD_FOLDER=
+
+# Mail (Brevo). Leave empty locally to send no mail.
+BREVO_API_KEY=
+BREVO_SENDER_NAME=
+BREVO_SENDER_EMAIL=
+
+# First super admin (used once by POST /api/admin/setup/super-admin on an empty database)
+SUPER_ADMIN_EMAIL=
+SUPER_ADMIN_PASSWORD=
+SUPER_ADMIN_FULLNAME=Super Admin
+
+# Captcha and search engine ping
+TURNSTILE_SECRET=
+INDEXNOW_KEY=
+
+# Site
+VITE_CLIENT_BASE_URL=http://localhost:3000
+VITE_SERVER_BASE_URL=http://localhost:8787
+SUPPORT_HOTLINE=
+SUPPORT_EMAIL=
+COMPANY_ADDRESS=
