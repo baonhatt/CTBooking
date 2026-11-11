@@ -1,17 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { AuthShell, AuthField, AuthError, AuthSubmitButton, AUTH_INPUT } from '@/components/admin/auth/AuthShell';
+import { ADMIN_BTN_GHOST } from '@/components/admin/common/adminTokens';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useStaffStore } from '@/store/staffStore';
 import { useStaffPermission, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { loginApi } from '@/lib/api/auth';
 import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
-import iconCine from '@/assets/images/iconCine.svg';
-import { AlertCircle, ShieldAlert, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, Lock, Mail, Eye, EyeOff, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { forceChangePasswordApi, verifyAdminLoginOtpApi } from '@/lib/api/auth';
 import { SessionTimeoutModal } from '@/components/admin/SessionTimeoutModal';
 import { performLogout } from '@/lib/auth-utils';
@@ -202,192 +201,110 @@ const AdminLoginView = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden px-4 py-8 select-none">
-      {/* Ambient Cinematic Background Glows */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+    <AuthShell
+      title={requireOtp ? 'Xác thực bảo vệ 2 lớp' : 'Đăng nhập tài khoản'}
+      description={
+        requireOtp
+          ? 'Mã xác thực gồm 6 số đã được gửi tới email của bạn.'
+          : 'Truy cập bảng điều khiển dành cho ban quản trị & nhân viên'
+      }
+      footer="Bảo mật chuẩn phân quyền RBAC • Hệ thống CineSphere"
+    >
+      {requireOtp ? (
+        <form onSubmit={handleVerifyOtp} className="space-y-4">
+          <AuthField label="Mã xác thực (OTP)" icon={ShieldCheck}>
+            <Input
+              type="text"
+              placeholder="Nhập mã 6 số"
+              className={`${AUTH_INPUT} text-center font-mono text-xl font-bold tracking-[0.5em]`}
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              maxLength={8}
+              autoFocus
+              required
+            />
+          </AuthField>
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Brand Header */}
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="relative mb-3 group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-500" />
-            <div className="relative h-16 w-16 bg-slate-900 rounded-2xl border border-slate-700/80 flex items-center justify-center shadow-xl p-3">
-              <img src={iconCine} alt="CineSphere" className="h-full w-full object-contain" />
+          <AuthError message={error} />
+
+          <AuthSubmitButton loading={loading} disabled={otpCode.length < 4} busyText="Đang xác thực...">
+            <span>Xác thực & đăng nhập</span>
+            <ArrowRight className="h-4 w-4" />
+          </AuthSubmitButton>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRequireOtp(false);
+              setOtpCode('');
+              setPendingStaffId(null);
+              setError('');
+            }}
+            className={`${ADMIN_BTN_GHOST} inline-flex w-full items-center justify-center gap-1.5`}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quay lại
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleLogin} className="space-y-4">
+          <AuthField label="Email quản trị" icon={Mail}>
+            <Input
+              type="email"
+              placeholder="name@cinesphere.com"
+              className={AUTH_INPUT}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete={isEmailFocused ? 'email' : 'new-password'}
+              onFocus={() => setIsEmailFocused(true)}
+              readOnly={!isEmailFocused}
+              required
+            />
+          </AuthField>
+
+          <AuthField
+            label="Mật khẩu"
+            icon={Lock}
+            trailing={
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 transition-colors hover:text-slate-700"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            }
+          >
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              className={`${AUTH_INPUT} pr-10`}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
+              onFocus={() => setIsPasswordFocused(true)}
+              readOnly={!isPasswordFocused}
+              required
+            />
+          </AuthField>
+
+          <AuthError message={error} />
+
+          {/* Cloudflare Turnstile CAPTCHA */}
+          {!IS_LOCAL_HOST && (
+            <div className="flex justify-center">
+              <div ref={turnstileRef} className="cf-turnstile"></div>
             </div>
-          </div>
-          <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-emerald-400 uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            Cổng quản trị
-          </div>
-        </div>
-
-        {/* Login Card */}
-        <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-white">{requireOtp ? 'Xác thực bảo vệ 2 lớp' : 'Đăng nhập tài khoản'}</h2>
-            <p className="text-xs text-slate-400 mt-1">{requireOtp ? 'Mã xác thực gồm 6 số đã được gửi tới email của bạn.' : 'Truy cập bảng điều khiển dành cho ban quản trị & nhân viên'}</p>
-          </div>
-
-          {requireOtp ? (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-300">Mã xác thực (OTP)</Label>
-                <div className="relative group">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                    <ShieldCheck className="h-4 w-4" />
-                  </div>
-                  <Input
-                    type="text"
-                    placeholder="Nhập mã 6 số"
-                    className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-3 text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-center tracking-[0.5em] font-mono text-xl font-bold"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    maxLength={8}
-                    autoFocus
-                    required
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <Button
-                disabled={loading || otpCode.length < 4}
-                type="submit"
-                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-12 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Đang xác thực...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Xác thực & đăng nhập</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </Button>
-
-              <div className="text-center mt-4">
-                 <button
-                  type="button"
-                  onClick={() => {
-                    setRequireOtp(false);
-                    setOtpCode('');
-                    setPendingStaffId(null);
-                    setError('');
-                  }}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  &larr; Quay lại
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email Input */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-300">Email quản trị</Label>
-                <div className="relative group">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                    <Mail className="h-4 w-4" />
-                  </div>
-                  <Input
-                    type="email"
-                    placeholder="name@cinesphere.com"
-                    className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete={isEmailFocused ? 'email' : 'new-password'}
-                    onFocus={() => setIsEmailFocused(true)}
-                    readOnly={!isEmailFocused}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-300">Mật khẩu</Label>
-                <div className="relative group">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                    <Lock className="h-4 w-4" />
-                  </div>
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={isPasswordFocused ? 'current-password' : 'new-password'}
-                    onFocus={() => setIsPasswordFocused(true)}
-                    readOnly={!isPasswordFocused}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Error Message */}
-              {error && (
-                <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Cloudflare Turnstile CAPTCHA */}
-              {!IS_LOCAL_HOST && (
-                <div className="flex justify-center mt-2">
-                  <div ref={turnstileRef} className="cf-turnstile"></div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <Button
-                disabled={loading || !turnstileToken}
-                type="submit"
-                className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Đang xác thực...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Đăng nhập hệ thống</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </>
-                )}
-              </Button>
-            </form>
           )}
-        </div>
 
-        {/* Security Footer */}
-        <div className="text-center mt-6 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-          <span>🔒 Bảo mật chuẩn phân quyền RBAC</span>
-          <span>•</span>
-          <span>Hệ thống CineSphere</span>
-        </div>
-      </div>
-    </div>
+          <AuthSubmitButton loading={loading} disabled={!turnstileToken} busyText="Đang xác thực...">
+            <span>Đăng nhập hệ thống</span>
+            <ArrowRight className="h-4 w-4" />
+          </AuthSubmitButton>
+        </form>
+      )}
+    </AuthShell>
   );
 };
 
@@ -461,10 +378,10 @@ export const AdminGate = () => {
 
   if (checkingSetup || actuallyAuth === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#050915] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-700">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-          <p className="text-sm font-medium animate-pulse">Đang kiểm tra hệ thống...</p>
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600/20 border-t-blue-600" />
+          <p className="text-sm font-medium">Đang kiểm tra hệ thống...</p>
         </div>
       </div>
     );
@@ -759,99 +676,44 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 relative overflow-hidden px-4 py-8 select-none">
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+    <AuthShell
+      badge="Bảo mật tài khoản"
+      title="Đổi mật khẩu lần đầu"
+      description="Tài khoản của bạn vừa được khởi tạo hoặc thiết lập lại. Vui lòng đặt mật khẩu mới để tiếp tục."
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <AuthField label="Mật khẩu mới" icon={Lock} htmlFor="new-password">
+          <Input
+            id="new-password"
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Tối thiểu 12 ký tự, gồm chữ và số"
+            className={AUTH_INPUT}
+            required
+            autoFocus
+          />
+        </AuthField>
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="relative mb-3 group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-md opacity-70 group-hover:opacity-100 transition duration-500" />
-            <div className="relative h-16 w-16 bg-slate-900 rounded-2xl border border-slate-700/80 flex items-center justify-center shadow-xl p-3">
-              <img src={iconCine} alt="CineSphere" className="h-full w-full object-contain" />
-            </div>
-          </div>
-          <h1 className="text-xl font-black tracking-widest text-white uppercase">CINESPHERE</h1>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-[10px] font-bold tracking-wider text-amber-400 uppercase">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Bảo mật tài khoản
-          </div>
-        </div>
+        <AuthField label="Xác nhận mật khẩu mới" icon={Lock} htmlFor="confirm-password">
+          <Input
+            id="confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Nhập lại mật khẩu mới"
+            className={AUTH_INPUT}
+            required
+          />
+        </AuthField>
 
-        <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-white">Đổi mật khẩu lần đầu</h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Tài khoản của bạn vừa được khởi tạo hoặc thiết lập lại. Vui lòng đặt mật khẩu mới để tiếp tục.
-            </p>
-          </div>
+        <AuthError message={error} />
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-300">Mật khẩu mới</Label>
-              <div className="relative group">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                  <Lock className="h-4 w-4" />
-                </div>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Tối thiểu 12 ký tự, gồm chữ và số"
-                  className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  required
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-300">Xác nhận mật khẩu mới</Label>
-              <div className="relative group">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                  <Lock className="h-4 w-4" />
-                </div>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Nhập lại mật khẩu mới"
-                  className="bg-slate-950/70 border-slate-800/90 rounded-xl pl-10 pr-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-rose-400 text-xs animate-in fade-in-50 duration-200">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <Button
-              disabled={loading}
-              type="submit"
-              className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 h-11 rounded-xl shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Đang cập nhật...</span>
-                </>
-              ) : (
-                <>
-                  <span>Đổi mật khẩu & bắt đầu</span>
-                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </Button>
-          </form>
-        </div>
-      </div>
-    </div>
+        <AuthSubmitButton loading={loading} busyText="Đang cập nhật...">
+          <span>Đổi mật khẩu & bắt đầu</span>
+          <ArrowRight className="h-4 w-4" />
+        </AuthSubmitButton>
+      </form>
+    </AuthShell>
   );
 };

@@ -345,7 +345,7 @@ export default function TicketCheckContent() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
       <PageHeader
-        title="Kiểm tra vé"
+        title="Soát vé xem phim"
         description="Nhập mã đơn hàng hoặc mã vé để tra cứu thông tin phim và trạng thái."
         actions={
           <>
