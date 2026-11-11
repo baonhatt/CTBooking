@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUp, MapPin, Phone, Mail, Facebook, Building2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { MapPin, Phone, Mail, Facebook, Building2, Navigation } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 
 export default function Footer() {
-  const [isVisible, setIsVisible] = useState(false);
   const [loadMap, setLoadMap] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { selectedBranch } = useBranch();
@@ -66,12 +65,11 @@ export default function Footer() {
     return `https://maps.google.com/maps?q=${encodeURIComponent(fallbackQuery)}&hl=vi&z=16&output=embed`;
   }, [branchSettings, selectedBranch]);
 
-  useEffect(() => {
-    const setIsScrolled = (v: boolean) => setIsVisible(v);
-    const handler = () => setIsScrolled(window.scrollY > 0);
-    window.addEventListener('scroll', handler, { passive: true });
-    return () => window.removeEventListener('scroll', handler);
-  }, []);
+  // A link that opens the branch in Google Maps (the app on a phone), for directions
+  const directionsHref = useMemo(() => {
+    const place = [selectedBranch?.address, selectedBranch?.name].filter(Boolean).join(', ') || 'Cinesphere';
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+  }, [selectedBranch]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -241,12 +239,22 @@ export default function Footer() {
                   title={`Vị trí ${selectedBranch?.name || 'CINESPHERE'}`}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
-                  Đang tải bản đồ...
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center">
+                  <MapPin className="h-8 w-8 text-purple-400/70" />
+                  <p className="text-xs leading-relaxed text-gray-400">{selectedBranch?.address || 'Đang tải bản đồ...'}</p>
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
             </div>
+            <a
+              href={directionsHref}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-purple-300 transition-colors hover:text-purple-200"
+            >
+              <Navigation className="h-4 w-4" />
+              Chỉ đường tới rạp
+            </a>
           </motion.div>
 
           {/* Company Info */}

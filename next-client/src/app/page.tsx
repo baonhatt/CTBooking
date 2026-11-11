@@ -6,6 +6,7 @@ import UserLayout from '@/layouts/UserLayout';
 import HeroSection from '@/components/user/home/HeroSection';
 import FilmCarousel from '@/components/user/home/FilmCarousel';
 import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
+import MobileBookBar from '@/components/user/home/MobileBookBar';
 
 const MovieScheduleSection = dynamic(() => import('@/components/user/home/MovieScheduleSection'));
 
@@ -103,6 +104,7 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
     <UserLayout>
       <main>
         <ClearStorageOnMount />
+        <MobileBookBar />
         <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} initialBranchId={effectiveBranchId} />
 
         <Suspense fallback={<div className="min-h-[200px]" />}>

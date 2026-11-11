@@ -13,7 +13,7 @@ import { siteConfig } from '@/config/site';
 const SITE_URL = siteConfig.domain;
 
 export const metadata: Metadata = {
-  title: 'Tin Tức Điện Ảnh | Cinesphere Blog',
+  title: 'Tin Tức Điện Ảnh',
   description:
     'Cập nhật tin tức phim ảnh, review đánh giá các siêu phẩm phòng vé và xu hướng công nghệ chiếu rạp mới nhất tại Cinesphere.',
   alternates: { canonical: `${SITE_URL}/bai-viet` },

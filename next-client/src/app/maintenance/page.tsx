@@ -1,10 +1,13 @@
-import { Settings, Wrench } from 'lucide-react';
+import { Phone, Settings, Wrench } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Hệ thống đang bảo trì - Cinesphere',
+  title: 'Hệ thống đang bảo trì',
   description: 'Hệ thống đang được nâng cấp và bảo trì'
 };
+
+// The hotline shown on the other pages when a branch has none of its own
+const HOTLINE = '036 643 1179';
 
 const Maintenance = () => {
   return (
@@ -42,6 +45,17 @@ const Maintenance = () => {
               <span>Đang tiến hành cập nhật...</span>
             </div>
             <p className="text-xs text-gray-500 mt-2">Vui lòng quay lại sau.</p>
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-6">
+            <p className="text-sm text-gray-400 mb-2">Cần hỗ trợ gấp? Gọi hotline</p>
+            <a
+              href={`tel:${HOTLINE.replace(/\s/g, '')}`}
+              className="inline-flex min-h-[44px] items-center gap-2 text-lg font-semibold text-cyan-300 hover:text-cyan-200"
+            >
+              <Phone className="h-5 w-5" />
+              {HOTLINE}
+            </a>
           </div>
         </div>
       </div>

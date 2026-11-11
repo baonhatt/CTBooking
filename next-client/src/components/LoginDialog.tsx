@@ -1,15 +1,15 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AuthField } from '@/components/AuthField';
+import { AuthDialogShell } from '@/components/auth/AuthDialogShell';
+import { AUTH_LINK_BUTTON_CLASS, AuthAlert, AuthSubmitButton, TurnstileBox } from '@/components/auth/AuthParts';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { EMAIL_PATTERN, AUTH_DIALOG_CLASS } from '@/components/constants';
-import { useRouter } from 'next/navigation';
+import { Lock, Mail } from 'lucide-react';
+import { EMAIL_PATTERN } from '@/components/constants';
 import { OTPDialog } from './OTPDialog';
 import { setCookie } from '@/lib/cookies';
+import { useTurnstile } from '@/hooks/useTurnstile';
 
 interface LoginDialogProps {
   isOpen: boolean;
@@ -23,6 +23,22 @@ interface LoginDialogProps {
   setErrorModal: (modal: { open: boolean; title: string; message: string }) => void;
 }
 
+// Keeps the signed-in customer's token and profile where the header and the guarded pages look for them
+function saveSignedInUser(user: any, token: string) {
+  try {
+    setCookie('userToken', token, 86400);
+    localStorage.setItem('userToken', token);
+    const derivedName = user.username || (user.email || '').split('@')[0];
+    const profile = {
+      email: user.email,
+      name: derivedName,
+      phone: user.phone || ''
+    };
+    setCookie('userProfile', JSON.stringify(profile), 86400);
+    localStorage.setItem('userProfile', JSON.stringify(profile));
+  } catch {}
+}
+
 export function LoginDialog({
   isOpen,
   onOpenChange,
@@ -30,8 +46,7 @@ export function LoginDialog({
   onForgetPassword,
   initialEmail,
   auth,
-  setUserName,
-  setErrorModal
+  setUserName
 }: LoginDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -39,64 +54,14 @@ export function LoginDialog({
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [submitError, setSubmitError] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const turnstileRef = useRef<HTMLDivElement>(null);
-  const turnstileWidgetId = useRef<string | null>(null);
+  const turnstile = useTurnstile('user_login', isOpen);
 
   // OTP states
   const [showOTPDialog, setShowOTPDialog] = useState(false);
   const [tempAccountId, setTempAccountId] = useState<number | null>(null);
   const [otpEmail, setOtpEmail] = useState('');
 
-  const router = useRouter();
-
-  // Handle Turnstile explicit render
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let timeoutId: any;
-    const renderWidget = () => {
-      // If turnstile script is ready but ref is not yet attached by Radix UI portal, wait.
-      if (!turnstileRef.current) {
-        timeoutId = setTimeout(renderWidget, 100);
-        return;
-      }
-      
-      if ((window as any).turnstile && !turnstileWidgetId.current) {
-        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
-          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH',
-          action: 'user_login',
-          callback: (token: string) => setTurnstileToken(token),
-          'error-callback': () => setTurnstileToken(''),
-          'expired-callback': () => setTurnstileToken('')
-        });
-      }
-    };
-
-    if (!document.getElementById('turnstile-script')) {
-      const script = document.createElement('script');
-      script.id = 'turnstile-script';
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-      script.onload = () => {
-        timeoutId = setTimeout(renderWidget, 100);
-      };
-    } else {
-      timeoutId = setTimeout(renderWidget, 100);
-    }
-
-    return () => {
-      clearTimeout(timeoutId);
-      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
-        (window as any).turnstile.remove(turnstileWidgetId.current);
-        turnstileWidgetId.current = null;
-      }
-    };
-  }, [isOpen]);
-
-  // Ensure all states are clean when the dialog opens or closes
+  // Ensure all states are clean when the dialog opens
   useEffect(() => {
     if (isOpen) {
       setEmail(initialEmail || '');
@@ -107,17 +72,17 @@ export function LoginDialog({
       setShowOTPDialog(false);
       setTempAccountId(null);
       setOtpEmail('');
-      setTurnstileToken('');
-      
-      // Auto-reset turnstile on dialog open to generate fresh token
-      if ((window as any).turnstile && turnstileWidgetId.current) {
-        (window as any).turnstile.reset(turnstileWidgetId.current);
-      }
     }
   }, [isOpen]);
 
-  const handleOpenChange = (open: boolean) => {
-    onOpenChange(open);
+  // The customer stays on the page they were on: signing in only refreshes the header
+  const finishSignIn = (user: any) => {
+    setUserName(user.username);
+    window.dispatchEvent(new Event('user-auth-changed'));
+    toast.success('Đăng nhập thành công', { description: user.email });
+    onOpenChange(false);
+    setEmail('');
+    setPassword('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,14 +103,14 @@ export function LoginDialog({
       return;
     }
 
-    if (!turnstileToken) {
+    if (!turnstile.token) {
       setSubmitError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
       return;
     }
 
     try {
       setIsLoading(true);
-      const data = await auth.login(email, password, turnstileToken);
+      const data = await auth.login(email, password, turnstile.token);
 
       if (data?.requires_otp) {
         // Show OTP dialog
@@ -157,29 +122,8 @@ export function LoginDialog({
       }
 
       if (data?.status === 'success') {
-        // Token được lưu trong httpOnly cookie bởi backend
-        // Lưu token vào localStorage để frontend check nhanh
-        try {
-          setCookie('userToken', data.token, 86400);
-          const derivedName = data.user.username || (data.user.email || '').split('@')[0];
-          const profile = {
-            email: data.user.email,
-            name: derivedName,
-            phone: (data.user as any)?.phone || ''
-          };
-          setCookie('userProfile', JSON.stringify(profile), 86400);
-          localStorage.setItem('userProfile', JSON.stringify(profile));
-        } catch {
-        } finally {
-          router.push('/');
-        }
-        setUserName(data.user.username);
-        window.dispatchEvent(new Event('user-auth-changed'));
-        toast.success('Đăng nhập thành công', { description: data.user.email });
-
-        onOpenChange(false);
-        setEmail('');
-        setPassword('');
+        saveSignedInUser(data.user, data.token);
+        finishSignIn(data.user);
       } else {
         const msg = data?.message || 'Đăng nhập thất bại';
         if (msg.toLowerCase().includes('email')) {
@@ -193,134 +137,98 @@ export function LoginDialog({
       const msg = String(err?.message || 'Đăng nhập thất bại');
       if (msg.toLowerCase().includes('email')) {
         setEmailError(msg);
-      } else if (msg.toLowerCase().includes('mật khẩu') || msg.toLowerCase().includes('password')) {
-         setSubmitError(msg);
       } else {
-         setSubmitError(msg);
+        setSubmitError(msg);
       }
       toast.error(msg);
     } finally {
       setIsLoading(false);
-      if ((window as any).turnstile && turnstileWidgetId.current) {
-         (window as any).turnstile.reset(turnstileWidgetId.current);
-         setTurnstileToken('');
-      }
+      // A token works once: the next try needs a new one
+      turnstile.reset();
     }
   };
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent
-          className={cn(
-            'bg-gradient-to-br z-[9999] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]',
-            AUTH_DIALOG_CLASS
-          )}
+      <AuthDialogShell
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        title="Đăng Nhập Tài Khoản"
+        description="Đăng nhập vào tài khoản Cinesphere của bạn để tiếp tục đặt vé."
+        asideTitle="Chào mừng trở lại"
+        asideText="Đăng nhập để đặt vé nhanh hơn và quản lý vé của bạn ở một nơi."
+      >
+        <form
+          key={isOpen ? 'login-dialog-active' : 'login-dialog-inactive'}
+          className="space-y-4"
+          onSubmit={handleSubmit}
+          noValidate
         >
-          <DialogHeader>
-            <div className="flex justify-center mb-4">
-              <img src="/icon.svg" alt="Cinesphere" className="h-14 w-14 sm:h-20 sm:w-20" />
-            </div>
-            <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">
-              Đăng Nhập Tài Khoản
-            </DialogTitle>
-            <DialogDescription className="sr-only">
-              Đăng nhập vào tài khoản Cinesphere của bạn để tiếp tục đặt vé.
-            </DialogDescription>
-          </DialogHeader>
+          <AuthField
+            id="login-email"
+            name="email"
+            label="Email"
+            type="email"
+            icon={Mail}
+            value={email}
+            onChange={(value) => {
+              setEmail(value);
+              if (emailError && EMAIL_PATTERN.test(value)) setEmailError('');
+              if (submitError) setSubmitError('');
+            }}
+            onBlur={() => {
+              if (email && !EMAIL_PATTERN.test(email)) setEmailError('Vui lòng nhập email hợp lệ');
+            }}
+            error={emailError}
+            autoComplete="email"
+            inputMode="email"
+            maxLength={50}
+            disabled={isLoading}
+          />
 
-          <form
-            key={isOpen ? 'login-dialog-active' : 'login-dialog-inactive'}
-            className="space-y-4"
-            onSubmit={handleSubmit}
-            noValidate
-          >
-            <AuthField
-              id="login-email"
-              name="email"
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(value) => {
-                setEmail(value);
-                if (emailError && EMAIL_PATTERN.test(value)) setEmailError('');
-                if (submitError) setSubmitError('');
-              }}
-              onBlur={() => {
-                if (email && !EMAIL_PATTERN.test(email)) setEmailError('Vui lòng nhập email hợp lệ');
-              }}
-              error={emailError}
-              autoComplete="email"
-              inputMode="email"
-              maxLength={50}
-              disabled={isLoading}
-            />
+          <AuthField
+            id="login-password"
+            name="password"
+            label="Mật khẩu"
+            type="password"
+            icon={Lock}
+            value={password}
+            onChange={(value) => {
+              setPassword(value);
+              if (passwordError && value) setPasswordError('');
+              if (submitError) setSubmitError('');
+            }}
+            error={passwordError}
+            autoComplete="current-password"
+            maxLength={50}
+            disabled={isLoading}
+          />
 
-            <AuthField
-              id="login-password"
-              name="password"
-              label="Mật khẩu"
-              type="password"
-              value={password}
-              onChange={(value) => {
-                setPassword(value);
-                if (passwordError && value) setPasswordError('');
-                if (submitError) setSubmitError('');
-              }}
-              error={passwordError}
-              autoComplete="current-password"
-              maxLength={50}
-              disabled={isLoading}
-            />
-
-            {submitError && (
-              <div role="alert" className="rounded-md bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-                {submitError}
-              </div>
-            )}
-
-            {/* Cloudflare Turnstile */}
-            <div className="flex justify-center">
-              <div ref={turnstileRef} className="cf-turnstile"></div>
-            </div>
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={isLoading || !turnstileToken}
-              className="w-full h-11 bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Đang đăng nhập...
-                </span>
-              ) : (
-                'Đăng nhập'
-              )}
+          <div className="-mt-2 flex justify-end">
+            <Button variant="link" className={`${AUTH_LINK_BUTTON_CLASS} h-9 px-0`} type="button" onClick={onForgetPassword}>
+              Quên mật khẩu?
             </Button>
+          </div>
 
-            <div className="flex flex-col items-center">
-              <Button
-                variant="link"
-                className="h-11 text-sm text-cyan-300 hover:text-cyan-200"
-                type="button"
-                onClick={onForgetPassword}
-              >
-                Quên mật khẩu?
-              </Button>
-              <Button
-                variant="link"
-                className="h-11 text-sm text-cyan-300 hover:text-cyan-200"
-                type="button"
-                onClick={onRegister}
-              >
-                Bạn chưa có tài khoản? Đăng ký
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          {submitError && <AuthAlert>{submitError}</AuthAlert>}
+
+          <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} />
+
+          <AuthSubmitButton
+            label="Đăng nhập"
+            loadingLabel="Đang đăng nhập..."
+            isLoading={isLoading}
+            disabled={!turnstile.token}
+          />
+
+          <div className="flex items-center justify-center gap-1 border-t border-white/10 pt-3 text-sm text-gray-300">
+            Bạn chưa có tài khoản?
+            <Button variant="link" className={`${AUTH_LINK_BUTTON_CLASS} h-9 px-1 font-semibold`} type="button" onClick={onRegister}>
+              Đăng ký
+            </Button>
+          </div>
+        </form>
+      </AuthDialogShell>
 
       {/* OTP Dialog */}
       {tempAccountId && (
@@ -336,27 +244,8 @@ export function LoginDialog({
           tempAccountId={tempAccountId}
           email={otpEmail}
           onSuccess={(userData, token) => {
-            try {
-              setCookie('userToken', token, 86400);
-              localStorage.setItem('userToken', token);
-              const derivedName = userData.username || (userData.email || '').split('@')[0];
-              const profile = {
-                email: userData.email,
-                name: derivedName,
-                phone: userData.phone || ''
-              };
-              setCookie('userProfile', JSON.stringify(profile), 86400);
-              localStorage.setItem('userProfile', JSON.stringify(profile));
-            } catch {
-            } finally {
-              router.push('/');
-            }
-            setUserName(userData.username);
-            window.dispatchEvent(new Event('user-auth-changed'));
-            toast.success('Đăng nhập thành công', { description: userData.email });
-            onOpenChange(false);
-            setEmail('');
-            setPassword('');
+            saveSignedInUser(userData, token);
+            finishSignIn(userData);
           }}
           auth={auth}
         />

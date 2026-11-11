@@ -81,6 +81,36 @@ export async function forgetPassImpl(
   return { status: 200, message: 'Vui lòng kiểm tra email!' };
 }
 
+// Turns "nguyenvan@gmail.com" into "ng***@gmail.com", so the reset page can say whose password is being changed
+// without printing the whole address
+function maskEmail(email: string): string {
+  const atIndex = email.indexOf('@');
+  if (atIndex < 1) return '';
+  const localPart = email.slice(0, atIndex);
+  return `${localPart.slice(0, Math.min(2, localPart.length))}***${email.slice(atIndex)}`;
+}
+
+// Whether a reset link can still be used, checked when the reset page opens (nothing is changed or used up).
+// The link is a 64-character random code, so asking about it cannot be used to guess anything.
+export async function checkResetTokenImpl(
+  anyDb: any,
+  tables: { accounts: any; tokens: any },
+  token: string
+): Promise<{ valid: boolean; maskedEmail: string }> {
+  if (!token) return { valid: false, maskedEmail: '' };
+  const tokenRecord = await anyDb.query.tokens.findFirst({
+    where: and(
+      eq(tables.tokens.token, token),
+      eq(tables.tokens.type, 'reset_password'),
+      gte(tables.tokens.expired_at, formatDateForDb(new Date()))
+    )
+  });
+  if (!tokenRecord) return { valid: false, maskedEmail: '' };
+  const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.id, tokenRecord.account_id) });
+  if (!account || account.is_active === false) return { valid: false, maskedEmail: '' };
+  return { valid: true, maskedEmail: maskEmail(String(account.email || '')) };
+}
+
 export async function resetPasswordImpl(
   anyDb: any,
   tables: { accounts: any; tokens: any },

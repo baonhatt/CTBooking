@@ -114,7 +114,7 @@ export default function PromotionShowcase({
   return (
     <section
       id="promotions"
-      className="relative py-20 bg-gradient-to-b from-[#050915] via-[#0b1026] to-[#060915] overflow-hidden"
+      className="relative py-14 sm:py-20 bg-gradient-to-b from-[#050915] via-[#0b1026] to-[#060915] border-t border-white/[0.06] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise pointer-events-none opacity-60" />
       <div className="absolute left-10 top-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(245,158,11,0.15)_0%,_transparent_70%)] pointer-events-none" />
@@ -132,7 +132,7 @@ export default function PromotionShowcase({
         </div>
 
         <div className="mx-auto max-w-7xl">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-6">
+          <div className="flex flex-wrap justify-center gap-2.5 sm:gap-6">
             {combos.map((combo: (typeof combos)[0], index: number) => (
               <motion.div
                 key={combo.id}
@@ -143,7 +143,7 @@ export default function PromotionShowcase({
                   delay: index * 0.05,
                   duration: 0.4
                 }}
-                className="h-full"
+                className="h-auto w-[calc(50%-0.3125rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] xl:w-[calc(25%-1.125rem)]"
               >
                 <div className="h-full relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-6 bg-slate-900/80 border border-white/10 backdrop-blur-xl hover:border-amber-400/40 hover:shadow-[0_0_35px_rgba(245,158,11,0.2)] group transition-all duration-300 flex flex-col justify-between">
                   <div className="space-y-2 sm:space-y-4">

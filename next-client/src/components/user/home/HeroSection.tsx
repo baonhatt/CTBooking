@@ -114,6 +114,8 @@ export default function HeroSection({
   const { data: vrRes } = useQuery({
     queryKey: ['vrPackages', selectedBranch?.id],
     queryFn: () => getVRPackages(selectedBranch?.id),
+    // Wait for the branch: asking before it is known fetches the packages of every branch for nothing
+    enabled: !!selectedBranch?.id,
     staleTime: 60 * 1000
   });
   const hasVRPackages = vrRes?.items && vrRes.items.length > 0;
@@ -360,14 +362,14 @@ export default function HeroSection({
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Left Column: Brand, Slogan, Description & CTA Action Buttons */}
             <m.div
-              initial={{ opacity: 0, x: -30 }}
+              initial={false}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
               className="lg:col-span-7 space-y-6"
             >
               <div className="space-y-3">
                 <m.h1
-                  initial={{ opacity: 0, y: 15 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                   className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none tracking-tight flex flex-col gap-1.5"
@@ -381,7 +383,7 @@ export default function HeroSection({
                 </m.h1>
 
                 <m.p
-                  initial={{ opacity: 0, y: 15 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                   className="text-base sm:text-lg text-gray-200 leading-relaxed max-w-2xl font-normal"
@@ -393,7 +395,7 @@ export default function HeroSection({
 
               {/* Action Buttons: two main choices, the rest as quiet links */}
               <m.div
-                initial={{ opacity: 0, y: 15 }}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
                 className="space-y-1 pt-1"
@@ -457,7 +459,7 @@ export default function HeroSection({
 
             {/* Right Column: 3 Sci-Fi Feature Glass Tiles */}
             <m.div
-              initial={{ opacity: 0, x: 30 }}
+              initial={false}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
               className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4"
@@ -469,7 +471,7 @@ export default function HeroSection({
               ].map(({ icon: Icon, title, desc, color }, idx) => (
                 <m.div
                   key={title}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 + idx * 0.1, duration: 0.45 }}
                   whileHover={{ scale: 1.03, x: 4 }}

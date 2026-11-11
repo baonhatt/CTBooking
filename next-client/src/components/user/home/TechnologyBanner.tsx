@@ -238,7 +238,7 @@ export default function TechnologyBanner({
   return (
     <section
       id="technology"
-      className="relative py-12 sm:py-20 bg-gradient-to-b from-[#060915] via-[#080d21] to-[#050915] overflow-hidden"
+      className="relative py-12 sm:py-20 bg-gradient-to-b from-[#060915] via-[#080d21] to-[#050915] border-t border-white/[0.06] overflow-hidden"
     >
       <div className="absolute inset-0 neon-noise opacity-50 pointer-events-none" />
       <div className="absolute -left-10 top-16 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
@@ -250,7 +250,7 @@ export default function TechnologyBanner({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.4 }}
-          className="text-center mb-10 sm:mb-16 max-w-3xl mx-auto space-y-3"
+          className="text-center mb-8 sm:mb-12 max-w-3xl mx-auto space-y-3"
         >
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(59,130,246,0.2)]">
             <Sparkles className="w-4 h-4 text-blue-400" />
@@ -276,7 +276,7 @@ export default function TechnologyBanner({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="max-w-6xl mx-auto mb-10 sm:mb-16"
+          className="max-w-6xl mx-auto mb-8 sm:mb-12"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             <div className="w-full md:basis-5/12 lg:basis-5/12 xl:max-w-[480px]">

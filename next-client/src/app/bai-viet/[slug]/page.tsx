@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 export const runtime = 'edge';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { ArrowLeft, Eye } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Eye } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
 import { getPostBySlugId, getPublicPosts, type PostItem } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
@@ -14,6 +14,16 @@ import BranchScoped from '@/components/user/posts/BranchScoped';
 import { siteConfig } from '@/config/site';
 
 const SITE_URL = siteConfig.domain;
+
+// Average reading speed (words a minute) used for the "x phút đọc" label
+const WORDS_PER_MINUTE = 200;
+
+// Minutes to read the article: the words of its HTML without the tags, never less than one
+function estimateReadingMinutes(html: string): number {
+  const text = html.replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ');
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE));
+}
 
 export async function generateStaticParams() {
   try {
@@ -108,6 +118,8 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
     .slice(0, 3);
 
   const postUrl = `${SITE_URL}${buildPostHref(post)}`;
+  const readingMinutes = estimateReadingMinutes(post.content || '');
+  const publishedDate = new Date(post.published_at || post.created_at || Date.now());
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -160,7 +172,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
         </div>
 
         {/* ── Hero Banner ── */}
-        <section className="relative mt-4 w-full overflow-hidden" style={{ minHeight: '520px' }}>
+        <section className="relative mt-4 min-h-[420px] w-full overflow-hidden md:min-h-[500px]">
           {post.featured_image ? (
             <img
               src={post.featured_image}
@@ -174,22 +186,23 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent" />
 
           <div
-            className="relative z-10 container mx-auto px-4 md:px-6 lg:px-8 flex flex-col justify-end h-full"
-            style={{ minHeight: '520px', paddingBottom: '3rem' }}
+            className="relative z-10 container mx-auto flex h-full min-h-[420px] flex-col justify-end px-4 pb-10 md:min-h-[500px] md:px-6 lg:px-8"
           >
-            <div className="flex items-center gap-3 mb-4">
-              <span className="bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="rounded-sm bg-yellow-400 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-black">
                 Bài Viết
               </span>
-              <span className="text-slate-300 text-xs uppercase tracking-widest font-semibold">
-                {new Date(post.published_at || post.created_at || Date.now()).toLocaleDateString('vi-VN', {
-                  month: 'long',
-                  year: 'numeric'
-                })}
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                <CalendarDays className="h-4 w-4 text-cyan-400" />
+                {publishedDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                <Clock className="h-4 w-4 text-cyan-400" />
+                {readingMinutes} phút đọc
               </span>
             </div>
 
-            <h1 className="text-white font-black leading-[1.05] tracking-tight text-4xl sm:text-5xl md:text-6xl lg:text-7xl max-w-5xl">
+            <h1 className="text-white font-black leading-[1.1] tracking-tight text-3xl sm:text-4xl md:text-5xl lg:text-6xl max-w-4xl">
               {post.title}
             </h1>
 
@@ -214,7 +227,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
             <article className="lg:col-span-8">
               <div className="rounded-2xl md:rounded-3xl neon-border bg-white/5 p-6 md:p-10">
                 <div
-                  className="leading-7 text-slate-200 [&_h1]:text-white [&_h1]:font-black [&_h1]:text-3xl [&_h1]:mt-8 [&_h2]:text-white [&_h2]:font-extrabold [&_h2]:text-2xl [&_h2]:mt-8 [&_h3]:text-white [&_h3]:font-bold [&_h3]:text-xl [&_h3]:mt-6 [&_p]:text-slate-200 [&_p]:mb-4 [&_strong]:text-white [&_a]:text-cyan-300 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_li]:text-slate-200 [&_li]:mb-1 [&_img]:rounded-xl [&_img]:my-6 [&_img]:w-full [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-300 [&_blockquote]:my-4 [&_figure]:my-6 [&_figure]:text-center [&_figure_img]:rounded-xl [&_figure_img]:w-full [&_figure_img]:my-0 [&_figcaption]:mt-2 [&_figcaption]:text-xs [&_figcaption]:text-slate-400 [&_figcaption]:italic"
+                  className="text-base leading-8 text-slate-200 md:text-[17px] [&_h1]:text-white [&_h1]:font-black [&_h1]:text-3xl [&_h1]:mt-8 [&_h2]:text-white [&_h2]:font-extrabold [&_h2]:text-2xl [&_h2]:mt-8 [&_h3]:text-white [&_h3]:font-bold [&_h3]:text-xl [&_h3]:mt-6 [&_p]:text-slate-200 [&_p]:mb-4 [&_strong]:text-white [&_a]:text-cyan-300 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-4 [&_li]:text-slate-200 [&_li]:mb-1 [&_img]:rounded-xl [&_img]:my-6 [&_img]:w-full [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-400 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-slate-300 [&_blockquote]:my-4 [&_figure]:my-6 [&_figure]:text-center [&_figure_img]:rounded-xl [&_figure_img]:w-full [&_figure_img]:my-0 [&_figcaption]:mt-2 [&_figcaption]:text-xs [&_figcaption]:text-slate-400 [&_figcaption]:italic"
                   dangerouslySetInnerHTML={{
                     // The title goes into alt text, so it is escaped
                     __html: addMissingImageAlt(post.content || '', post.title)
@@ -237,12 +250,13 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
                   <BranchScoped key={item.id} branchIds={item.branch_ids}>
                   <Link
                     href={buildPostHref(item)}
-                    className="rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
+                    className="block h-full rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
                   >
                     {item.featured_image && (
                       <img
                         src={item.featured_image}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-36 object-cover rounded-xl mb-3"
                       />
                     )}

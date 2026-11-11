@@ -1,16 +1,22 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AuthField } from '@/components/AuthField';
+import { AuthDialogShell } from '@/components/auth/AuthDialogShell';
+import {
+  AUTH_LINK_BUTTON_CLASS,
+  AuthAlert,
+  AuthStepper,
+  AuthSubmitButton,
+  PasswordChecklist,
+  TurnstileBox
+} from '@/components/auth/AuthParts';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-import { PASSWORD_PATTERN, EMAIL_PATTERN, PASSWORD_RULE_TEXT, AUTH_DIALOG_CLASS } from '@/components/constants';
-import { useRouter } from 'next/navigation';
+import { ArrowLeft, Lock, Mail, User } from 'lucide-react';
+import { PASSWORD_PATTERN, EMAIL_PATTERN, PASSWORD_RULE_TEXT } from '@/components/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { setCookie } from '@/lib/cookies';
+import { useTurnstile } from '@/hooks/useTurnstile';
 
 interface RegisterDialogProps {
   isOpen: boolean;
@@ -22,14 +28,13 @@ interface RegisterDialogProps {
   setErrorModal: (modal: { open: boolean; title: string; message: string }) => void;
 }
 
-export function RegisterDialog({
-  isOpen,
-  onOpenChange,
-  onLogin,
-  auth,
-  setUserName,
-  setErrorModal
-}: RegisterDialogProps) {
+// The two steps of the form: the account details, then the terms and the security check
+const STEP_LABELS = ['Tài khoản', 'Xác nhận'];
+const STEP_ACCOUNT = 0;
+const STEP_CONFIRM = 1;
+
+export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserName }: RegisterDialogProps) {
+  const [step, setStep] = useState(STEP_ACCOUNT);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -44,111 +49,110 @@ export function RegisterDialog({
   const [termsError, setTermsError] = useState('');
   const [submitError, setSubmitError] = useState('');
 
-  const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const turnstileRef = useRef<HTMLDivElement>(null);
-  const turnstileWidgetId = useRef<string | null>(null);
+  // True while the email is being checked against the registered accounts
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  // The last email asked about and the answer ('' = free), so the same address is not asked twice
+  const checkedEmailRef = useRef<{ email: string; message: string } | null>(null);
 
-  const router = useRouter();
+  // The security check only appears on the last step
+  const turnstile = useTurnstile('user_register', isOpen && step === STEP_CONFIRM);
 
-  // Handle Turnstile explicit render
+  // A fresh form every time the dialog opens
   useEffect(() => {
     if (!isOpen) return;
-
-    let timeoutId: any;
-    const renderWidget = () => {
-      if (!turnstileRef.current) {
-        timeoutId = setTimeout(renderWidget, 100);
-        return;
-      }
-
-      if ((window as any).turnstile && !turnstileWidgetId.current) {
-        turnstileWidgetId.current = (window as any).turnstile.render(turnstileRef.current, {
-          sitekey: '0x4AAAAAAE1v1PaZCL-bktYH',
-          action: 'user_register',
-          callback: (token: string) => setTurnstileToken(token),
-          'error-callback': () => setTurnstileToken(''),
-          'expired-callback': () => setTurnstileToken('')
-        });
-      }
-    };
-
-    if (!document.getElementById('turnstile-script')) {
-      const script = document.createElement('script');
-      script.id = 'turnstile-script';
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-      script.onload = () => {
-        timeoutId = setTimeout(renderWidget, 100);
-      };
-    } else {
-      timeoutId = setTimeout(renderWidget, 100);
-    }
-
-    return () => {
-      clearTimeout(timeoutId);
-      if (turnstileWidgetId.current && (window as any).turnstile?.remove) {
-        (window as any).turnstile.remove(turnstileWidgetId.current);
-        turnstileWidgetId.current = null;
-      }
-    };
-  }, [isOpen]);
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Reset errors
+    setStep(STEP_ACCOUNT);
+    setEmail('');
+    setName('');
+    setPassword('');
+    setConfirmPassword('');
+    setTermsAccepted(false);
     setEmailError('');
     setNameError('');
     setPasswordError('');
     setConfirmError('');
     setTermsError('');
     setSubmitError('');
+    setIsCheckingEmail(false);
+    checkedEmailRef.current = null;
+  }, [isOpen]);
 
-    // Validate email
+  // Checks the four account fields together, so every problem shows at once; true when all are fine
+  const validateAccountStep = () => {
+    const emailMessage = EMAIL_PATTERN.test(email) ? '' : 'Vui lòng nhập email hợp lệ';
+    const nameMessage = name.trim() ? '' : 'Vui lòng nhập họ và tên';
+    const passwordMessage = PASSWORD_PATTERN.test(password) ? '' : 'Mật khẩu ít nhất 6 ký tự, gồm chữ và số';
+    const confirmMessage = password === confirmPassword ? '' : 'Mật khẩu nhập lại không khớp';
+    setEmailError(emailMessage);
+    setNameError(nameMessage);
+    setPasswordError(passwordMessage);
+    setConfirmError(confirmMessage);
+    return !(emailMessage || nameMessage || passwordMessage || confirmMessage);
+  };
+
+  // Asks the server whether the email is still free; returns the reason when it is not, or '' when it is.
+  // When the check itself fails (no network, too many asks) the customer is let through: the final step checks again.
+  const findEmailProblem = async (emailToCheck: string, showBusy: boolean) => {
+    if (checkedEmailRef.current?.email === emailToCheck) return checkedEmailRef.current.message;
+    try {
+      if (showBusy) setIsCheckingEmail(true);
+      const result = await auth.checkEmail(emailToCheck);
+      const message = result?.available === false ? String(result.message || 'Email đã tồn tại') : '';
+      checkedEmailRef.current = { email: emailToCheck, message };
+      return message;
+    } catch {
+      return '';
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  // Leaving the email field tells the customer at once if the address is taken
+  const checkEmailOnBlur = async () => {
+    if (!email) return;
     if (!EMAIL_PATTERN.test(email)) {
       setEmailError('Vui lòng nhập email hợp lệ');
       return;
     }
+    const problem = await findEmailProblem(email, false);
+    if (problem) setEmailError(problem);
+  };
 
-    // Validate name
-    if (!name.trim()) {
-      setNameError('Vui lòng nhập họ và tên');
+  const goToConfirmStep = async () => {
+    setSubmitError('');
+    if (!validateAccountStep()) return;
+    const problem = await findEmailProblem(email, true);
+    if (problem) {
+      setEmailError(problem);
+      return;
+    }
+    setStep(STEP_CONFIRM);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (step === STEP_ACCOUNT) {
+      void goToConfirmStep();
       return;
     }
 
-    // Validate password
-    const passOk = PASSWORD_PATTERN.test(password);
-    if (!passOk) {
-      setPasswordError('Mật khẩu ít nhất 6 ký tự, gồm chữ và số');
-      return;
-    }
+    setTermsError('');
+    setSubmitError('');
 
-    // Validate confirm password
-    if (password !== confirmPassword) {
-      setConfirmError('Mật khẩu nhập lại không khớp');
-      return;
-    }
-
-    // Validate terms
     if (!termsAccepted) {
       setTermsError('Vui lòng đồng ý điều khoản để tiếp tục');
       return;
     }
 
-    if (!turnstileToken) {
+    if (!turnstile.token) {
       setSubmitError('Vui lòng hoàn thành bài kiểm tra bảo mật (CAPTCHA).');
       return;
     }
 
     try {
       setIsLoading(true);
-      const data = await auth.register(email, password, name, turnstileToken);
+      const data = await auth.register(email, password, name, turnstile.token);
 
       if (data?.status === 'success') {
-        // Token được lưu trong httpOnly cookie bởi backend (nếu có)
-        // Không cần lưu vào localStorage anymore
-
         try {
           const derivedName = data.user.username || (data.user.email || '').split('@')[0];
           const profile = {
@@ -164,224 +168,183 @@ export function RegisterDialog({
         window.dispatchEvent(new Event('user-auth-changed'));
         toast.success('Đăng ký thành công', { description: data.user.email });
 
-        // Reset form
-        const registeredEmail = email;
+        // Open the login dialog with the email filled in
         onOpenChange(false);
-        setEmail('');
-        setName('');
-        setPassword('');
-        setConfirmPassword('');
-        setTermsAccepted(false);
-
-        // Open login dialog with the email filled in
-        onLogin(registeredEmail);
+        onLogin(email);
       }
     } catch (err: any) {
       const msg = String(err?.message || 'Đăng ký thất bại');
       if (msg.toLowerCase().includes('email')) {
+        // The email belongs to the first step: take the customer back to it
         setEmailError(msg);
+        setStep(STEP_ACCOUNT);
       } else {
         setSubmitError(msg);
       }
     } finally {
       setIsLoading(false);
-      if ((window as any).turnstile && turnstileWidgetId.current) {
-         (window as any).turnstile.reset(turnstileWidgetId.current);
-         setTurnstileToken('');
-      }
-      // router.push('/'); // Should not push if it fails
+      turnstile.reset();
     }
-  };
-
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      // Reset all states when closing
-      setEmail('');
-      setPassword('');
-      setConfirmPassword('');
-      setEmailError('');
-      setPasswordError('');
-      setConfirmError('');
-      setSubmitError('');
-      setTermsAccepted(false);
-      setTurnstileToken('');
-      // Auto-reset turnstile
-      if ((window as any).turnstile && turnstileWidgetId.current) {
-        (window as any).turnstile.reset(turnstileWidgetId.current);
-      }
-    }
-    onOpenChange(open);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent
-        className={cn(
-          'bg-gradient-to-br z-[9999] from-[#0b1226] via-[#0e1b3d] to-[#050915] border border-cyan-500/30 text-white shadow-[0_0_50px_rgba(59,130,246,0.3)]',
-          AUTH_DIALOG_CLASS
-        )}
-      >
-        <DialogHeader>
-          <div className="flex justify-center mb-4">
-            <img src="/icon.svg" alt="Cinesphere" className="h-14 w-14 sm:h-20 sm:w-20" />
-          </div>
-          <DialogTitle className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 text-center">
-            Đăng Ký Tài Khoản
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Đăng ký tài khoản để trải nghiệm đặt vé phim đa chiều tại Cinesphere.
-          </DialogDescription>
-        </DialogHeader>
+    <AuthDialogShell
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      title="Đăng Ký Tài Khoản"
+      description="Đăng ký tài khoản để trải nghiệm đặt vé phim đa chiều tại Cinesphere."
+      asideTitle="Tạo tài khoản Cinesphere"
+      asideText="Chỉ mất một phút để có tài khoản và đặt vé nhanh hơn ở những lần sau."
+    >
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+        <AuthStepper steps={STEP_LABELS} current={step} />
 
-        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-          <AuthField
-            id="register-email"
-            name="email"
-            label="Email"
-            type="email"
-            value={email}
-            placeholder="you@email.com"
-            onChange={(value) => {
-              setEmail(value);
-              if (emailError && EMAIL_PATTERN.test(value)) setEmailError('');
-              if (submitError) setSubmitError('');
-            }}
-            onBlur={() => {
-              if (email && !EMAIL_PATTERN.test(email)) setEmailError('Vui lòng nhập email hợp lệ');
-            }}
-            error={emailError}
-            autoComplete="email"
-            inputMode="email"
-            maxLength={50}
-            disabled={isLoading}
-          />
-
-          <AuthField
-            id="register-name"
-            name="name"
-            label="Họ và tên"
-            value={name}
-            placeholder="Nguyễn Văn A"
-            onChange={(value) => {
-              setName(value);
-              if (nameError && value.trim()) setNameError('');
-              if (submitError) setSubmitError('');
-            }}
-            onBlur={() => {
-              if (!name.trim()) setNameError('Vui lòng nhập họ và tên');
-            }}
-            error={nameError}
-            autoComplete="name"
-            maxLength={50}
-            disabled={isLoading}
-          />
-
-          <AuthField
-            id="register-password"
-            name="new-password"
-            label="Mật khẩu"
-            type="password"
-            value={password}
-            onChange={(value) => {
-              setPassword(value);
-              if (passwordError && PASSWORD_PATTERN.test(value)) setPasswordError('');
-              if (submitError) setSubmitError('');
-              if (confirmPassword && value === confirmPassword) setConfirmError('');
-            }}
-            onBlur={() => {
-              if (password && !PASSWORD_PATTERN.test(password)) setPasswordError(`Mật khẩu chưa đủ mạnh. ${PASSWORD_RULE_TEXT}`);
-            }}
-            error={passwordError}
-            hint={PASSWORD_RULE_TEXT}
-            autoComplete="new-password"
-            maxLength={50}
-            disabled={isLoading}
-          />
-
-          <AuthField
-            id="register-confirm-password"
-            name="confirm-password"
-            label="Nhập lại mật khẩu"
-            type="password"
-            value={confirmPassword}
-            onChange={(value) => {
-              setConfirmPassword(value);
-              if (confirmError && password === value) setConfirmError('');
-            }}
-            onBlur={() => {
-              if (confirmPassword && password !== confirmPassword) setConfirmError('Mật khẩu nhập lại không khớp');
-            }}
-            error={confirmError}
-            autoComplete="new-password"
-            maxLength={50}
-            disabled={isLoading}
-          />
-
-          {/* Terms Checkbox */}
-          <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-1">
-            <Checkbox
-              checked={termsAccepted}
-              onCheckedChange={(e) => {
-                setTermsAccepted(e === true);
-                if (e) setTermsError('');
+        {step === STEP_ACCOUNT ? (
+          <div className="space-y-4">
+            <AuthField
+              id="register-email"
+              name="email"
+              label="Email"
+              type="email"
+              icon={Mail}
+              value={email}
+              placeholder="you@email.com"
+              onChange={(value) => {
+                setEmail(value);
+                if (emailError && EMAIL_PATTERN.test(value)) setEmailError('');
               }}
-              disabled={isLoading}
-              className="mt-0.5 border-white/40 data-[state=checked]:bg-blue-500 w-5 h-5 shrink-0"
+              onBlur={checkEmailOnBlur}
+              error={emailError}
+              autoComplete="email"
+              inputMode="email"
+              maxLength={50}
             />
-            <span className="text-[13px] leading-relaxed text-gray-400 select-none">
-              Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của Cinesphere.
-            </span>
-          </label>
 
-          {termsError && (
-            <div role="alert" className="rounded-md bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">{termsError}</div>
-          )}
+            <AuthField
+              id="register-name"
+              name="name"
+              label="Họ và tên"
+              icon={User}
+              value={name}
+              placeholder="Nguyễn Văn A"
+              onChange={(value) => {
+                setName(value);
+                if (nameError && value.trim()) setNameError('');
+              }}
+              onBlur={() => {
+                if (!name.trim()) setNameError('Vui lòng nhập họ và tên');
+              }}
+              error={nameError}
+              autoComplete="name"
+              maxLength={50}
+            />
 
-          {submitError && (
-            <div role="alert" className="rounded-md bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
-              {submitError}
+            <div className="space-y-2">
+              <AuthField
+                id="register-password"
+                name="new-password"
+                label="Mật khẩu"
+                type="password"
+                icon={Lock}
+                value={password}
+                onChange={(value) => {
+                  setPassword(value);
+                  if (passwordError && PASSWORD_PATTERN.test(value)) setPasswordError('');
+                  if (confirmPassword && value === confirmPassword) setConfirmError('');
+                }}
+                onBlur={() => {
+                  if (password && !PASSWORD_PATTERN.test(password)) setPasswordError(`Mật khẩu chưa đủ mạnh. ${PASSWORD_RULE_TEXT}`);
+                }}
+                error={passwordError}
+                autoComplete="new-password"
+                maxLength={50}
+              />
+              <PasswordChecklist password={password} />
             </div>
-          )}
 
-          {/* Cloudflare Turnstile */}
-          <div className="flex justify-center">
-            <div ref={turnstileRef} className="cf-turnstile"></div>
+            <AuthField
+              id="register-confirm-password"
+              name="confirm-password"
+              label="Nhập lại mật khẩu"
+              type="password"
+              icon={Lock}
+              value={confirmPassword}
+              onChange={(value) => {
+                setConfirmPassword(value);
+                if (confirmError && password === value) setConfirmError('');
+              }}
+              onBlur={() => {
+                if (confirmPassword && password !== confirmPassword) setConfirmError('Mật khẩu nhập lại không khớp');
+              }}
+              error={confirmError}
+              autoComplete="new-password"
+              maxLength={50}
+            />
+
+            {/* A submit button, so the Enter key also moves on */}
+            <AuthSubmitButton label="Tiếp tục" loadingLabel="Đang kiểm tra email..." isLoading={isCheckingEmail} />
           </div>
+        ) : (
+          <div className="space-y-4">
+            {/* What the customer is about to register */}
+            <div className="rounded-lg border border-white/10 bg-white/[0.05] px-4 py-3 text-sm">
+              <p className="text-xs text-gray-400">Tài khoản sẽ được tạo cho</p>
+              <p className="font-semibold text-white">{name.trim()}</p>
+              <p className="break-all text-gray-300">{email}</p>
+            </div>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={
-              isLoading ||
-              !turnstileToken ||
-              !(email && name && password && confirmPassword && password === confirmPassword && termsAccepted)
-            }
-            className="w-full h-11 bg-gradient-to-r from-cyan-400 via-blue-600 to-fuchsia-500 hover:from-fuchsia-500 hover:via-cyan-400 hover:to-blue-600 text-white font-semibold shadow-[0_0_30px_rgba(59,130,246,0.4)] hover:shadow-[0_0_40px_rgba(236,72,153,0.6)]"
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Đang đăng ký...
+            {/* Terms Checkbox */}
+            <label className="flex min-h-[44px] cursor-pointer items-start gap-3 py-1">
+              <Checkbox
+                checked={termsAccepted}
+                onCheckedChange={(checked) => {
+                  setTermsAccepted(checked === true);
+                  if (checked) setTermsError('');
+                }}
+                disabled={isLoading}
+                className="mt-0.5 h-5 w-5 shrink-0 border-white/40 data-[state=checked]:bg-blue-500"
+              />
+              <span className="select-none text-[13px] leading-relaxed text-gray-300">
+                Bằng việc đăng ký tài khoản, tôi đồng ý với Điều khoản dịch vụ và Chính sách bảo vệ của Cinesphere.
               </span>
-            ) : (
-              'Đăng ký'
-            )}
-          </Button>
+            </label>
 
-          {/* Login Link */}
-          <div className="flex justify-center">
-            <Button
-              variant="link"
-              className="h-11 text-sm text-cyan-300 hover:text-cyan-200"
-              type="button"
-              onClick={() => onLogin()}
-            >
-              Đã có tài khoản? Đăng nhập
-            </Button>
+            {termsError && <AuthAlert tone="warning">{termsError}</AuthAlert>}
+            {submitError && <AuthAlert>{submitError}</AuthAlert>}
+
+            <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} />
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLoading}
+                onClick={() => setStep(STEP_ACCOUNT)}
+                className="h-11 shrink-0 rounded-lg border-white/20 bg-transparent px-4 text-gray-200 hover:bg-white/10 hover:text-white"
+                aria-label="Quay lại bước tài khoản"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex-1">
+                <AuthSubmitButton
+                  label="Đăng ký"
+                  loadingLabel="Đang đăng ký..."
+                  isLoading={isLoading}
+                  disabled={!turnstile.token || !termsAccepted}
+                />
+              </div>
+            </div>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+
+        <div className="flex items-center justify-center gap-1 border-t border-white/10 pt-3 text-sm text-gray-300">
+          Đã có tài khoản?
+          <Button variant="link" className={`${AUTH_LINK_BUTTON_CLASS} h-9 px-1 font-semibold`} type="button" onClick={() => onLogin()}>
+            Đăng nhập
+          </Button>
+        </div>
+      </form>
+    </AuthDialogShell>
   );
 }
 

@@ -316,7 +316,7 @@ export default function MovieScheduleSection() {
   return (
     <section
       id="schedule"
-      className="relative py-8 sm:py-20 px-2 sm:px-3 bg-gradient-to-b from-[#050915] via-[#070e24] to-[#050915] overflow-hidden"
+      className="relative py-10 sm:py-20 px-2 sm:px-3 bg-gradient-to-b from-[#050915] via-[#070e24] to-[#050915] border-t border-white/[0.06] overflow-hidden"
     >
       {/* Sci-Fi Ambient Glows */}
       <div className="absolute top-1/4 left-1/4 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] rounded-full bg-cyan-500/10 blur-[120px] sm:blur-[140px] pointer-events-none" />

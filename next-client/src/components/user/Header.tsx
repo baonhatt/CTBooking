@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,13 +30,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import {
-    DropdownMenu,
-    DropdownMenuTrigger,
-    DropdownMenuContent,
-    DropdownMenuItem
-} from '@/components/ui/dropdown-menu';
-import { Calendar, Check, ChevronDown, Gamepad2, MapPin, ShoppingCart } from 'lucide-react';
+import { ShoppingCart, User } from 'lucide-react';
+import { scrollToElementId } from '@/lib/scroll';
+import { useHeaderEvents } from '@/hooks/useHeaderEvents';
+import BranchSelector from '@/components/user/header/BranchSelector';
 import { useCart } from '@/store/cartStore';
 import { useQuery } from '@tanstack/react-query';
 import { getVRPackages } from '@/lib/api/vr-packages';
@@ -76,6 +73,8 @@ export default function Header({
     const { data: vrRes } = useQuery({
         queryKey: ['vrPackages', selectedBranch?.id],
         queryFn: () => getVRPackages(selectedBranch?.id),
+        // Wait for the branch: asking before it is known fetches the packages of every branch for nothing
+        enabled: !!selectedBranch?.id,
         staleTime: 60 * 1000
     });
     const hasVRPackages = vrRes?.items && vrRes.items.length > 0;
@@ -112,45 +111,6 @@ export default function Header({
         }
     }, []);
 
-    // Listen for global open-movie-schedule event
-    useEffect(() => {
-        const handleOpenSchedule = () => setIsScheduleOpen(true);
-        window.addEventListener('open-movie-schedule', handleOpenSchedule);
-        return () => window.removeEventListener('open-movie-schedule', handleOpenSchedule);
-    }, []);
-
-    // Listen for global 401 interceptor event
-    useEffect(() => {
-        const handleOpenLogin = (e: any) => {
-            setIsRegisterOpen(false);
-            setIsForgetPassOpen(false);
-            setTimeout(() => {
-                setIsLoginOpen(true);
-            }, 50);
-            
-            if (e.detail?.message) {
-                import('sonner').then(({ toast }) => {
-                    toast.error(e.detail.message, { id: 'session-expired-toast' });
-                });
-            }
-        };
-        window.addEventListener('open-login-dialog', handleOpenLogin as EventListener);
-        return () => window.removeEventListener('open-login-dialog', handleOpenLogin as EventListener);
-    }, []);
-
-    // Listen for global 403 access denied event
-    useEffect(() => {
-        const handleShowErrorToast = (e: any) => {
-            if (e.detail?.message) {
-                import('sonner').then(({ toast }) => {
-                    toast.error(e.detail.message, { id: 'access-denied-toast' });
-                });
-            }
-        };
-        window.addEventListener('show-error-toast', handleShowErrorToast as EventListener);
-        return () => window.removeEventListener('show-error-toast', handleShowErrorToast as EventListener);
-    }, []);
-
     // Login status
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -174,19 +134,28 @@ export default function Header({
         message: ''
     });
 
+    // Page-wide events: the schedule panel, the login dialog (a 401 or a guarded page), the access-denied toast
+    const openScheduleFromEvent = useCallback(() => setIsScheduleOpen(true), []);
+    const openLoginFromEvent = useCallback((message?: string) => {
+        setIsRegisterOpen(false);
+        setIsForgetPassOpen(false);
+        setTimeout(() => {
+            setIsLoginOpen(true);
+        }, 50);
+
+        if (message) {
+            import('sonner').then(({ toast }) => {
+                toast.error(message, { id: 'session-expired-toast' });
+            });
+        }
+    }, []);
+    useHeaderEvents({ onOpenSchedule: openScheduleFromEvent, onOpenLogin: openLoginFromEvent });
+
     // Utilities
     const scrollToSection = (id: string) => {
         if (id === 'schedule') {
-            const scheduleEl = document.getElementById('schedule');
-            if (scheduleEl) {
-                const headerEl = document.querySelector('header') as HTMLElement | null;
-                const headerOffset = headerEl?.offsetHeight || 72;
-                const rect = scheduleEl.getBoundingClientRect();
-                const absoluteTop = window.scrollY + rect.top;
-                window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
-                return;
-            }
-            setIsScheduleOpen(true);
+            // On the home page the schedule is a section; elsewhere it opens as a panel
+            if (!scrollToElementId('schedule')) setIsScheduleOpen(true);
             return;
         }
 
@@ -197,25 +166,11 @@ export default function Header({
 
         if (pathname !== '/') {
             router.push('/');
-            setTimeout(() => {
-                const element = document.getElementById(id);
-                if (!element) return;
-                const headerEl = document.querySelector('header') as HTMLElement | null;
-                const headerOffset = headerEl?.offsetHeight || 72;
-                const rect = element.getBoundingClientRect();
-                const absoluteTop = window.scrollY + rect.top;
-                window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
-            }, 180);
+            setTimeout(() => scrollToElementId(id), 180);
             return;
         }
 
-        const element = document.getElementById(id);
-        if (!element) return;
-        const headerEl = document.querySelector('header') as HTMLElement | null;
-        const headerOffset = headerEl?.offsetHeight || 72;
-        const rect = element.getBoundingClientRect();
-        const absoluteTop = window.scrollY + rect.top;
-        window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
+        scrollToElementId(id);
     };
 
     const openRegister = () => {
@@ -307,7 +262,7 @@ export default function Header({
                         : 'bg-gradient-to-b from-black/90 via-black/60 to-transparent border-b border-white/5'
             )}
         >
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
+            <div className="container mx-auto px-3 min-[360px]:px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4">
                 {/* Logo */}
                 <div className="flex items-center gap-2 sm:gap-3 animate-fade-in shrink-0">
                     <img
@@ -347,55 +302,15 @@ export default function Header({
                 </nav>
 
                 {/* Right Actions / Utilities Cluster */}
-                <div className="flex items-center gap-2.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
+                <div className="flex items-center gap-2 min-[360px]:gap-2.5 sm:gap-3.5 animate-fade-in delay-200 shrink-0">
                     {/* Branch Selector Chip */}
                     {selectedBranch && branches.length > 1 && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger
-                                disabled={isBookingFlow}
-                                className={cn(
-                                    'group relative flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold before:absolute before:-inset-1.5 before:content-[""] text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
-                                    isBookingFlow ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                                )}
-                            >
-                                <MapPin className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
-                                <span className="max-w-[70px] min-[380px]:max-w-[100px] sm:max-w-[140px] truncate">{selectedBranch.name}</span>
-                                <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-white transition-transform duration-200 group-data-[state=open]:rotate-180 shrink-0" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                side="bottom"
-                                align="end"
-                                className="bg-[#0b1226]/95 backdrop-blur-2xl border border-white/15 p-1.5 min-w-[200px] shadow-[0_20px_50px_rgba(0,0,0,0.6)] animate-in fade-in-0 zoom-in-95 rounded-2xl z-[100]"
-                            >
-                                <div className="px-3 py-2 text-xs uppercase font-bold text-cyan-400/80 tracking-widest border-b border-white/5 mb-1 flex items-center justify-between">
-                                    <span>Chọn Chi Nhánh</span>
-                                    <MapPin className="w-3 h-3 text-cyan-400/60" />
-                                </div>
-                                <div className="space-y-1">
-                                    {branches.map((branch) => {
-                                        const isSelected = branch.id === selectedBranch.id;
-                                        return (
-                                            <DropdownMenuItem
-                                                key={branch.id}
-                                                onClick={() => handleBranchChange(branch.id)}
-                                                className={cn(
-                                                    'flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-xs font-semibold transition-all duration-200 outline-none',
-                                                    isSelected
-                                                        ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-300 border border-cyan-500/30'
-                                                        : 'text-slate-300 hover:text-white focus:bg-white/10 focus:text-white border border-transparent'
-                                                )}
-                                            >
-                                                <div className="flex items-center gap-2 truncate">
-                                                    <MapPin className={cn("w-3.5 h-3.5 shrink-0", isSelected ? "text-cyan-400" : "text-slate-400")} />
-                                                    <span className="truncate">{branch.name}</span>
-                                                </div>
-                                                {isSelected && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
-                                            </DropdownMenuItem>
-                                        );
-                                    })}
-                                </div>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <BranchSelector
+                            branches={branches}
+                            selectedBranch={selectedBranch}
+                            disabled={isBookingFlow}
+                            onChange={handleBranchChange}
+                        />
                     )}
 
                     {/* Shopping Cart Button */}
@@ -412,6 +327,16 @@ export default function Header({
                                 {totalItemsCount}
                             </span>
                         )}
+                    </button>
+
+                    {/* Phone: one round button, to the account when signed in, else to the login dialog */}
+                    <button
+                        type="button"
+                        onClick={isLoggedIn ? () => router.push('/account') : openLogin}
+                        aria-label={isLoggedIn ? 'Tài khoản của tôi' : 'Đăng nhập'}
+                        className="sm:hidden relative flex h-8 w-8 items-center justify-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)] before:absolute before:-inset-1.5 before:content-[''] touch-manipulation select-none active:scale-95"
+                    >
+                        <User className="h-4 w-4" />
                     </button>
 
                     {/* Desktop User Menu or Login Button */}

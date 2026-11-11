@@ -35,11 +35,11 @@ import {
 } from '@/lib/api';
 import { optimizeCloudinaryUrl } from '@/lib/utils';
 import UserLayout from '@/layouts/UserLayout';
+import BookingSteps, { BOOKING_STEP } from '@/components/user/BookingSteps';
 import {
   ArrowLeft,
   ArrowRight,
   CreditCard,
-  ChevronRight,
   X,
   Loader2,
   Gamepad2,
@@ -743,17 +743,9 @@ export default function BookingPage() {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 sm:pt-36 pb-44 lg:pb-20">
-          {/* Breadcrumb Navigation */}
-          <div className="text-xs sm:text-sm pt-2 pb-6 flex items-center gap-2 text-slate-400">
-            <button onClick={() => router.push('/')} className="inline-flex items-center min-h-[44px] hover:text-cyan-400 transition-colors">
-              Trang chủ
-            </button>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-            <button onClick={openCart} className="inline-flex items-center min-h-[44px] hover:text-cyan-400 transition-colors">
-              Giỏ hàng ({selectedItems.length})
-            </button>
-            <ChevronRight className="w-3.5 h-3.5 opacity-50" />
-            <span className="text-cyan-300 font-semibold">Xác nhận &amp; Thanh toán</span>
+          {/* Where the customer is in the purchase; the first step opens the cart */}
+          <div className="pb-4">
+            <BookingSteps current={BOOKING_STEP.details} onCartClick={openCart} />
           </div>
 
           {/* Header Title Bar */}
@@ -999,8 +991,8 @@ export default function BookingPage() {
                 {movieItems.length > 0 && availableMovies.length > 0 && (
                   <Card className="order-5 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
                     <CardHeader 
-                      className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6 cursor-pointer lg:cursor-default select-none group"
-                      onClick={() => window.innerWidth < 1024 && setIsMoviesOpen(!isMoviesOpen)}
+                      className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6 cursor-pointer select-none group"
+                      onClick={() => setIsMoviesOpen(!isMoviesOpen)}
                     >
                       <CardTitle className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
@@ -1020,13 +1012,13 @@ export default function BookingPage() {
                           </button>
                           <div className="flex items-center gap-1.5 px-2 py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/20 group-hover:bg-cyan-500/15 transition-colors">
                             <span className="text-xs sm:text-xs text-cyan-400 font-semibold">{availableMovies.length} phim</span>
-                            <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 lg:hidden transition-transform duration-300 ${isMoviesOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 transition-transform duration-300 ${isMoviesOpen ? 'rotate-180' : ''}`} />
                           </div>
                         </div>
                       </CardTitle>
                     </CardHeader>
 
-                    <CardContent className={`p-5 sm:p-6 ${isMoviesOpen ? 'block' : 'hidden lg:block'}`}>
+                    <CardContent className={`p-5 sm:p-6 ${isMoviesOpen ? 'block' : 'hidden'}`}>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
                         {availableMovies.map((m: any) => (
                           <div

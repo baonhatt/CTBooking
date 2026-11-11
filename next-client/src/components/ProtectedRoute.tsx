@@ -29,8 +29,8 @@ export default function ProtectedRoute({ children }: Props) {
       window.dispatchEvent(new Event('user-auth-changed'));
 
       toast.error('Vui lòng đăng nhập trước!', { duration: 3000 });
-      window.dispatchEvent(new Event('open-login'));
-      router.replace('/');
+      // The home page opens the login dialog for this address (the header of this page goes away with the redirect)
+      router.replace('/?login=1');
     } else {
       setIsCheckingAuth(false);
     }

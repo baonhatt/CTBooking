@@ -15,9 +15,15 @@ import {
 } from '../utils';
 import { requireAuth } from '../middleware';
 
-import { loginWithSessionImpl, validateOTPImpl, resendOTPImpl, registerImpl } from '../../../server/routes/user/auth';
+import {
+  loginWithSessionImpl,
+  validateOTPImpl,
+  resendOTPImpl,
+  registerImpl,
+  checkEmailAvailableImpl
+} from '../../../server/routes/user/auth';
 
-import { forgetPassImpl, resetPasswordImpl, changePasswordImpl } from '../../../server/routes/user/password';
+import { forgetPassImpl, resetPasswordImpl, changePasswordImpl, checkResetTokenImpl } from '../../../server/routes/user/password';
 
 import {
   getUserProfileByAccountIdImpl,
@@ -254,6 +260,51 @@ const registerSchema = z.object({
   turnstileToken: z.string().min(1, 'Mã xác thực không hợp lệ'),
 }).passthrough();
 
+// CHECK EMAIL (register form: "is this email still free?")
+// No CAPTCHA, so the customer hears about a taken email on the first step, not after filling in the whole form. To keep it
+// from being used to list the customers' emails, each IP may ask only CHECK_EMAIL_LIMIT times per CHECK_EMAIL_WINDOW_MS.
+// The counters live in this worker instance only, so this is a brake, not a hard limit; /api/register still has its CAPTCHA.
+const CHECK_EMAIL_LIMIT = 20;
+const CHECK_EMAIL_WINDOW_MS = 60 * 1000;
+const checkEmailHits = new Map<string, { count: number; windowStart: number }>();
+
+function isCheckEmailLimited(ip: string): boolean {
+  const now = Date.now();
+  const hit = checkEmailHits.get(ip);
+  if (!hit || now - hit.windowStart >= CHECK_EMAIL_WINDOW_MS) {
+    // Old windows are dropped now and then so the map does not grow without end
+    if (checkEmailHits.size > 5000) checkEmailHits.clear();
+    checkEmailHits.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  hit.count += 1;
+  return hit.count > CHECK_EMAIL_LIMIT;
+}
+
+const checkEmailSchema = z.object({ email: z.string().email('Email không hợp lệ') });
+
+userRouter.post('/api/check-email', async (c) => {
+  try {
+    const clientIp = c.req.header('CF-Connecting-IP') || 'unknown';
+    if (isCheckEmailLimited(clientIp)) {
+      return c.json({ status: 'error', message: 'Bạn thử quá nhiều lần, vui lòng đợi một phút rồi thử lại.' }, 429);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const parsed = checkEmailSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ status: 'error', message: parsed.error.issues[0].message }, 400);
+    }
+
+    const db = drizzle(c.env.cinema_db, { schema });
+    const result = await checkEmailAvailableImpl(db, { accounts: schema.accounts }, parsed.data.email);
+    return c.json({ status: 'success', ...result });
+  } catch (err: any) {
+    logSystemError('check-email', err, {});
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
 userRouter.post('/api/register', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
@@ -399,6 +450,21 @@ userRouter.post('/api/forget-password', async (c) => {
     logSystemError('forget-password', err, body);
 
     return c.json({ message: 'Lỗi máy chủ nội bộ', error: String(err?.message || err) }, 500);
+  }
+});
+
+userRouter.post('/api/reset-password/check', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body: any = await c.req.json().catch(() => ({}));
+    const result = await checkResetTokenImpl(
+      db,
+      { accounts: schema.accounts, tokens: schema.tokens },
+      String(body?.token || '')
+    );
+    return c.json({ status: 'success', ...result });
+  } catch {
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 

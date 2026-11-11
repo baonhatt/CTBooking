@@ -133,10 +133,11 @@ export default function FloatingActions() {
                       rel="noopener noreferrer"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#0068ff] text-white flex items-center justify-center shadow-lg border border-white/20"
+                      className="w-12 h-12 rounded-full bg-[#0068ff] text-white flex items-center justify-center shadow-lg border border-white/20"
                       title="Chat Zalo"
+                      aria-label="Chat Zalo"
                     >
-                      <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <MessageCircle className="w-6 h-6" />
                     </motion.a>
                   )}
 
@@ -146,10 +147,11 @@ export default function FloatingActions() {
                       href={`tel:${hotline}`}
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border border-white/20"
+                      className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border border-white/20"
                       title="Gọi Hotline"
+                      aria-label="Gọi hotline"
                     >
-                      <Phone className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <Phone className="w-6 h-6" />
                     </motion.a>
                   )}
                 </motion.div>
@@ -165,11 +167,11 @@ export default function FloatingActions() {
               whileTap={{ scale: 0.9 }}
               aria-label={isExpanded ? 'Đóng liên hệ' : 'Mở liên hệ'}
               className={cn(
-                'w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center shadow-lg border border-white/20 transition-colors duration-300 cursor-pointer',
+                'w-12 h-12 rounded-full flex items-center justify-center shadow-lg border border-white/20 transition-colors duration-300 cursor-pointer',
                 isExpanded ? 'bg-gray-800 text-white' : 'bg-slate-900/80 backdrop-blur-md text-white hover:bg-slate-800'
               )}
             >
-              {isExpanded ? <X className="w-5 h-5 sm:w-6 sm:h-6" /> : <Headset className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />}
+              {isExpanded ? <X className="w-6 h-6" /> : <Headset className="w-6 h-6 text-purple-400" />}
             </motion.button>
           </div>
         )}

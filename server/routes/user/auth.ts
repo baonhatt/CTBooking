@@ -291,6 +291,30 @@ export async function resendOTPImpl(
   };
 }
 
+// Whether an email can still be registered. Used by the register step ("is this email free?") and by registerImpl, so both
+// give the same answer and the same message.
+export async function checkEmailAvailableImpl(
+  anyDb: any,
+  tables: { accounts: any },
+  email: string
+): Promise<{ available: true } | { available: false; message: string }> {
+  const existing = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
+  if (existing) {
+    return { available: false, message: 'Email đã tồn tại' };
+  }
+
+  // The email of a staff member cannot be used for a customer account
+  const { staffs } = await import('../../../shared/schema');
+  const staffExist = await anyDb.query.staffs.findFirst({
+    where: eq(staffs.email, email)
+  });
+  if (staffExist) {
+    return { available: false, message: 'Email này thuộc về hệ thống quản lý. Vui lòng dùng email khác.' };
+  }
+
+  return { available: true };
+}
+
 export async function registerImpl(
   anyDb: any,
   tables: { accounts: any; users: any; email_logs?: any },
@@ -309,18 +333,9 @@ export async function registerImpl(
       return { status: 400, message: 'Email và mật khẩu không được để trống!' };
     }
 
-    const existing = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) });
-    if (existing) {
-      return { status: 400, message: 'Email đã tồn tại' };
-    }
-
-    // Check if email already exists in staffs
-    const { staffs } = await import('../../../shared/schema');
-    const staffExist = await anyDb.query.staffs.findFirst({
-      where: eq(staffs.email, email)
-    });
-    if (staffExist) {
-      return { status: 400, message: 'Email này thuộc về hệ thống quản lý. Vui lòng dùng email khác.' };
+    const emailCheck = await checkEmailAvailableImpl(anyDb, tables, email);
+    if (!emailCheck.available) {
+      return { status: 400, message: emailCheck.message };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

@@ -311,7 +311,7 @@ export default function CartDrawer() {
                         {/* Details */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-bold text-sm text-white line-clamp-1 group-hover:text-cyan-300">
+                            <h4 className="font-bold text-sm text-white line-clamp-1">
                               {item.name}
                             </h4>
                             <button
@@ -345,6 +345,7 @@ export default function CartDrawer() {
                             <div className="flex items-center bg-white/10 border border-white/15 rounded-lg overflow-hidden">
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                aria-label={`Giảm số lượng ${item.name}`}
                                 className="w-11 h-11 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"
                               >
                                 <Minus className="w-3 h-3" />
@@ -352,6 +353,7 @@ export default function CartDrawer() {
                               <span className="w-8 text-center text-xs font-bold text-white">{item.quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                aria-label={`Tăng số lượng ${item.name}`}
                                 className="w-11 h-11 flex items-center justify-center hover:bg-white/15 text-slate-200 hover:text-white transition-colors"
                               >
                                 <Plus className="w-3 h-3" />

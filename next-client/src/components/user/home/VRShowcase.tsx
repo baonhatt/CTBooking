@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn, optimizeCloudinaryUrl } from '@/lib/utils';
+import { optimizeCloudinaryUrl } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,7 +21,6 @@ import {
   Plus,
   Minus,
   CheckCircle2,
-  SlidersHorizontal,
   Info
 } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
@@ -56,7 +55,6 @@ export default function VRShowcase({
   const searchParams = useSearchParams();
   const { selectedBranch } = useBranch();
   const isInitialBranch = !selectedBranch?.id || selectedBranch?.id === initialBranchId;
-  const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedDetailPkg, setSelectedDetailPkg] = useState<any | null>(null);
   const [modalQty, setModalQty] = useState<number>(1);
 
@@ -85,25 +83,11 @@ export default function VRShowcase({
     return Number(n || 0).toLocaleString('vi-VN') + '₫';
   };
 
-  // Extract unique genres for filter tabs
-  const availableGenres = useMemo(() => {
-    const set = new Set<string>();
-    packagesData.forEach((p) => {
-      if (p.vr_genre && String(p.vr_genre).trim()) {
-        set.add(String(p.vr_genre).trim());
-      }
-    });
-    return Array.from(set);
-  }, [packagesData]);
-
-  // Filtered packages
-  const filteredPackages = useMemo(() => {
-    let list = [...packagesData];
-    if (selectedGenre !== 'all') {
-      list = list.filter((p) => String(p.vr_genre || '').trim() === selectedGenre);
-    }
-    return list.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
-  }, [packagesData, selectedGenre]);
+  // Every package is shown, in the order set in the admin
+  const filteredPackages = useMemo(
+    () => [...packagesData].sort((a, b) => (a.display_order || 0) - (b.display_order || 0)),
+    [packagesData]
+  );
 
   const handleAddToCart = (pkg: any, quantity: number = 1) => {
     cartStore.addItem({
@@ -167,7 +151,7 @@ export default function VRShowcase({
   return (
     <section
       id="vr"
-      className="relative py-20 bg-gradient-to-b from-[#050915] via-[#0c0821] to-[#050915] overflow-hidden"
+      className="relative py-14 sm:py-20 bg-gradient-to-b from-[#050915] via-[#0c0821] to-[#050915] border-t border-white/[0.06] overflow-hidden"
     >
       {/* Background neon glows & ambient lighting - Zero-overhead CSS Radial Gradients */}
       <div className="absolute inset-0 neon-noise pointer-events-none opacity-60" />
@@ -197,42 +181,9 @@ export default function VRShowcase({
           </p>
         </div>
 
-        {/* Genre Filter Pills */}
-        {availableGenres.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 mb-6 sm:mb-10">
-            <button
-              type="button"
-              onClick={() => setSelectedGenre('all')}
-              className={cn(
-                'px-3 min-h-[44px] sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 backdrop-blur-md border',
-                selectedGenre === 'all'
-                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border-purple-400/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] scale-105'
-                  : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border-white/10 hover:border-purple-500/30'
-              )}
-            >
-              Tất cả ({packagesData.length})
-            </button>
-            {availableGenres.map((genre) => (
-              <button
-                key={genre}
-                type="button"
-                onClick={() => setSelectedGenre(genre)}
-                className={cn(
-                  'px-3 min-h-[44px] sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 backdrop-blur-md border',
-                  selectedGenre === genre
-                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white border-purple-400/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] scale-105'
-                    : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border-white/10 hover:border-purple-500/30'
-                )}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* VR Package Grid (2 columns on mobile, 3 on desktop) */
         filteredPackages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-6 max-w-7xl mx-auto">
+          <div className="flex flex-wrap justify-center gap-2.5 sm:gap-6 max-w-7xl mx-auto">
             {filteredPackages.map((pkg: any) => {
               const imageUrl = resolveImageUrl(pkg.cover_image);
               const hasImage = Boolean(pkg.cover_image);
@@ -240,7 +191,7 @@ export default function VRShowcase({
               return (
                 <Card
                   key={pkg.id}
-                  className="bg-slate-900/80 border border-white/10 backdrop-blur-md overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_35px_rgba(168,85,247,0.25)] transition-all duration-300 group flex flex-col h-full rounded-xl sm:rounded-2xl"
+                  className="bg-slate-900/80 border border-white/10 backdrop-blur-md overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_35px_rgba(168,85,247,0.25)] transition-all duration-300 group flex flex-col rounded-xl sm:rounded-2xl w-[calc(50%-0.3125rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] xl:w-[calc(25%-1.125rem)]"
                 >
                   {/* Package Cover Image Header */}
                   <div className="relative aspect-[4/5] w-full overflow-hidden bg-slate-950 flex items-center justify-center">

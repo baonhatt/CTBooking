@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, type LucideIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +20,8 @@ interface AuthFieldProps {
   maxLength?: number;
   placeholder?: string;
   disabled?: boolean;
+  // A small icon at the left of the input
+  icon?: LucideIcon;
 }
 
 /**
@@ -40,7 +42,8 @@ export function AuthField({
   inputMode,
   maxLength,
   placeholder,
-  disabled
+  disabled,
+  icon: Icon
 }: AuthFieldProps) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
@@ -48,10 +51,11 @@ export function AuthField({
 
   return (
     <div>
-      <label htmlFor={id} className="text-sm text-gray-300 mb-1 block">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-200">
         {label}
       </label>
       <div className="relative">
+        {Icon && <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />}
         <Input
           id={id}
           name={name || id}
@@ -69,7 +73,8 @@ export function AuthField({
           aria-invalid={error ? true : undefined}
           aria-describedby={messageId}
           className={cn(
-            'h-11 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
+            'h-11 bg-white/[0.07] border-white/20 text-white placeholder:text-gray-400 focus-visible:ring-cyan-400 focus-visible:ring-offset-1 rounded-lg',
+            Icon && 'pl-10',
             isPassword && 'pr-12',
             error && 'border-yellow-500 focus-visible:ring-yellow-500'
           )}

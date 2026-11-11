@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import UserLayout from '@/layouts/UserLayout';
+import BookingSteps, { BOOKING_STEP } from '@/components/user/BookingSteps';
 import { buildUrl } from '@/lib/api/http';
 import { copyText } from '@/lib/clipboard';
 import { fetchBookingStatus, cancelBookingByToken } from '@/lib/api/booking';
@@ -165,7 +166,7 @@ export default function QRPaymentPage() {
 
     // Prefetch trang đích để tránh lag sau khi thanh toán xong
     useEffect(() => {
-        router.prefetch('/success-payment');
+        router.prefetch('/checkout');
         router.prefetch('/checkout');
         router.prefetch('/');
     }, [router]);
@@ -200,7 +201,7 @@ export default function QRPaymentPage() {
         localStorage.removeItem('pendingOrder');
         clearPaymentStorage();
         toast.success('Thanh toán thành công!');
-        router.replace('/success-payment');
+        router.replace('/checkout');
     };
 
     const handleSuccess = () => {
@@ -503,14 +504,8 @@ export default function QRPaymentPage() {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(30,58,138,0.2),transparent_70%)] pointer-events-none" />
 
                 <div className="relative z-10 max-w-5xl mx-auto px-4 pt-28 sm:pt-36">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4 px-1">
-                        <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider font-bold">
-                            <span className="hover:text-blue-400 cursor-pointer transition-colors" onClick={() => router.push('/')}>
-                                Trang chủ
-                            </span>
-                            <span className="text-white/10 text-xs">&gt;</span>
-                            <span className="text-blue-400 font-black">Thanh toán VietQR</span>
-                        </div>
+                    <div className="py-4 px-1">
+                        <BookingSteps current={BOOKING_STEP.payment} />
                     </div>
 
                     {/* Countdown and status: sticks under the site header */}

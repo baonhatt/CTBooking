@@ -1,5 +1,5 @@
 'use client';
-import { forgetPassApi, loginApi, registerApi, resetPasswordApi, logoutApi } from '@/lib/api';
+import { checkEmailApi, forgetPassApi, loginApi, registerApi, resetPasswordApi, logoutApi } from '@/lib/api';
 
 export function useAuth() {
   async function login(email: string, password: string, turnstileToken?: string) {
@@ -20,6 +20,10 @@ export function useAuth() {
     return registerApi({ email, password, name, turnstileToken, ...(options || {}) });
   }
 
+  async function checkEmail(email: string) {
+    return checkEmailApi(email);
+  }
+
   async function forgetPass(email: string, turnstileToken?: string) {
     return forgetPassApi({ email, turnstileToken });
   }
@@ -28,5 +32,5 @@ export function useAuth() {
     return resetPasswordApi({ token, newPassword });
   }
 
-  return { login, logout, register, forgetPass, resetPass };
+  return { login, logout, register, checkEmail, forgetPass, resetPass };
 }

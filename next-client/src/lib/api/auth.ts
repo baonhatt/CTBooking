@@ -30,10 +30,26 @@ export async function registerApi(body: {
   });
 }
 
+// Whether an email can still be registered (asked on the first step of the register form)
+export async function checkEmailApi(email: string) {
+  return request<{ status: string; available: boolean; message?: string }>('/api/check-email', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+}
+
 export async function forgetPassApi(body: { email: string; turnstileToken?: string }) {
   return request<{ status: string; message: string }>('/api/forget-password', {
     method: 'POST',
     body: JSON.stringify(body)
+  });
+}
+
+// Whether a reset link can still be used (asked when the reset page opens)
+export async function checkResetTokenApi(token: string) {
+  return request<{ status: string; valid: boolean; maskedEmail: string }>('/api/reset-password/check', {
+    method: 'POST',
+    body: JSON.stringify({ token })
   });
 }
 

@@ -23,9 +23,11 @@ import {
         MapPin,
         Gamepad2,
         Copy,
-        Clock
+        Clock,
+        Loader2
 } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
+import BookingSteps, { BOOKING_STEP, BOOKING_STEP_LABELS } from '@/components/user/BookingSteps';
 import { toast } from 'sonner';
 import { copyText } from '@/lib/clipboard';
 import { getPublicBranches } from '@/lib/api/branches';
@@ -349,6 +351,10 @@ export default function Checkout() {
                                 </div>
 
                                 <div className="container mx-auto px-4 relative z-10">
+                                        {/* A paid order finishes every step; an order still waiting or refused stays on the payment step */}
+                                        <div className="w-full max-w-md md:max-w-lg mx-auto mb-4">
+                                                <BookingSteps current={isSuccess ? BOOKING_STEP_LABELS.length : BOOKING_STEP.payment} />
+                                        </div>
                                         <motion.div
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
@@ -368,11 +374,11 @@ export default function Checkout() {
                                                                         className={`flex items-center justify-center gap-2 py-3 rounded-t-[1.4rem] ${isSuccess ? 'bg-emerald-500' : isError ? 'bg-rose-500' : 'bg-slate-500'}`}
                                                                 >
                                                                         {isSuccess ? (
-                                                                                <CheckCircle2 className="w-6 h-6 text-white animate-bounce" />
+                                                                                <CheckCircle2 className="w-7 h-7 text-white" />
                                                                         ) : isError ? (
-                                                                                <XCircle className="w-6 h-6 text-white animate-pulse" />
+                                                                                <XCircle className="w-7 h-7 text-white" />
                                                                         ) : (
-                                                                                <Sparkles className="w-6 h-6 text-white animate-spin" />
+                                                                                <Loader2 className="w-7 h-7 text-white animate-spin" />
                                                                         )}
                                                                         <h1 className="text-white font-bold text-lg tracking-wide uppercase">
                                                                                 {isSuccess ? 'Thanh toán thành công' : isError ? 'Thanh toán thất bại' : 'Đang xử lý...'}
@@ -388,7 +394,7 @@ export default function Checkout() {
                                                                         </p>
                                                                         {bookingCode ? (
                                                                                 <>
-                                                                                        <p className="text-3xl md:text-4xl font-black text-white tracking-[0.2em] font-mono break-all select-all">
+                                                                                        <p className="rounded-xl border-2 border-dashed border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-3xl md:text-4xl font-black text-white tracking-[0.2em] font-mono break-all select-all">
                                                                                                 {bookingCode}
                                                                                         </p>
                                                                                         <Button
@@ -458,6 +464,13 @@ export default function Checkout() {
                                                                         </Button>
                                                                 </div>
                                                         )}
+
+                                                        {/* Tear-off line of the ticket: two notches and a dashed line between the code and the details */}
+                                                        <div className="relative h-0" aria-hidden="true">
+                                                                <div className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#0f172a]" />
+                                                                <div className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-[#0f172a]" />
+                                                                <div className="mx-5 border-t-2 border-dashed border-white/15" />
+                                                        </div>
 
                                                         {/* Booking & Ticket Details (PROMINENT TOP SECTION) */}
                                                         <div className="p-4 bg-white/[0.02] border-b border-white/10 space-y-3">

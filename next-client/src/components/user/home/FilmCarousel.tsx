@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Play, Clock, Star, Ticket } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Film as FilmIcon, Play, Clock, Star, Ticket } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getMovieById, getActiveMoviesToday } from '@/lib/api/movies';
 import { useBranch } from '@/hooks/useBranch';
@@ -20,6 +20,34 @@ interface FilmCarouselProps {
   initialFilms?: any[];
   initialBranchId?: number;
   onSelectFilm?: () => void;
+}
+
+// The poster of one film. When its picture is missing or does not load, a plain panel with an icon takes its place,
+// so the card never shows a broken-image mark
+function FilmPoster({ film, isFirst }: { film: any; isFirst: boolean }) {
+  const [hasFailed, setHasFailed] = useState(false);
+  if (hasFailed || !film.poster) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950">
+        <FilmIcon className="h-14 w-14 text-slate-600" aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={optimizeCloudinaryUrl(film.poster, 400)}
+      srcSet={generateCloudinarySrcSet(film.poster, [300, 400, 600])}
+      sizes="(max-width: 768px) 280px, 400px"
+      alt={film.title}
+      width={280}
+      height={320}
+      loading={isFirst ? 'eager' : 'lazy'}
+      fetchPriority={isFirst ? 'high' : 'low'}
+      decoding="async"
+      onError={() => setHasFailed(true)}
+      className="absolute object-cover inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105"
+    />
+  );
 }
 
 export default function FilmCarousel({ initialFilms = [], initialBranchId, onSelectFilm }: FilmCarouselProps) {
@@ -187,7 +215,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
   return (
     <section
       id="films"
-      className="relative py-20 px-2 bg-gradient-to-b from-[#050915] via-[#070b1e] to-[#050915] overflow-hidden"
+      className="relative py-14 sm:py-20 px-2 bg-gradient-to-b from-[#050915] via-[#070b1e] to-[#050915] overflow-hidden"
     >
       <div className="absolute inset-0 opacity-60 neon-noise pointer-events-none" />
       <div className="absolute -left-20 -top-10 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
@@ -265,28 +293,24 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                     className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-slate-900 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
                   >
                     <div className="relative h-80 w-full overflow-hidden will-change-transform bg-slate-950">
-                      <img
-                        src={optimizeCloudinaryUrl(film.poster, 400)}
-                        srcSet={generateCloudinarySrcSet(film.poster, [300, 400, 600])}
-                        sizes="(max-width: 768px) 280px, 400px"
-                        alt={film.title}
-                        width={280}
-                        height={320}
-                        loading={index === 0 ? 'eager' : 'lazy'}
-                        fetchPriority={index === 0 ? 'high' : 'low'}
-                        decoding="async"
-                        className="absolute object-cover inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105"
-                      />
+                      <FilmPoster film={film} isFirst={index === 0} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                      <div
-                        // A touch screen has no hover, so there the name and genre are always shown
-                        className={`absolute bottom-4 left-4 right-4 space-y-2 text-left opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
-                          hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
-                        }`}
-                      >
-                        <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">{film.genre}</p>
+                      {/* The title is always shown, so a poster can be told apart at rest; genre and the button appear on hover
+                          (a touch screen has no hover, so there they are always shown) */}
+                      <div className="absolute bottom-4 left-4 right-4 space-y-2 text-left">
+                        <div
+                          className={`space-y-2 opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
+                            hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
+                          }`}
+                        >
+                          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">{film.genre}</p>
+                        </div>
                         <h3 className="text-xl font-semibold text-white drop-shadow-lg">{film.title}</h3>
-                        <div className="inline-flex hover:bg-white/20 items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white transition-colors">
+                        <div
+                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
+                            hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
+                          }`}
+                        >
                           <Play className="h-4 w-4 text-cyan-300" />
                           Mở chi tiết
                         </div>
