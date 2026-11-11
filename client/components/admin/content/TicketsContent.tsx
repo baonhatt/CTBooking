@@ -33,6 +33,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
+import { BranchTag, branch_ids_of_item } from '@/components/admin/BranchTag';
+import { BranchGroupHeader, group_items_by_branch } from '@/components/admin/BranchGroups';
 import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
 import { useNavigate } from 'react-router-dom';
 import { createTicketApi, updateTicketApi, getAdminBranchOptions, toggleTicketStatusApi, getTicketById } from '@/lib/api';
@@ -390,6 +392,63 @@ export default function TicketsContent(props: Props) {
     if (form_untouched) setInitialFormSnapshot(ticket_form_snapshot(next_form));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditOpen, editData?.auto_select_combo, editData?.type, autoTickBranchKey, movies, movieSearch, initialFormSnapshot]);
+
+  // The branch tag in the movie list only helps when the package spans more than one branch
+  const showMovieBranchTag = (() => {
+    const packageBranches = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
+    return packageBranches === null || packageBranches.length > 1;
+  })();
+
+  // Several branches at once: list the movies branch by branch (a movie shared by several branches keeps a tag)
+  const movieGroups = group_items_by_branch(
+    filteredMovies,
+    (movie: any) => branch_ids_of_item(movie.branch_ids, movie.branch_id),
+    branchOptions.length > 0 ? branchOptions : branches
+  );
+  const toggleMovieGroup = (items: any[]) => {
+    const groupIds: number[] = items.map((movie: any) => movie.id);
+    const current: number[] = editData.combo || [];
+    const wholeGroupTicked = groupIds.every((id) => current.includes(id));
+    setEditData({
+      ...editData,
+      combo: wholeGroupTicked ? current.filter((id) => !groupIds.includes(id)) : [...current, ...groupIds.filter((id) => !current.includes(id))]
+    });
+  };
+  const renderMovieRow = (movie: any, showTag: boolean) => (
+                          <div
+                            key={movie.id}
+                            className="flex items-center space-x-2.5 hover:bg-white p-1.5 rounded-lg border border-transparent hover:border-slate-200 transition-colors"
+                          >
+                            <Checkbox
+                              id={`movie-${movie.id}`}
+                              checked={(editData.combo || []).includes(movie.id)}
+                              onCheckedChange={(checked) => {
+                                const current = editData.combo || [];
+                                if (checked) {
+                                  setEditData({
+                                    ...editData,
+                                    combo: [...current, movie.id]
+                                  });
+                                } else {
+                                  setEditData({
+                                    ...editData,
+                                    combo: current.filter((id: number) => id !== movie.id)
+                                  });
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`movie-${movie.id}`}
+                              className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
+                              title={movie.title}
+                            >
+                              {movie.title}
+                            </label>
+                            {showTag && (
+                              <BranchTag branch_ids={movie.branch_ids} branch_id={movie.branch_id} branches={branchOptions.length > 0 ? branchOptions : branches} />
+                            )}
+                          </div>
+  );
 
   // Movies of the combo that stay on save: the ones it started with, plus new ones the branch rule allows
   const keepComboIds = (combo: any[]): number[] =>
@@ -1310,38 +1369,19 @@ export default function TicketsContent(props: Props) {
                             : 'Không có phim nào khả dụng cho chi nhánh này'}
                         </p>
                       ) : (
-                        filteredMovies.map((movie) => (
-                          <div
-                            key={movie.id}
-                            className="flex items-center space-x-2.5 hover:bg-white p-1.5 rounded-lg border border-transparent hover:border-slate-200 transition-colors"
-                          >
-                            <Checkbox
-                              id={`movie-${movie.id}`}
-                              checked={(editData.combo || []).includes(movie.id)}
-                              onCheckedChange={(checked) => {
-                                const current = editData.combo || [];
-                                if (checked) {
-                                  setEditData({
-                                    ...editData,
-                                    combo: [...current, movie.id]
-                                  });
-                                } else {
-                                  setEditData({
-                                    ...editData,
-                                    combo: current.filter((id: number) => id !== movie.id)
-                                  });
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`movie-${movie.id}`}
-                              className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
-                              title={movie.title}
-                            >
-                              {movie.title}
-                            </label>
-                          </div>
-                        ))
+                        showMovieBranchTag
+                          ? movieGroups.map((group) => (
+                              <div key={group.key}>
+                                <BranchGroupHeader
+                                  label={group.label}
+                                  count={group.items.length}
+                                  all_selected={group.items.every((movie: any) => (editData.combo || []).includes(movie.id))}
+                                  on_toggle={() => toggleMovieGroup(group.items)}
+                                />
+                                {group.items.map((movie: any) => renderMovieRow(movie, group.key === 'multi'))}
+                              </div>
+                            ))
+                          : filteredMovies.map((movie: any) => renderMovieRow(movie, false))
                       )}
                     </div>
                     {movieTotal > movies.length && (

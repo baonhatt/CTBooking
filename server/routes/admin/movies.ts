@@ -698,7 +698,10 @@ export async function getMovieByIdImpl(
       is_active: tables.ticket_packages.is_active,
       type: tables.ticket_packages.type,
       description: tables.ticket_packages.description,
-      features: tables.ticket_packages.features
+      features: tables.ticket_packages.features,
+      // The movie detail tells same-named packages of different branches apart
+      branch_id: tables.ticket_packages.branch_id,
+      branch_ids: tables.ticket_packages.branch_ids
     })
     .from(tables.ticket_packages)
     .where(

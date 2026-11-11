@@ -41,6 +41,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
+import { BranchTag, branch_ids_of_item } from '@/components/admin/BranchTag';
+import { BranchGroupHeader, group_items_by_branch } from '@/components/admin/BranchGroups';
 import { useNavigate } from 'react-router-dom';
 import {
     createVoucherApi,
@@ -1674,6 +1676,59 @@ export default function VouchersContent(props: Props) {
                                         const hasAnyApplicable = appliedList.length > 0;
                                         const mode: 'all' | 'whitelist' = isAllChecked ? 'all' : 'whitelist';
 
+                                        // Several branches at once: list the packages branch by branch (a package shared by several branches keeps a tag)
+                                        const show_branch_groups = !Array.isArray(editData?.branch_ids) || editData.branch_ids.length > 1;
+                                        const package_groups = group_items_by_branch(
+                                            vrPackages,
+                                            (pkg: any) => branch_ids_of_item(pkg.branch_ids, pkg.branch_id),
+                                            branchOptions.length > 0 ? branchOptions : branches
+                                        );
+                                        const toggle_package_group = (items: any[]) => {
+                                            const group_ids: number[] = items.map((pkg: any) => pkg.id);
+                                            const whole_group_ticked = group_ids.every((id) => appliedList.includes(id));
+                                            const next_applied = whole_group_ticked
+                                                ? appliedList.filter((id: number) => !group_ids.includes(id))
+                                                : [...appliedList, ...group_ids.filter((id) => !appliedList.includes(id))];
+                                            update_fields({ applicable_ticket_package_ids: next_applied });
+                                        };
+                                        const render_package_row = (pkg: any, show_tag: boolean) => {
+                                                                const applied = appliedList.includes(pkg.id);
+                                                                return (
+                                                                    <div
+                                                                        key={pkg.id}
+                                                                        className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors hover:bg-slate-50`}
+                                                                    >
+                                                                        <div>
+                                                                            <Checkbox
+                                                                                id={`vrpkg-apply-${pkg.id}`}
+                                                                                checked={applied}
+                                                                                onCheckedChange={(checked) => {
+                                                                                    const curr = appliedList;
+                                                                                    const nextApplied = checked
+                                                                                        ? [...curr, pkg.id]
+                                                                                        : curr.filter((id: number) => id !== pkg.id);
+
+                                                                                    update_fields({ applicable_ticket_package_ids: nextApplied });
+                                                                                }}
+                                                                            />
+                                                                        </div>
+                                                                        <label
+                                                                            htmlFor={`vrpkg-apply-${pkg.id}`}
+                                                                            className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${applied ? 'text-slate-800 font-semibold' : 'text-slate-700'
+                                                                                }`}
+                                                                        >
+                                                                            {pkg.name}
+                                                                            <span className="ml-1 text-[11px] text-slate-400">
+                                                                                ({formatMoney(pkg.price)})
+                                                                            </span>
+                                                                        </label>
+                                                                        {show_tag && (
+                                                                            <BranchTag branch_ids={pkg.branch_ids} branch_id={pkg.branch_id} branches={branchOptions.length > 0 ? branchOptions : branches} />
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                        };
+
                                         return (
                                             <FormSection title={scopeConfig.title} icon={scopeConfig.icon} className="space-y-3">
                                                 <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1731,40 +1786,19 @@ export default function VouchersContent(props: Props) {
                                                                     Chọn tất cả
                                                                 </label>
                                                             </div>
-                                                            {vrPackages.map((pkg) => {
-                                                                const applied = appliedList.includes(pkg.id);
-                                                                return (
-                                                                    <div
-                                                                        key={pkg.id}
-                                                                        className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors hover:bg-slate-50`}
-                                                                    >
-                                                                        <div>
-                                                                            <Checkbox
-                                                                                id={`vrpkg-apply-${pkg.id}`}
-                                                                                checked={applied}
-                                                                                onCheckedChange={(checked) => {
-                                                                                    const curr = appliedList;
-                                                                                    const nextApplied = checked
-                                                                                        ? [...curr, pkg.id]
-                                                                                        : curr.filter((id: number) => id !== pkg.id);
-
-                                                                                    update_fields({ applicable_ticket_package_ids: nextApplied });
-                                                                                }}
-                                                                            />
-                                                                        </div>
-                                                                        <label
-                                                                            htmlFor={`vrpkg-apply-${pkg.id}`}
-                                                                            className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${applied ? 'text-slate-800 font-semibold' : 'text-slate-700'
-                                                                                }`}
-                                                                        >
-                                                                            {pkg.name}
-                                                                            <span className="ml-1 text-[11px] text-slate-400">
-                                                                                ({formatMoney(pkg.price)})
-                                                                            </span>
-                                                                        </label>
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                            {show_branch_groups
+                                            ? package_groups.map((group) => (
+                                                  <div key={group.key}>
+                                                      <BranchGroupHeader
+                                                          label={group.label}
+                                                          count={group.items.length}
+                                                          all_selected={group.items.every((pkg: any) => appliedList.includes(pkg.id))}
+                                                          on_toggle={() => toggle_package_group(group.items)}
+                                                      />
+                                                      {group.items.map((pkg: any) => render_package_row(pkg, group.key === 'multi'))}
+                                                  </div>
+                                              ))
+                                            : vrPackages.map((pkg: any) => render_package_row(pkg, false))}
                                                         </>
                                                     )}
                                                 </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
+import { BranchTag } from '@/components/admin/BranchTag';
 import { Switch } from '@/components/ui/switch';
 import {
   Pencil,
@@ -635,6 +636,7 @@ export default function MoviesContent({
                             <span className={`text-xs font-semibold ${isVip ? 'text-indigo-700' : 'text-emerald-700'}`}>
                               {pkg.name} ({formatVnd(pkg.price)})
                             </span>
+                            <BranchTag branch_ids={pkg.branch_ids} branch_id={pkg.branch_id} branches={branches || []} />
                           </div>
                         );
                       })
