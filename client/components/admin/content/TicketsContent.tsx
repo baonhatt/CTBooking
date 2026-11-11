@@ -242,6 +242,8 @@ export default function TicketsContent(props: Props) {
   const [detailLoadError, setDetailLoadError] = useState(false);
   // The form as it was when the dialog opened; null while the dialog is closed
   const [initialFormSnapshot, setInitialFormSnapshot] = useState<string | null>(null);
+  // Branch choice for which the combo was last auto-ticked (a new package re-ticks when the branch choice changes)
+  const autoTickKeyRef = React.useRef<string | null>(null);
 
   const clearTicketError = (field: string) => {
     setTicketErrors((previous) => (previous[field] ? { ...previous, [field]: '' } : previous));
@@ -309,6 +311,7 @@ export default function TicketsContent(props: Props) {
 
   // When the form opens: load branches, remember the combo it started with and name its movies
   React.useEffect(() => {
+    autoTickKeyRef.current = null;
     if (!isEditOpen) {
       setMovieSearch('');
       setTicketErrors({});
@@ -371,6 +374,22 @@ export default function TicketsContent(props: Props) {
     return movies.filter((movie) => isMovieEligible(movie));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movies, editData?.branch_ids, editData?.branch_id]);
+
+  // New package only: tick every movie the branch rule allows, once the movies are loaded and again whenever the
+  // branch choice changes. Edit and clone keep the combo they already have.
+  const autoTickBranchKey = JSON.stringify(sorted_id_list(normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)) ?? 'all');
+  React.useEffect(() => {
+    if (!isEditOpen || !editData?.auto_select_combo || editData.type === 'vr') return;
+    if (initialFormSnapshot === null || movieSearch.trim() || movies.length === 0) return;
+    if (autoTickKeyRef.current === autoTickBranchKey) return;
+    autoTickKeyRef.current = autoTickBranchKey;
+    const form_untouched = ticket_form_snapshot(editData) === initialFormSnapshot;
+    const next_form = { ...editData, combo: filteredMovies.map((movie) => Number(movie.id)) };
+    setEditData(next_form);
+    // Ticking by itself must not make an untouched form look edited (no "unsaved changes" prompt on close)
+    if (form_untouched) setInitialFormSnapshot(ticket_form_snapshot(next_form));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditOpen, editData?.auto_select_combo, editData?.type, autoTickBranchKey, movies, movieSearch, initialFormSnapshot]);
 
   // Movies of the combo that stay on save: the ones it started with, plus new ones the branch rule allows
   const keepComboIds = (combo: any[]): number[] =>

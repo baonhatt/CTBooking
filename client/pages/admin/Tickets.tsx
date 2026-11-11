@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import TicketsContent from '@/components/admin/content/TicketsContent';
 import { getTickets, deleteTicketApi, getAdminBranchOptions, getTicketById } from '@/lib/api';
-import { useStaffPermission } from '@/hooks/useStaffPermission';
+import { useStaffPermission, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { notify } from '@/components/admin/common/notify';
@@ -38,6 +38,8 @@ interface TicketPackage {
 export default function TicketsPage() {
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
+  const staffBranchIds = useStaffStore((state) => state.branchIds);
+  const isSuperAdmin = useIsSuperAdmin();
   const clearStaff = useStaffStore((state) => state.clearStaff);
 
   const getInitialFilters = () => {
@@ -170,7 +172,22 @@ export default function TicketsPage() {
 
   const openCreate = () => {
     const defaultType = typeFilter === 'vr' ? 'vr' : 'movie';
-    setEditData({ id: 0, name: '', code: generateCode(), price: 0, is_active: true, features: [], type: defaultType });
+    // A branch staff member starts with their own branch(es); a Super Admin starts with "all branches"
+    const defaultBranchIds = !isSuperAdmin && staffBranchIds.length > 0 ? staffBranchIds : undefined;
+    setEditData({
+      id: 0,
+      name: '',
+      code: generateCode(),
+      price: 0,
+      is_active: true,
+      features: [],
+      type: defaultType,
+      ...(defaultBranchIds
+        ? { branch_ids: defaultBranchIds, branch_id: defaultBranchIds.length === 1 ? defaultBranchIds[0] : undefined }
+        : {}),
+      // Tell the form to tick every movie the branch rule allows (new packages only, not edit or clone)
+      auto_select_combo: true
+    });
     setIsCodeEditable(false);
     setIsEditOpen(true);
   };
