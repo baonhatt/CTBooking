@@ -1,3 +1,4 @@
+import { configureEmailBrand } from '../../../server/lib/email-layout';
 import { Hono, Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { z } from 'zod';
@@ -24,6 +25,7 @@ const sepayWebhookSchema = z.object({
 const webhookRouter = new Hono<any>();
 
 function getMailer(c: Context) {
+  configureEmailBrand(c.env);
   return async (to: string, subject: string, html: string) => {
     const res = await sendMail(to, subject, html, c.env);
     if (res.ok) {

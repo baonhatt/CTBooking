@@ -18,6 +18,7 @@ import { requireStaffAuth, isPublicAdminPath } from './middleware';
 
 import { expireStaleBookingsImpl } from '../../server/routes/scheduled/booking-expiry';
 import { isLocal } from './utils';
+import { refreshEmailBrandFromBranches } from '../../server/lib/email-brand-source';
 
 type Variables = {
   userId?: number;
@@ -240,7 +241,12 @@ app.onError((err, c) => {
   );
 });
 
+// Mail footers (hotline, support email) come from the default branch. Mails are sent by write requests
+// (register, forgot password, payment, resend), so only those load it; the lookup is cached for a few minutes.
 app.use('*', async (c, next) => {
+  if (c.req.method !== 'GET' && c.req.method !== 'OPTIONS' && c.env?.cinema_db) {
+    await refreshEmailBrandFromBranches(drizzle(c.env.cinema_db, { schema }), schema.branches);
+  }
   await next();
 });
 

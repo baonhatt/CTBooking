@@ -4,6 +4,7 @@ import { queueBookingConfirmationEmail } from './confirmation-email';
 import { validateBookingInput } from './validate';
 import { getBookingByCodeImpl } from './query';
 import { mailQueue } from '../../../lib/mail-queue';
+import { getBookingEmailTemplate } from '../../../lib/email-templates';
 
 vi.mock('../../../lib/mail-queue', () => ({ mailQueue: { add: vi.fn() } }));
 
@@ -67,11 +68,15 @@ describe('queueBookingConfirmationEmail', () => {
     expect(sent[0].subject).toContain('ABCD2345');
   });
 
-  it('escapes the package name in the table it hands to the template', async () => {
+  it('hands the package lines to the template, and the template escapes the name', async () => {
     const { templateData } = await runQueuedTask(booking);
 
-    expect(templateData.moviePackagesTableHtml).not.toContain('<a href="http://evil.test">');
-    expect(templateData.moviePackagesTableHtml).toContain('&lt;a href=&quot;http://evil.test&quot;&gt;x&lt;/a&gt;');
+    expect(templateData.packageLines).toHaveLength(1);
+    expect(templateData.packageLines[0].name).toBe(EVIL);
+
+    const html = getBookingEmailTemplate('https://cinesphere.com.vn', templateData);
+    expect(html).not.toContain('<a href="http://evil.test">');
+    expect(html).toContain('&lt;a href=&quot;http://evil.test&quot;&gt;x&lt;/a&gt;');
   });
 });
 

@@ -9,6 +9,7 @@ import {
   restoreStaffImpl,
   updateStaffImpl
 } from '../../../../server/routes/admin/staff-management';
+import { queueStaffCredentialsEmail } from '../../../../server/lib/staff-credentials-mail';
 
 // The guards are tested elsewhere. Here they just copy the signed-in staff from test headers into the context,
 // so the test can check what the router passes on to the Impl functions.
@@ -27,12 +28,22 @@ vi.mock('../../middleware', () => ({
 vi.mock('../../../../server/routes/admin/staff-management', () => ({
   listStaffImpl: vi.fn(async () => ({ items: [], total: 0 })),
   getStaffByIdImpl: vi.fn(async () => ({ status: 'success', staff: {} })),
-  createStaffImpl: vi.fn(async () => ({ status: 'success', generated_password: 'Gen-Pass-1234' })),
+  createStaffImpl: vi.fn(async () => ({
+    status: 'success',
+    staff: { id: 55, email: 'new@staff.test', fullname: 'New Staff' },
+    generated_password: 'Gen-Pass-1234'
+  })),
   updateStaffImpl: vi.fn(async () => ({ status: 'success' })),
   deleteStaffImpl: vi.fn(async () => ({ status: 'success' })),
   restoreStaffImpl: vi.fn(async () => ({ status: 'success' })),
   listDeletedStaffImpl: vi.fn(async () => ({ items: [] })),
   resetStaffPasswordImpl: vi.fn(async () => ({ status: 'success', generated_password: 'Gen-Pass-1234' }))
+}));
+
+// The mail itself is tested in staff-credentials-mail.test.ts; here only what the router hands to it matters
+vi.mock('../../../../server/lib/staff-credentials-mail', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../server/lib/staff-credentials-mail')>()),
+  queueStaffCredentialsEmail: vi.fn()
 }));
 
 const env = { cinema_db: {} };
@@ -97,12 +108,27 @@ describe('staff router: what is passed to the Impl functions', () => {
     expect((restoreStaffImpl as any).mock.calls[0][1]).toHaveProperty('staffBranches');
   });
 
-  it('create reports the generated password and passes no mailer', async () => {
+  it('create shows the generated password to the Super Admin and emails it to the new staff member', async () => {
     const response = await call('POST', '/api/admin/staff', SUPER, { email: 'a@b.c', fullname: 'A' });
 
     expect(response.status).toBe(200);
     expect(((await response.json()) as any).generated_password).toBe('Gen-Pass-1234');
     expect((createStaffImpl as any).mock.calls[0]).toHaveLength(5);
+
+    expect(queueStaffCredentialsEmail).toHaveBeenCalledTimes(1);
+    expect((queueStaffCredentialsEmail as any).mock.calls[0][0]).toMatchObject({
+      kind: 'created',
+      staff: { id: 55, email: 'new@staff.test' },
+      password: 'Gen-Pass-1234'
+    });
+  });
+
+  it('create emails the password but does not show it on screen when the caller is not the Super Admin', async () => {
+    const response = await call('POST', '/api/admin/staff', MANAGER, { email: 'a@b.c', fullname: 'A' });
+
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as any).generated_password).toBeUndefined();
+    expect((queueStaffCredentialsEmail as any).mock.calls[0][0].password).toBe('Gen-Pass-1234');
   });
 });
 

@@ -203,6 +203,9 @@ export default function StaffPage() {
           email: variables?.email,
           password: data.generated_password
         });
+      } else {
+        // Only the Super Admin sees the password on screen; everyone else is told it went to the staff member's email
+        notify.success('Thông tin đăng nhập đã được gửi vào email nhân viên');
       }
       setIsCreateDialogOpen(false);
       resetForm();

@@ -2,14 +2,16 @@ import { Hono, Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
-import { getRestrictBranchIds } from './admin-helpers';
+import { getRestrictBranchIds, getMailer } from './admin-helpers';
 
 
 
 import { getEmailLogsImpl } from '../../../../server/routes/admin/email-logs';
 import { getAuditLogsImpl } from '../../../../server/lib/audit-logger';
 import { getUsersImpl, getUserByIdImpl, setUserActiveImpl } from '../../../../server/routes/admin/users';
-import { getEmailPreviewImpl } from '../../../../server/routes/admin/email-preview';
+import { configureEmailBrand } from '../../../../server/lib/email-layout';
+import { refreshEmailBrandFromBranches } from '../../../../server/lib/email-brand-source';
+import { sendTestEmailImpl, getEmailPreviewImpl } from '../../../../server/routes/admin/email-preview';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const logsRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
@@ -203,6 +205,8 @@ logsRouter.get('/api/admin/audit-logs', requireStaffAuth, requirePermission('aud
 
 logsRouter.get('/api/admin/email-preview', requireStaffAuth, requirePermission('email_logs', 'view'), async (c) => {
   try {
+    await refreshEmailBrandFromBranches(drizzle(c.env.cinema_db, { schema }), schema.branches);
+    configureEmailBrand(c.env);
     const r = await getEmailPreviewImpl();
     return c.json(r, 200);
   } catch (err: any) {
@@ -211,5 +215,20 @@ logsRouter.get('/api/admin/email-preview', requireStaffAuth, requirePermission('
 });
 
 
+// POST /api/admin/email-preview/send-test - send one sample mail to the address typed on the preview page
+logsRouter.post(
+  '/api/admin/email-preview/send-test',
+  requireStaffAuth,
+  requirePermission('email_logs', 'view'),
+  async (c) => {
+    try {
+      const body: any = await c.req.json().catch(() => ({}));
+      const r = await sendTestEmailImpl(String(body?.templateId || ''), String(body?.toEmail || ''), getMailer(c));
+      return c.json(r, r.status === 'error' ? 400 : 200);
+    } catch (err: any) {
+      return c.json({ status: 'error', message: String(err?.message || 'Không gửi được thư thử') }, 500);
+    }
+  }
+);
 
 export default logsRouter;

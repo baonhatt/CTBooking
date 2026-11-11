@@ -40,7 +40,8 @@ const EMAIL_TYPE_LABELS: Record<string, string> = {
   reset_password: 'Quên mật khẩu',
   booking_confirmation: 'Xác nhận đặt vé',
   otp: 'Mã OTP khách hàng',
-  staff_otp: 'Mã OTP nhân viên'
+  staff_otp: 'Mã OTP nhân viên',
+  staff_credentials: 'Thông tin đăng nhập nhân viên'
 };
 
 const email_type_label = (emailType: string) => EMAIL_TYPE_LABELS[emailType] || emailType;
@@ -71,6 +72,7 @@ const getTypeIcon = (type: string) => {
     case 'reset_password':
     case 'otp':
     case 'staff_otp':
+    case 'staff_credentials':
       return <Key size={14} className="text-amber-500" />;
     case 'booking_confirmation':
       return <Ticket size={14} className="text-emerald-500" />;
@@ -219,6 +221,7 @@ export default function EmailLogsContent() {
           <option value="booking_confirmation">Xác nhận đặt vé</option>
           <option value="otp">Mã OTP khách hàng</option>
           <option value="staff_otp">Mã OTP nhân viên</option>
+          <option value="staff_credentials">Thông tin đăng nhập nhân viên</option>
         </select>
       </div>
       <button type="button" onClick={fetchData} className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}>

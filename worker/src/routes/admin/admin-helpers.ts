@@ -1,3 +1,4 @@
+import { configureEmailBrand } from '../../../../server/lib/email-layout';
 import { Context } from 'hono';
 import { sendMail } from '../../../../server/routes/mail-service';
 import { uploadCloudinaryImageDataURI, deleteCloudinaryImage, getPublicIdFromUrl, hasCloudinary } from '../../utils';
@@ -9,6 +10,7 @@ export function getRestrictBranchIds(c: Context): number[] | null {
 }
 
 export function getMailer(c: Context) {
+  configureEmailBrand(c.env);
   return async (to: string, subject: string, html: string) => {
     const res = await sendMail(to, subject, html, c.env);
     if (res.ok) console.log(`[AdminMailer] Sent to ${to} via ${res.provider}`);

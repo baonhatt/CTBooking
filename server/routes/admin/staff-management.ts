@@ -260,8 +260,8 @@ export async function createStaffImpl(
     }
   }
 
-  // The password is always generated here and shown once to the person creating the account.
-  // It is not emailed (staff emails are placeholders) and never written to a log.
+  // The password is always generated here. The router emails it to the new staff member and, for the Super Admin only,
+  // also returns it once for the screen. It is never written to a log.
   const generatedPassword = generateStrongPassword();
   const hashedPassword = await hashPassword(generatedPassword);
 
@@ -704,9 +704,9 @@ export async function listDeletedStaffImpl(
 
 /**
  * Resets a staff member's password. Only the Super Admin may do this.
- * The new password is generated here and returned once, so the Super Admin can pass it on.
- * It is not emailed (staff emails are placeholders) and not written to any log. The staff member must change
- * it at the next login, and every session they have is revoked.
+ * The new password is generated here and returned once, so the Super Admin sees it. The router also emails it to
+ * the staff member. It is not written to any log. The staff member must change it at the next login, and every
+ * session they have is revoked.
  */
 export async function resetStaffPasswordImpl(
   db: any,
@@ -787,7 +787,7 @@ export async function resetStaffPasswordImpl(
 
   return {
     status: 'success',
-    message: 'Đã đặt lại mật khẩu. Hãy chuyển mật khẩu mới cho nhân viên, mật khẩu chỉ hiển thị một lần.',
+    message: 'Đã đặt lại mật khẩu và gửi vào email nhân viên. Mật khẩu cũng chỉ hiển thị một lần tại đây, phòng khi thư chưa tới.',
     generated_password: newPassword
   };
 }

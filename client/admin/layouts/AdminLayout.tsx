@@ -54,6 +54,7 @@ interface Props {
     | 'ticket-check'
     | 'uploads'
     | 'email-logs'
+    | 'email-templates'
     | 'settings'
     | 'branches'
     | 'staff'
@@ -167,7 +168,8 @@ export default function AdminLayout({
         { key: 'roles', label: 'Quyền & vai trò (RBAC)', icon: <ShieldCheck className="h-4 w-4 text-purple-400" /> },
         { key: 'audit-logs', label: 'Nhật ký hoạt động', icon: <History className="h-4 w-4 text-purple-400" /> },
         { key: 'uploads', label: 'Quản lý tệp media', icon: <UploadCloud className="h-4 w-4 text-purple-400" /> },
-        { key: 'email-logs', label: 'Nhật ký email', icon: <Mail className="h-4 w-4 text-purple-400" /> }
+        { key: 'email-logs', label: 'Nhật ký email', icon: <Mail className="h-4 w-4 text-purple-400" /> },
+        { key: 'email-templates', label: 'Mẫu email', icon: <Mail className="h-4 w-4 text-purple-400" /> }
       ]
     }
   ];
@@ -189,6 +191,7 @@ export default function AdminLayout({
     'audit-logs': { module: 'audit_logs', action: 'view' },
     uploads: { module: 'uploads', action: 'view' },
     'email-logs': { module: 'email_logs', action: 'view' },
+    'email-templates': { module: 'email_logs', action: 'view' },
     settings: { module: 'settings', action: 'view' }
   };
 

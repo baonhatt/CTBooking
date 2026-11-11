@@ -2,7 +2,7 @@ import type { Login, Register } from '@shared/api';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { mailQueue } from '../../lib/mail-queue';
-import { getWelcomeEmailTemplate } from '../../lib/booking-utils';
+import { EMAIL_SUBJECTS, getWelcomeEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
 import { generateOTP, sendOTPEmail, createOTPRecord, validateOTP, deleteOTP, canResendOTP } from '../../lib/otp-utils';
 import { getGlobalSettingsImpl } from '../../lib/global-settings';
@@ -404,7 +404,7 @@ export async function registerImpl(
         async () => {
           try {
             if (mailer) {
-              await mailer(email, '🎉 Chào mừng bạn đến CINESPHERE', html);
+              await mailer(email, EMAIL_SUBJECTS.welcome, html);
               console.log(`[MailQueue] Sent welcome email to ${email}`);
             } else {
               console.warn('[Register] No mailer provided, skipping welcome email');
@@ -417,7 +417,7 @@ export async function registerImpl(
         {
           db: anyDb,
           recipient: email,
-          subject: '🎉 Chào mừng bạn đến CINESPHERE',
+          subject: EMAIL_SUBJECTS.welcome,
           emailType: 'welcome',
           recipientType: 'user',
           userId: newUser.id,

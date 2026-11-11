@@ -5,7 +5,7 @@ export type EmailMetadata = {
   db: any;
   recipient: string;
   subject: string;
-  emailType: 'welcome' | 'reset_password' | 'booking_confirmation' | 'otp' | 'staff_otp';
+  emailType: 'welcome' | 'reset_password' | 'booking_confirmation' | 'otp' | 'staff_otp' | 'staff_credentials';
   recipientType?: 'user' | 'staff';
   userId?: number;
   staffId?: number;

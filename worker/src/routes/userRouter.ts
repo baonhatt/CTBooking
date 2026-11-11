@@ -1,3 +1,4 @@
+import { configureEmailBrand } from '../../../server/lib/email-layout';
 import { Hono, Context } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
@@ -42,6 +43,7 @@ type Variables = {
 const userRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
 function getMailer(c: Context) {
+  configureEmailBrand(c.env);
   return async (to: string, subject: string, html: string) => {
     const res = await sendMail(to, subject, html, c.env);
     if (res.ok) {

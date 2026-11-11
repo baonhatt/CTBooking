@@ -3,7 +3,7 @@ import { eq, and, gte } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { mailQueue } from '../../lib/mail-queue';
 import 'dotenv/config';
-import { getResetPasswordEmailTemplate } from '../../lib/booking-utils';
+import { EMAIL_SUBJECTS, getResetPasswordEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
 import { ACCOUNT_LOCKED_MESSAGE } from './auth';
 
@@ -42,12 +42,12 @@ export async function forgetPassImpl(
     // Khi caller (Worker hoặc server khác) cung cấp renderer, ưu tiên để caller quyết định base URL.
     // Ở môi trường Node (Express), vẫn có thể dùng env để tạo link đầy đủ.
     let resetLink = `/reset-password?token=${token}`;
-    if (typeof process !== 'undefined' && process.env?.VITE_SERVER_BASE_URL) {
-      resetLink = `${process.env.VITE_SERVER_BASE_URL}/reset-password?token=${token}`;
+    if (typeof process !== 'undefined' && process.env?.VITE_CLIENT_BASE_URL) {
+      resetLink = `${process.env.VITE_CLIENT_BASE_URL}/reset-password?token=${token}`;
     }
     contentMail = getResetPasswordEmailHtml(resetLink);
   } else {
-    const baseUrl = process.env.VITE_SERVER_BASE_URL || 'https://cinesphere.com.vn';
+    const baseUrl = process.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
     const resetLink = `${baseUrl}/reset-password?token=${token}`;
     contentMail = getResetPasswordEmailTemplate(resetLink);
   }
@@ -57,7 +57,7 @@ export async function forgetPassImpl(
     async () => {
       try {
         if (mailer) {
-          await mailer(email, 'Đặt lại mật khẩu - Film', contentMail);
+          await mailer(email, EMAIL_SUBJECTS.resetPassword, contentMail);
           console.log(`[MailQueue] Sent password reset email to ${email}`);
         } else {
           console.warn('[ForgetPassword] No mailer provided, skipping email');
@@ -70,7 +70,7 @@ export async function forgetPassImpl(
     {
       db: anyDb,
       recipient: email,
-      subject: 'Đặt lại mật khẩu - Film',
+      subject: EMAIL_SUBJECTS.resetPassword,
       emailType: 'reset_password',
       userId: useracc.id,
       emailLogsTable: tables.email_logs

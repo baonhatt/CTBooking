@@ -1,6 +1,11 @@
 import { eq, and, gte, lt, isNull } from 'drizzle-orm';
 import { mailQueue } from './mail-queue';
-import { getOTPEmailTemplate, getStaffPasswordChangeOTPTemplate, getStaffLoginOTPTemplate } from './email-templates';
+import {
+  EMAIL_SUBJECTS,
+  getOTPEmailTemplate,
+  getStaffPasswordChangeOTPTemplate,
+  getStaffLoginOTPTemplate
+} from './email-templates';
 import { formatDateForDb } from './date-utils';
 
 export function generateOTP(length: number = 6): string {
@@ -33,7 +38,7 @@ export async function sendOTPEmail(
     await mailQueue.add(
       async () => {
         try {
-          await sendMailFn(to, '🔐 Mã Xác Thực - CINESPHERE', html);
+          await sendMailFn(to, EMAIL_SUBJECTS.otp, html);
           console.log(`[OTP] Sent OTP to ${to}`);
         } catch (e) {
           console.error(`[OTP] Failed to send OTP to ${to}`, e);
@@ -43,7 +48,7 @@ export async function sendOTPEmail(
       {
         db: anyDb,
         recipient: to,
-        subject: '🔐 Mã Xác Thực - CINESPHERE',
+        subject: EMAIL_SUBJECTS.otp,
         emailType: 'otp',
         emailLogsTable: tables.email_logs
       },
@@ -193,7 +198,7 @@ export async function sendStaffPasswordChangeOTP(
         try {
           const mailer = sendMailFn;
           if (mailer) {
-            const mailRes = await mailer(staffEmail, '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE', html);
+            const mailRes = await mailer(staffEmail, EMAIL_SUBJECTS.staffPasswordChangeOtp, html);
             console.log(`[Staff OTP] Sent OTP to ${staffEmail}`, mailRes);
           } else {
             console.warn('[Staff OTP] No mailer provided, skipping email (OTP was logged to console)');
@@ -206,7 +211,7 @@ export async function sendStaffPasswordChangeOTP(
       {
         db: anyDb,
         recipient: staffEmail,
-        subject: '🔐 Mã Xác Thực Thay Đổi Mật Khẩu - CINESPHERE',
+        subject: EMAIL_SUBJECTS.staffPasswordChangeOtp,
         emailType: 'staff_otp',
         recipientType: 'staff',
         staffId: staffId,
@@ -269,7 +274,7 @@ export async function sendStaffLoginOTP(
         try {
           const mailer = sendMailFn;
           if (mailer) {
-            const mailRes = await mailer(staffEmail, '🔐 Mã Xác Thực Đăng Nhập (2FA) - CINESPHERE', html);
+            const mailRes = await mailer(staffEmail, EMAIL_SUBJECTS.staffLoginOtp, html);
             console.log(`[Staff Login OTP] Sent to ${staffEmail}`, mailRes);
           } else {
             console.warn('[Staff Login OTP] No mailer provided, skipping email');
@@ -282,7 +287,7 @@ export async function sendStaffLoginOTP(
       {
         db: anyDb,
         recipient: staffEmail,
-        subject: '🔐 Mã Xác Thực Đăng Nhập (2FA) - CINESPHERE',
+        subject: EMAIL_SUBJECTS.staffLoginOtp,
         emailType: 'staff_otp',
         recipientType: 'staff',
         staffId: staffId,

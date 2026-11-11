@@ -1,8 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { getBookingEmailTemplate } from '../../../lib/booking-utils';
-import { escapeHtml } from '../../../lib/email-templates';
+import { EMAIL_SUBJECTS } from '../../../lib/email-templates';
+import type { ItemLine } from '../../../lib/email-layout';
 import { mailQueue } from '../../../lib/mail-queue';
-import { isLineDiscounted, voucherScopeLabel, parseApplicableIds, vrPackageId } from '@shared/booking-invoice';
+import { isLineDiscounted, parseApplicableIds, vrPackageId } from '@shared/booking-invoice';
 
 /** The booking row with the fields the confirmation email needs from other tables. */
 export interface BookingEmailSource {
@@ -56,7 +57,6 @@ export function queueBookingConfirmationEmail(args: {
 
           const originalTotal = Number(booking.original_total_price || booking.total_price || 0);
           const discountAmt = Number(booking.voucher_discount_amount || 0);
-          const totalPrice = Number(booking.total_price || 0);
           const voucherCode = booking.voucher_code_snapshot || null;
 
           let voucherScope = 'all';
@@ -93,120 +93,47 @@ export function queueBookingConfirmationEmail(args: {
             parsedPackages = [{ name: rawPkg, quantity: booking.ticket_count || 1 }];
           }
 
-          // Build Movie Packages HTML Table
-          let moviePackagesTableHtml = '';
+          // Movie package lines for the confirmation mail
+          const packageLines: ItemLine[] = [];
           if (parsedPackages.length > 0 && !isVR) {
-            const rowsHtml = parsedPackages
-              .map((pkg: any) => {
-                const pkgName = pkg.name || pkg.package_name || rawPkg || 'Gói vé';
-                const qty = Number(pkg.quantity || booking.ticket_count || 1);
-                const unitPrice = Number(pkg.unit_price || pkg.price || booking.ticket_unit_price || 0);
-                const lineTotal = unitPrice > 0 ? unitPrice * qty : 0;
-                const discounted = isLineDiscounted({
+            for (const pkg of parsedPackages) {
+              const quantity = Number(pkg.quantity || booking.ticket_count || 1);
+              const unitPrice = Number(pkg.unit_price || pkg.price || booking.ticket_unit_price || 0);
+              packageLines.push({
+                name: String(pkg.name || pkg.package_name || rawPkg || 'Gói vé'),
+                quantity,
+                unitPrice,
+                lineTotal: unitPrice > 0 ? unitPrice * quantity : 0,
+                discounted: isLineDiscounted({
                   discountAmount: discountAmt,
                   scope: voucherScope,
                   applicableIds,
                   kind: 'movie',
                   packageId: pkg.package_id || pkg.id || booking.ticket_package_id
-                });
-                const badgeHtml = discounted
-                  ? `<span style="color:#e11d48;font-size:10px;font-weight:bold;margin-left:6px;border:1px solid #fda4af;padding:1px 4px;border-radius:3px;background-color:#fff1f2;">ĐƯỢC GIẢM</span>`
-                  : '';
-                return `
-                  <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee;">${escapeHtml(pkgName)}${badgeHtml}</td>
-                    <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${qty}</td>
-                    <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${unitPrice > 0 ? unitPrice.toLocaleString('vi-VN') + 'đ' : '--'}</td>
-                    <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${lineTotal > 0 ? lineTotal.toLocaleString('vi-VN') + 'đ' : '--'}</td>
-                  </tr>
-                `;
-              })
-              .join('');
-
-            moviePackagesTableHtml = `
-              <h3 style="margin-top:20px;color:#2563eb;font-size:14px;text-transform:uppercase;">Danh sách gói vé đã chọn</h3>
-              <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
-                <thead>
-                  <tr style="background:#f1f5f9;color:#475569;">
-                    <th style="padding:10px;text-align:left;">Gói vé</th>
-                    <th style="padding:10px;text-align:center;">SL</th>
-                    <th style="padding:10px;text-align:right;">Đơn giá</th>
-                    <th style="padding:10px;text-align:right;">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rowsHtml}
-                </tbody>
-              </table>
-            `;
-          }
-
-          // 2. Build VR items HTML Table
-          let vrTableHtml = '';
-          if (isVR || isComboVR || vr_items.length > 0) {
-            let vrRowsHtml = '';
-            if (vr_items.length > 0) {
-              vrRowsHtml = vr_items
-                .map((it: any) => {
-                  const discounted = isLineDiscounted({
-                    discountAmount: discountAmt,
-                    scope: voucherScope,
-                    applicableIds,
-                    kind: 'vr',
-                    packageId: vrPackageId(it)
-                  });
-                  const badgeHtml = discounted
-                    ? `<span style="color:#e11d48;font-size:10px;font-weight:bold;margin-left:6px;border:1px solid #fda4af;padding:1px 4px;border-radius:3px;background-color:#fff1f2;">ĐƯỢC GIẢM</span>`
-                    : '';
-                  return `
-                    <tr>
-                      <td style="padding:10px;border-bottom:1px solid #eee;">${escapeHtml(it.package_name || 'Gói VR')}${badgeHtml}</td>
-                      <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${it.quantity || 1}</td>
-                      <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.unit_price || it.discounted_unit_price || 0).toLocaleString('vi-VN')}đ</td>
-                      <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">${Number(it.line_total || Number(it.unit_price || 0) * (it.quantity || 1)).toLocaleString('vi-VN')}đ</td>
-                    </tr>
-                  `;
                 })
-                .join('');
-            } else if (isComboVR) {
-              // Orphan fallback notice
-              vrRowsHtml = `
-                <tr>
-                  <td colspan="4" style="padding:12px;border-bottom:1px solid #eee;text-align:center;color:#94a3b8;font-style:italic;">
-                    Không có chi tiết gói VR
-                  </td>
-                </tr>
-              `;
-            }
-
-            if (vrRowsHtml) {
-              vrTableHtml = `
-                <h3 style="margin-top:20px;color:#7c3aed;font-size:14px;text-transform:uppercase;">🎮 Trải nghiệm VR kèm theo</h3>
-                <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">
-                  <thead>
-                    <tr style="background:#f1f5f9;color:#475569;">
-                      <th style="padding:10px;text-align:left;">Gói VR</th>
-                      <th style="padding:10px;text-align:center;">SL</th>
-                      <th style="padding:10px;text-align:right;">Đơn giá</th>
-                      <th style="padding:10px;text-align:right;">Thành tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${vrRowsHtml}
-                  </tbody>
-                </table>
-              `;
+              });
             }
           }
 
-          // 3. Build consistent price breakdown HTML block
-          const priceBreakdownHtml = `
-            <div style="margin-top:20px;padding:15px;background:#f8fafc;border-radius:8px;text-align:right;font-size:14px;">
-              ${discountAmt > 0 ? `<p style="margin:4px 0;color:#64748b;">Tạm tính (Giá gốc): <b>${originalTotal.toLocaleString('vi-VN')}đ</b></p>` : ''}
-              ${discountAmt > 0 ? `<p style="margin:4px 0;color:#16a34a;">${voucherScopeLabel(voucherScope)} ${voucherCode ? `(${escapeHtml(voucherCode)})` : ''}: <b>- ${discountAmt.toLocaleString('vi-VN')}đ</b></p>` : ''}
-              <h3 style="margin:8px 0 0;color:#2563eb;font-size:18px;">Tổng thực tế thanh toán: ${totalPrice.toLocaleString('vi-VN')}đ</h3>
-            </div>
-          `;
+          // VR lines for the confirmation mail
+          const vrLines: ItemLine[] = vr_items.map((item: any) => {
+            const quantity = Number(item.quantity || 1);
+            const unitPrice = Number(item.unit_price || item.discounted_unit_price || 0);
+            return {
+              name: String(item.package_name || 'Gói VR'),
+              quantity,
+              unitPrice,
+              lineTotal: Number(item.line_total || unitPrice * quantity),
+              discounted: isLineDiscounted({
+                discountAmount: discountAmt,
+                scope: voucherScope,
+                applicableIds,
+                kind: 'vr',
+                packageId: vrPackageId(item)
+              })
+            };
+          });
+          const vrEmptyNotice = isComboVR && vrLines.length === 0;
 
           // Clean formatted ticket package name string for legacy template summary
           const cleanPackageName =
@@ -228,8 +155,9 @@ export function queueBookingConfirmationEmail(args: {
               branchAddress: result.branch_address,
               branchPhone: result.branch_phone,
               branchSettings: result.branch_settings,
-              moviePackagesTableHtml,
-              vrTableHtml,
+              packageLines,
+              vrLines,
+              vrEmptyNotice,
               originalTotal,
               discountAmt,
               voucherCode,
@@ -241,7 +169,7 @@ export function queueBookingConfirmationEmail(args: {
               : getBookingEmailTemplate(templateData);
             const mailer = sendMailFn;
             const effectiveOrderCode = bookingCode || booking.pay_txt_code || booking.id;
-            const confirmSubject = `Xác nhận đặt vé thành công cho đơn #${effectiveOrderCode}`;
+            const confirmSubject = EMAIL_SUBJECTS.bookingConfirmation(effectiveOrderCode);
 
             if (mailer) {
               await mailer(booking.email, confirmSubject, emailTemplate);
@@ -257,7 +185,7 @@ export function queueBookingConfirmationEmail(args: {
       {
         db: anyDb,
         recipient: booking.email,
-        subject: `Xác nhận đặt vé thành công cho đơn #${bookingCode || booking.pay_txt_code || booking.id}`,
+        subject: EMAIL_SUBJECTS.bookingConfirmation(bookingCode || booking.pay_txt_code || booking.id),
         emailType: 'booking_confirmation',
         userId: booking.user_id || undefined,
         bookingId: booking.id,

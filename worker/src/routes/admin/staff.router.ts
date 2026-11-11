@@ -2,7 +2,10 @@ import { Hono, Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
-import { getRestrictBranchIds } from './admin-helpers';
+import { getRestrictBranchIds, getMailer } from './admin-helpers';
+import { queueStaffCredentialsEmail, resolve_staff_login_url } from '../../../../server/lib/staff-credentials-mail';
+import { getEmailBrand } from '../../../../server/lib/email-layout';
+import { eq } from 'drizzle-orm';
 
 import {
   listStaffImpl,
@@ -17,6 +20,41 @@ import {
 
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const staffRouter = new Hono<{ Bindings: any; Variables: Variables }>();
+
+/**
+ * Emails the staff member their login details, and keeps the password on screen for the Super Admin only.
+ * The mail is queued: a failure to send is recorded in the email log, it does not fail the request.
+ */
+function sendCredentialsAndHidePassword(
+  c: Context<any>,
+  db: any,
+  kind: 'created' | 'reset',
+  staff: { id: number; email: string; fullname: string },
+  result: any
+) {
+  const password = String(result?.generated_password || '');
+  if (!password) return;
+
+  const mailer = getMailer(c);
+  // Outside a real worker request (tests) there is no execution context
+  let context: { waitUntil: (promise: Promise<any>) => void } | undefined;
+  try {
+    context = c.executionCtx;
+  } catch {}
+  queueStaffCredentialsEmail({
+    anyDb: db,
+    emailLogsTable: schema.email_logs,
+    kind,
+    staff,
+    password,
+    loginUrl: resolve_staff_login_url(c.req.header('Origin'), getEmailBrand().clientBaseUrl),
+    sendMailFn: mailer,
+    context
+  });
+
+  // Only the Super Admin sees the password on screen; everyone else gets it by email only
+  if (!c.get('isSuperAdmin')) delete result.generated_password;
+}
 
 /** The signed-in staff member, as the Impl functions expect it. */
 function getCaller(c: Context<any>) {
@@ -127,6 +165,13 @@ staffRouter.post('/api/admin/staff', requireStaffAuth, requirePermission('staff'
     );
 
     if (r.status === 'error') return c.json(r, errorStatus(r));
+
+    // The account already exists at this point, so a problem with the mail must not fail the request
+    try {
+      if ((r as any).staff) sendCredentialsAndHidePassword(c, db, 'created', (r as any).staff, r);
+    } catch (mailError) {
+      console.error('[StaffCredentials] Could not queue the account email:', mailError);
+    }
 
     return c.json(r);
   } catch (err: any) {
@@ -255,6 +300,18 @@ staffRouter.post(
       );
 
       if (r.status === 'error') return c.json(r, errorStatus(r));
+
+      // The password is already changed at this point, so a problem with the mail must not fail the request
+      try {
+        const [staffRow] = await db
+          .select({ id: schema.staffs.id, email: schema.staffs.email, fullname: schema.staffs.fullname })
+          .from(schema.staffs)
+          .where(eq(schema.staffs.id, id))
+          .limit(1);
+        if (staffRow) sendCredentialsAndHidePassword(c, db, 'reset', staffRow, r);
+      } catch (mailError) {
+        console.error('[StaffCredentials] Could not queue the reset email:', mailError);
+      }
 
       return c.json(r);
     } catch (err: any) {

@@ -9,8 +9,11 @@ import {
   getStaffAccountCreatedTemplate,
   getStaffPasswordResetTemplate,
   getStaffPasswordChangeOTPTemplate,
-  getStaffLoginOTPTemplate
+  getStaffLoginOTPTemplate,
+  EMAIL_SUBJECTS
 } from './email-templates';
+import { configureEmailBrand } from './email-layout';
+import { htmlToPlainText } from '../routes/mail-service';
 
 // A name that would add a link and a script if it reached an email unescaped
 const EVIL = '<a href="http://evil.test">click</a><script>alert(1)</script>';
@@ -146,5 +149,94 @@ describe('other emails', () => {
   it('an ordinary password with special characters is shown exactly', () => {
     const html = getStaffAccountCreatedTemplate({ staffName: 'An', email: 'an@x.test', password: 'Ab&1<2>' });
     expect(html).toContain('Ab&amp;1&lt;2&gt;');
+  });
+});
+
+describe('layout and brand settings', () => {
+  const ALL_MAILS: Record<string, () => string> = {
+    booking: () => getBookingEmailTemplate('https://cinesphere.com.vn', {}),
+    reset: () => getResetPasswordEmailTemplate('https://cinesphere.com.vn/reset-password?token=abc'),
+    welcome: () => getWelcomeEmailTemplate('https://cinesphere.com.vn', { customerName: 'An', email: 'an@x.test' }),
+    otp: () => getOTPEmailTemplate({ customerName: 'An', email: 'an@x.test', otp: '123456', expiryMinutes: 5 }),
+    staffCreated: () => getStaffAccountCreatedTemplate({ staffName: 'An', email: 'an@x.test', password: 'pw' }),
+    staffReset: () => getStaffPasswordResetTemplate({ staffName: 'An', email: 'an@x.test', newPassword: 'pw' }),
+    staffOtp: () => getStaffPasswordChangeOTPTemplate({ staffName: 'An', email: 'an@x.test', otp: '123456', expiryMinutes: 5 }),
+    staffLogin: () => getStaffLoginOTPTemplate({ email: 'an@x.test', otp: '123456', expiryMinutes: 5 })
+  };
+
+  it('never prints a placeholder, "undefined" or "null" in any mail', () => {
+    configureEmailBrand({});
+    for (const [name, build] of Object.entries(ALL_MAILS)) {
+      const html = build();
+      expect(html, name).not.toContain('1900-xxxx');
+      expect(html, name).not.toContain('undefined');
+      expect(html, name).not.toContain('null');
+    }
+  });
+
+  it('leaves the hotline and address out when they are not configured, and prints them when they are', () => {
+    configureEmailBrand({});
+    const bare = getBookingEmailTemplate('https://cinesphere.com.vn', {});
+    expect(bare).not.toContain('Hotline');
+    expect(bare).not.toContain('Trụ sở');
+
+    configureEmailBrand({ SUPPORT_HOTLINE: '1900 6868', COMPANY_ADDRESS: '1 Đường Phim, Quận 1', SUPPORT_EMAIL: 'help@cinesphere.test' });
+    const full = getBookingEmailTemplate('https://cinesphere.com.vn', {});
+    expect(full).toContain('Hotline: 1900 6868');
+    expect(full).toContain('Trụ sở: 1 Đường Phim, Quận 1');
+    expect(full).toContain('help@cinesphere.test');
+    configureEmailBrand({});
+  });
+
+  it('every mail has a preheader, a table frame and the code or button the customer needs', () => {
+    expect(ALL_MAILS.otp()).toContain('Mã của bạn là 123456');
+    expect(ALL_MAILS.booking()).toContain('Mã đặt vé của bạn');
+    expect(ALL_MAILS.reset()).toContain('token=abc');
+    for (const build of Object.values(ALL_MAILS)) {
+      expect(build()).toContain('width="600"');
+    }
+  });
+
+  it('the booking mail lists package and VR lines, the discount and a link to the account page', () => {
+    const html = getBookingEmailTemplate('https://cinesphere.com.vn', {
+      bookingCode: 'CB1',
+      packageLines: [{ name: 'Gói VIP', quantity: 2, unitPrice: 150000, lineTotal: 300000, discounted: true }],
+      vrLines: [{ name: 'VR Vũ trụ', quantity: 1, unitPrice: 250000, lineTotal: 250000 }],
+      originalTotal: 550000,
+      totalPrice: 500000,
+      discountAmt: 50000,
+      voucherCode: 'SALE'
+    });
+    expect(html).toContain('Gói VIP');
+    expect(html).toContain('ĐƯỢC GIẢM');
+    expect(html).toContain('VR Vũ trụ');
+    expect(html).toContain('Giảm giá (SALE)');
+    expect(html).toContain('https://cinesphere.com.vn/account');
+  });
+
+  it('escapes package and VR names', () => {
+    const html = getBookingEmailTemplate('https://cinesphere.com.vn', {
+      packageLines: [{ name: EVIL, quantity: 1, unitPrice: 1000, lineTotal: 1000 }],
+      vrLines: [{ name: EVIL, quantity: 1, unitPrice: 1000, lineTotal: 1000 }]
+    });
+    expectEscaped(html);
+  });
+
+  it('uses one brand name in every subject', () => {
+    expect(EMAIL_SUBJECTS.resetPassword).toContain('CINESPHERE');
+    expect(EMAIL_SUBJECTS.resetPassword).not.toContain('Film');
+    expect(EMAIL_SUBJECTS.bookingConfirmation('X1')).toContain('#X1');
+  });
+});
+
+describe('plain-text twin', () => {
+  it('keeps the code and the link, and drops markup, styles and the hidden preheader', () => {
+    const text = htmlToPlainText(getOTPEmailTemplate({ customerName: 'An', email: 'an@x.test', otp: '482913', expiryMinutes: 5 }));
+    expect(text).toContain('482913');
+    expect(text).not.toContain('<');
+    expect(text).not.toContain('font-family');
+
+    const reset = htmlToPlainText(getResetPasswordEmailTemplate('https://cinesphere.com.vn/reset-password?token=abc&x=1'));
+    expect(reset).toContain('https://cinesphere.com.vn/reset-password?token=abc&x=1');
   });
 });
