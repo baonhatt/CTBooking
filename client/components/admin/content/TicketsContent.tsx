@@ -355,8 +355,8 @@ export default function TicketsContent(props: Props) {
 
   // A movie can join the combo when the package is global, the movie is global, or they share a branch
   const isMovieEligible = (movie: any) => {
-    const packageBranchesRaw =
-      editData?.branch_ids !== undefined ? editData.branch_ids : editData?.branch_id ? [editData.branch_id] : [];
+    // Same reading as the branch picker and the save: no branch set at all means "all branches" (null), not an empty list
+    const packageBranchesRaw = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
     if (packageBranchesRaw === null) return true;
     const packageBranches = Array.isArray(packageBranchesRaw) ? packageBranchesRaw : [];
     // The movie branch ids can be a stringified JSON from the API
