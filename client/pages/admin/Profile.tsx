@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_OUTLINE, ADMIN_BTN_PRIMARY, ADMIN_BTN_GHOST, ADMIN_CARD, ADMIN_INPUT, ADMIN_TEXT } from '@/components/admin/common/adminTokens';
 import { Skeleton } from '@/components/ui/skeleton';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
@@ -12,34 +15,16 @@ import { requestStaffPasswordChangeOTP, changeStaffPasswordWithOTP } from '@/lib
 import { request } from '@/lib/api/http';
 import { formatVnDateTime } from '@/lib/format';
 
-type AdminLayoutActive =
-  | 'dashboard'
-  | 'users'
-  | 'movies'
-  | 'toys'
-  | 'posts'
-  | 'transactions'
-  | 'tickets'
-  | 'ticket-check'
-  | 'uploads'
-  | 'email-logs'
-  | 'settings'
-  | 'branches'
-  | 'staff'
-  | 'roles'
-  | 'audit-logs'
-  | 'profile';
-
-interface Props {
-  active: AdminLayoutActive;
-  setActive: (x: AdminLayoutActive) => void;
-  adminEmailState: string;
-  handleLogout: () => void;
-}
-
-export default function ProfilePage({ active, setActive, adminEmailState, handleLogout }: Props) {
+export default function ProfilePage() {
   const queryClient = useQueryClient();
-  const { staff } = useStaffStore();
+  const { staff, clearStaff } = useStaffStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem('staffToken');
+    clearStaff();
+    navigate('/login');
+  };
   // The role names come from the server (the stored session only knows whether the user is a super admin)
   const { data: meData } = useQuery({
     queryKey: ['staff-me'],
@@ -53,7 +38,6 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [showOtpInput, setShowOtpInput] = useState(false);
 
   // Request OTP mutation
@@ -61,15 +45,14 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
     mutationFn: requestStaffPasswordChangeOTP,
     onSuccess: (data: any) => {
       if (data.status === 'success') {
-        toast.success(data.message);
-        setOtpSent(true);
+        notify.success(data.message);
         setShowOtpInput(true);
       } else {
-        toast.error(data.message);
+        notify.error(data.message);
       }
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Không thể gửi OTP');
+      notify.error(error.message || 'Không thể gửi OTP');
     }
   });
 
@@ -78,26 +61,25 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
     mutationFn: changeStaffPasswordWithOTP,
     onSuccess: (data: any) => {
       if (data.status === 'success') {
-        toast.success(data.message);
+        notify.success(data.message);
         // Reset form
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setOtp('');
-        setOtpSent(false);
         setShowOtpInput(false);
       } else {
-        toast.error(data.message);
+        notify.error(data.message);
       }
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Không thể đổi mật khẩu');
+      notify.error(error.message || 'Không thể đổi mật khẩu');
     }
   });
 
   const handleRequestOTP = () => {
     if (!oldPassword) {
-      toast.error('Vui lòng nhập mật khẩu cũ');
+      notify.error('Vui lòng nhập mật khẩu cũ');
       return;
     }
     requestOTPMutation.mutate({ oldPassword });
@@ -105,17 +87,17 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
 
   const handleChangePassword = () => {
     if (!oldPassword || !newPassword || !confirmPassword || !otp) {
-      toast.error('Vui lòng điền đầy đủ thông tin');
+      notify.error('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error('Mật khẩu mới không khớp');
+      notify.error('Mật khẩu mới không khớp');
       return;
     }
 
     if (newPassword.length < 12 || !/[A-Za-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-      toast.error('Mật khẩu mới phải có ít nhất 12 ký tự, gồm cả chữ và số');
+      notify.error('Mật khẩu mới phải có ít nhất 12 ký tự, gồm cả chữ và số');
       return;
     }
 
@@ -124,7 +106,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
 
   if (!staff) {
     return (
-      <AdminLayout active={active} setActive={setActive} adminEmailState={adminEmailState} handleLogout={handleLogout}>
+      <AdminLayout active="profile" setActive={() => {}} adminEmailState={staff?.email || ''} handleLogout={handleLogout}>
         <div className="p-6">
           <Skeleton className="h-8 w-48 mb-4" />
           <Skeleton className="h-64 w-full" />
@@ -134,57 +116,57 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
   }
 
   return (
-    <AdminLayout active={active} setActive={setActive} adminEmailState={adminEmailState} handleLogout={handleLogout}>
-      <div className="space-y-6 max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Hồ sơ nhân viên</h1>
+    <AdminLayout active="profile" setActive={() => {}} adminEmailState={staff?.email || ''} handleLogout={handleLogout}>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <PageHeader title="Hồ sơ nhân viên" />
 
         {/* Staff Info Card */}
-        <Card className="mb-6">
+        <Card className={ADMIN_CARD}>
           <CardHeader>
-            <CardTitle>Thông tin cá nhân</CardTitle>
+            <CardTitle className="text-base font-bold text-slate-800">Thông tin cá nhân</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label className="text-sm text-gray-600">Họ và tên</Label>
-              <p className="font-medium">{staff.fullname}</p>
+              <Label className="text-sm text-slate-500">Họ và tên</Label>
+              <p className="font-medium text-slate-800">{staff.fullname}</p>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">Email</Label>
-              <p className="font-medium">{staff.email}</p>
+              <Label className="text-sm text-slate-500">Email</Label>
+              <p className="font-medium text-slate-800">{staff.email}</p>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">Số điện thoại</Label>
-              <p className="font-medium">{staff.phone || NOT_UPDATED}</p>
+              <Label className="text-sm text-slate-500">Số điện thoại</Label>
+              <p className="font-medium text-slate-800">{staff.phone || NOT_UPDATED}</p>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">Vai trò</Label>
-              <p className="font-medium">
+              <Label className="text-sm text-slate-500">Vai trò</Label>
+              <p className="font-medium text-slate-800">
                 {staff.isSuperAdmin ? 'Siêu quản trị' : roleNames.length > 0 ? roleNames.join(', ') : 'Nhân viên'}
               </p>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">Chi nhánh phụ trách</Label>
-              <p className="font-medium">
+              <Label className="text-sm text-slate-500">Chi nhánh phụ trách</Label>
+              <p className="font-medium text-slate-800">
                 {staff.isSuperAdmin ? 'Tất cả chi nhánh' : branchNames.length > 0 ? branchNames.join(', ') : NOT_UPDATED}
               </p>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">Ngày tạo tài khoản</Label>
-              <p className="font-medium">
+              <Label className="text-sm text-slate-500">Ngày tạo tài khoản</Label>
+              <p className="font-medium text-slate-800">
                 {meData?.staff?.createdAt ? formatVnDateTime(meData.staff.createdAt) : NOT_UPDATED}
               </p>
             </div>
             <div>
-              <Label className="text-sm text-gray-600">Lần đăng nhập cuối</Label>
-              <p className="font-medium">{staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : NOT_UPDATED}</p>
+              <Label className="text-sm text-slate-500">Lần đăng nhập cuối</Label>
+              <p className="font-medium text-slate-800">{staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : NOT_UPDATED}</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Change Password Card */}
-        <Card>
+        <Card className={ADMIN_CARD}>
           <CardHeader>
-            <CardTitle>Đổi mật khẩu</CardTitle>
+            <CardTitle className="text-base font-bold text-slate-800">Đổi mật khẩu</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4" autoComplete="off">
@@ -199,12 +181,13 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   placeholder="Nhập mật khẩu cũ"
+                  className={ADMIN_INPUT}
                   disabled={showOtpInput}
                 />
               </div>
 
               {!showOtpInput ? (
-                <Button onClick={handleRequestOTP} disabled={requestOTPMutation.isPending} className="w-full">
+                <Button onClick={handleRequestOTP} disabled={requestOTPMutation.isPending} className={`${ADMIN_BTN_PRIMARY} w-full`}>
                   {requestOTPMutation.isPending ? 'Đang gửi OTP...' : 'Gửi OTP'}
                 </Button>
               ) : (
@@ -217,8 +200,9 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Nhập mật khẩu mới"
+                      className={ADMIN_INPUT}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Ít nhất 12 ký tự, gồm cả chữ và số.</p>
+                    <p className="text-xs text-slate-500 mt-1">Ít nhất 12 ký tự, gồm cả chữ và số.</p>
                   </div>
 
                   <div>
@@ -229,6 +213,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Nhập lại mật khẩu mới"
+                      className={ADMIN_INPUT}
                     />
                   </div>
 
@@ -241,9 +226,9 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                       onChange={(e) => setOtp(e.target.value)}
                       placeholder="Nhập mã OTP từ email"
                       maxLength={6}
-                      className="text-center text-lg tracking-widest"
+                      className={`${ADMIN_INPUT} text-center text-lg tracking-widest`}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       OTP đã được gửi đến email của bạn. Mã có hiệu lực trong 5 phút.
                     </p>
                   </div>
@@ -252,19 +237,18 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                     <Button
                       onClick={handleChangePassword}
                       disabled={changePasswordMutation.isPending}
-                      className="flex-1"
+                      className={`${ADMIN_BTN_PRIMARY} flex-1`}
                     >
-                      {changePasswordMutation.isPending ? 'Đang xử lý...' : 'Đổi mật khẩu'}
+                      {changePasswordMutation.isPending ? ADMIN_TEXT.busy : 'Đổi mật khẩu'}
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => {
                         setShowOtpInput(false);
-                        setOtpSent(false);
-                      }}
-                      className="flex-1"
+                                      }}
+                      className={`${ADMIN_BTN_OUTLINE} flex-1`}
                     >
-                      Hủy
+                      {ADMIN_TEXT.cancel}
                     </Button>
                   </div>
 
@@ -272,7 +256,7 @@ export default function ProfilePage({ active, setActive, adminEmailState, handle
                     variant="ghost"
                     onClick={handleRequestOTP}
                     disabled={requestOTPMutation.isPending}
-                    className="w-full text-sm"
+                    className={`${ADMIN_BTN_GHOST} w-full`}
                   >
                     Gửi lại OTP
                   </Button>

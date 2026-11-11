@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
 
 interface UseConfirmUnsavedProps {
   isDirty: boolean;
@@ -22,7 +13,7 @@ export function useConfirmUnsaved({ isDirty, isSubmitting = false, onConfirmClos
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       if (isSubmitting) return; // Không đóng modal nếu đang lưu
-      
+
       if (isDirty) {
         setShowAlert(true);
       } else {
@@ -32,30 +23,19 @@ export function useConfirmUnsaved({ isDirty, isSubmitting = false, onConfirmClos
   };
 
   const UnsavedAlert = () => (
-    <AlertDialog open={showAlert} onOpenChange={setShowAlert}>
-      <AlertDialogContent className="z-[9999] rounded-2xl">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-slate-900">Thay đổi chưa được lưu</AlertDialogTitle>
-          <AlertDialogDescription className="text-slate-500">
-            Bạn đang có những thay đổi dở dang. Nếu thoát bây giờ, các nội dung vừa nhập sẽ bị mất. Bạn có chắc muốn thoát?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter className="mt-4">
-          <AlertDialogCancel className="rounded-xl" onClick={() => setShowAlert(false)}>
-            Tiếp tục chỉnh sửa
-          </AlertDialogCancel>
-          <AlertDialogAction
-            className="rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium"
-            onClick={() => {
-              setShowAlert(false);
-              onConfirmClose();
-            }}
-          >
-            Đồng ý thoát
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={showAlert}
+      onOpenChange={setShowAlert}
+      variant="warning"
+      title="Thay đổi chưa được lưu"
+      description="Bạn đang có thay đổi chưa lưu. Nếu thoát bây giờ, nội dung vừa nhập sẽ bị mất."
+      cancelText="Tiếp tục chỉnh sửa"
+      confirmText="Thoát, bỏ thay đổi"
+      onConfirm={() => {
+        setShowAlert(false);
+        onConfirmClose();
+      }}
+    />
   );
 
   return { handleOpenChange, UnsavedAlert };

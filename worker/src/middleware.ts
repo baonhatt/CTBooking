@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { validateSessionTokenImpl } from '../../server/routes/user/auth';
+import { validateSessionTokenImpl, ACCOUNT_LOCKED_MESSAGE } from '../../server/routes/user/auth';
 import { loadStaffPermissions } from '../../server/lib/staff-auth';
 import { eq, and, isNull, gt } from 'drizzle-orm';
 import * as schema from '../../shared/schema';
@@ -24,7 +24,8 @@ export async function requireAuth(c: Context, next: any) {
     const validation = await validateSessionTokenImpl(db, { tokens: schema.tokens }, token);
 
     if (!validation.valid) {
-      return c.json({ status: 'error', message: 'Unauthorized' }, 401);
+      // 401 keeps the client's "session ended" handling; the message tells a locked customer why
+      return c.json({ status: 'error', message: validation.locked ? ACCOUNT_LOCKED_MESSAGE : 'Unauthorized' }, 401);
     }
 
     c.set('userId', validation.userId);

@@ -23,6 +23,7 @@ export const PERMISSIONS_SEED = [
   // Users (khách hàng)
   { module: 'users', action: 'view', description: 'Xem danh sách khách hàng' },
   { module: 'users', action: 'view_detail', description: 'Xem chi tiết khách hàng' },
+  { module: 'users', action: 'lock', description: 'Khóa / mở khóa tài khoản khách hàng' },
 
   // Movies
   { module: 'movies', action: 'view', description: 'Xem danh sách phim' },
@@ -220,6 +221,7 @@ export const ROLES_SEED = [
       'posts:delete',
       'users:view',
       'users:view_detail',
+      'users:lock',
       'staff:view',
       'staff:create',
       'staff:edit',

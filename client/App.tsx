@@ -37,7 +37,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster
             position="top-center"
-            theme="dark"
+            theme="light"
             expand={false}
             richColors={false}
             offset={80}
@@ -45,23 +45,23 @@ const App = () => (
               unstyled: true,
               classNames: {
                 toast:
-                  'flex items-center gap-3 w-full max-w-[350px] p-4 rounded-xl border shadow-2xl backdrop-blur-md font-sans',
+                  'flex items-center gap-3 w-full max-w-[380px] p-4 rounded-xl border bg-white shadow-xl font-sans',
                 title: 'text-sm font-bold',
-                description: 'text-xs text-slate-300',
+                description: 'text-xs text-slate-500',
                 actionButton: 'bg-zinc-900 text-zinc-50 font-medium',
                 cancelButton: 'bg-zinc-100 text-zinc-900 font-medium',
 
                 /* SUCCESS */
-                success: 'bg-[#050915]/95 border-emerald-500/50 text-emerald-400',
+                success: 'border-emerald-200 text-emerald-700',
 
                 /* ERROR */
-                error: 'bg-[#050915]/95 border-red-500/50 text-red-400',
+                error: 'border-red-200 text-red-700',
 
                 /* INFO */
-                info: 'bg-[#050915]/95 border-blue-500/50 text-blue-400',
+                info: 'border-blue-200 text-blue-700',
 
                 /* WARNING */
-                warning: 'bg-[#050915]/95 border-yellow-500/50 text-yellow-400'
+                warning: 'border-amber-200 text-amber-700'
               }
             }}
             icons={{

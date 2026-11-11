@@ -97,6 +97,17 @@ export default function AdminLayout({
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('admin_sidebar_collapsed') === 'true';
   });
+  // The collapsed icon rail only exists from lg (1024px) up; the drawer below lg always shows labels
+  const [isDesktop, setIsDesktop] = useState<boolean>(() =>
+    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1024px)').matches
+  );
+  useEffect(() => {
+    const media_query = window.matchMedia('(min-width: 1024px)');
+    const on_change = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
+    media_query.addEventListener('change', on_change);
+    return () => media_query.removeEventListener('change', on_change);
+  }, []);
+  const isRail = isCollapsed && isDesktop;
   const [searchQuery, setSearchQuery] = useState('');
   const permissions = useStaffPermissions();
   const isSuperAdmin = useIsSuperAdmin();
@@ -234,8 +245,8 @@ export default function AdminLayout({
 
   const showSidebar = filteredGroups.length > 0 || hasPermission('settings', 'view');
   const layoutClass = showSidebar
-    ? `h-screen w-full overflow-hidden flex md:grid ${
-        isCollapsed ? 'md:grid-cols-[76px_1fr]' : 'md:grid-cols-[260px_1fr]'
+    ? `h-screen w-full overflow-hidden flex lg:grid ${
+        isCollapsed ? 'lg:grid-cols-[76px_1fr]' : 'lg:grid-cols-[260px_1fr]'
       } transition-[grid-template-columns] duration-300 bg-slate-50`
     : 'h-screen w-full overflow-hidden flex flex-col bg-slate-50';
 
@@ -258,24 +269,24 @@ export default function AdminLayout({
     <div className={layoutClass}>
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden transition-all"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden transition-all"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {showSidebar && (
         <aside
-          className={`fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out md:static md:translate-x-0
+          className={`fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out lg:static lg:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isCollapsed ? 'w-[260px] md:w-[76px]' : 'w-[260px]'}
-        bg-slate-950 border-r border-slate-800 text-slate-300 flex flex-col h-screen select-none shadow-2xl md:shadow-none
+        ${isCollapsed ? 'w-[260px] lg:w-[76px]' : 'w-[260px]'}
+        bg-slate-950 border-r border-slate-800 text-slate-300 flex flex-col h-screen select-none shadow-2xl lg:shadow-none
       `}
         >
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
             {/* Header with Logo and Collapse Toggle */}
             <div className="flex items-center justify-between mb-6 relative">
               <button
-                className="absolute top-0 right-0 p-1 md:hidden text-slate-400 hover:text-white transition-colors"
+                className="absolute top-0 right-0 p-1 lg:hidden text-slate-400 hover:text-white transition-colors"
                 aria-label="Đóng menu"
                 onClick={() => setIsSidebarOpen(false)}
               >
@@ -284,12 +295,12 @@ export default function AdminLayout({
 
               <div
                 className={`flex items-center gap-3 ${
-                  isCollapsed ? 'md:justify-center md:w-full' : ''
+                  isRail ? 'lg:justify-center lg:w-full' : ''
                 } cursor-pointer`}
-                onClick={() => isCollapsed && toggleCollapsed()}
+                onClick={() => isRail && toggleCollapsed()}
               >
                 <img src={iconCine} alt="CINESPHERE" className="h-9 w-auto shrink-0" />
-                {!isCollapsed && (
+                {!isRail && (
                   <div className="min-w-0 transition-opacity duration-200">
                     <div className="font-black tracking-widest text-sm text-white truncate">CINESPHERE</div>
                     <div className="text-[10px] font-medium text-emerald-400/90 uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
@@ -302,7 +313,7 @@ export default function AdminLayout({
             </div>
 
             {/* Search Box / Search Icon */}
-            {!isCollapsed ? (
+            {!isRail ? (
               <div className="mb-6">
                 <div className="relative group">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
@@ -349,12 +360,12 @@ export default function AdminLayout({
 
             {/* Menu Groups */}
             <TooltipProvider delayDuration={150}>
-              <div className={isCollapsed ? 'space-y-3' : 'space-y-6'}>
+              <div className={isRail ? 'space-y-3' : 'space-y-6'}>
                 {filteredGroups.map((group, groupIdx) => {
                   const isOpen = openGroups[group.id] || searchQuery.trim() !== '';
                   return (
                     <div key={group.id} className="flex flex-col">
-                      {!isCollapsed ? (
+                      {!isRail ? (
                         <button
                           onClick={() => toggleGroup(group.id)}
                           className="w-full flex items-center justify-between px-1 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors group"
@@ -370,7 +381,7 @@ export default function AdminLayout({
                         groupIdx > 0 && <div className="my-2 border-t border-slate-800/80" />
                       )}
 
-                      {(!isCollapsed ? isOpen : true) && (
+                      {(!isRail ? isOpen : true) && (
                         <div className="space-y-1">
                           {group.items.map((item) => {
                             const isActive = active === item.key;
@@ -379,7 +390,7 @@ export default function AdminLayout({
                                 key={item.key}
                                 onClick={() => go(item.key)}
                                 className={`w-full flex items-center ${
-                                  isCollapsed
+                                  isRail
                                     ? 'justify-center p-2.5 h-10 w-10 mx-auto'
                                     : 'gap-3 px-3 py-2.5'
                                 } rounded-xl text-sm font-medium transition-all duration-200 text-left relative overflow-hidden group ${
@@ -388,7 +399,7 @@ export default function AdminLayout({
                                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/50'
                                 }`}
                               >
-                                {isActive && !isCollapsed && (
+                                {isActive && !isRail && (
                                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-500 rounded-r-full" />
                                 )}
                                 <span
@@ -398,11 +409,11 @@ export default function AdminLayout({
                                 >
                                   {item.icon}
                                 </span>
-                                {!isCollapsed && <span className="truncate flex-1">{item.label}</span>}
+                                {!isRail && <span className="truncate flex-1">{item.label}</span>}
                               </button>
                             );
 
-                            if (isCollapsed) {
+                            if (isRail) {
                               return (
                                 <Tooltip key={item.key}>
                                   <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
@@ -430,7 +441,7 @@ export default function AdminLayout({
           {/* Bottom Settings Button */}
           <div className="p-3 border-t border-slate-800/80 bg-slate-950 shrink-0">
             {hasPermission('settings', 'view') &&
-              (isCollapsed ? (
+              (isRail ? (
                 <TooltipProvider delayDuration={150}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -474,7 +485,7 @@ export default function AdminLayout({
 
       <main className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden relative">
         {/* Desktop Topbar */}
-        <header className="hidden md:flex h-16 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-6 items-center justify-between shadow-sm/50">
+        <header className="hidden lg:flex h-16 shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-6 items-center justify-between shadow-sm/50">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -526,7 +537,7 @@ export default function AdminLayout({
         </header>
 
         {/* Mobile Topbar */}
-        <div className="lg:hidden md:hidden shrink-0 w-full bg-white/80 backdrop-blur-xl border-b border-slate-200/60 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm/50">
+        <div className="lg:hidden shrink-0 w-full bg-white/80 backdrop-blur-xl border-b border-slate-200/60 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm/50">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" title="Mở menu" onClick={() => setIsSidebarOpen(true)} className="rounded-xl">
               <Menu className="h-6 w-6 text-slate-700" />

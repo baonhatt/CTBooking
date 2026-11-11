@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, RefreshCw, Pencil, Trash2, Plus, Package, Eye, X } from 'lucide-react';
+import { Search, RefreshCw, Plus, Package, Pencil } from 'lucide-react';
 import { useHasStaffPermission } from '@/hooks/useStaffPermission';
+import { AdminDialog } from '@/components/admin/common/AdminDialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { notify } from '@/components/admin/common/notify';
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
+  ADMIN_BTN_PRIMARY,
+  ADMIN_BTN_OUTLINE,
+  ADMIN_CARD,
+  ADMIN_TABLE_HEAD,
+  ADMIN_TH,
+  ADMIN_TEXT
+} from '@/components/admin/common/adminTokens';
 
 interface ToyData {
   id: number;
@@ -48,6 +53,16 @@ interface Props {
   setShowActiveOnly?: (v: boolean) => void;
 }
 
+// One label + value pair in the detail dialog
+function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-sm font-medium text-slate-500">{label}</Label>
+      <div className="text-sm text-slate-800">{children}</div>
+    </div>
+  );
+}
+
 export default function ToysContent({
   data,
   totalPages,
@@ -56,7 +71,6 @@ export default function ToysContent({
   onEdit,
   onCreate,
   toysLength,
-  deleteToyApi,
   setToys,
   onRefresh,
   searchQuery = '',
@@ -68,6 +82,8 @@ export default function ToysContent({
   const hasPermission = useHasStaffPermission();
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedToy, setSelectedToy] = useState<ToyData | null>(null);
+  const [toyToDelete, setToyToDelete] = useState<ToyData | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   useEffect(() => {
@@ -80,6 +96,7 @@ export default function ToysContent({
   };
 
   const handleDelete = async (id: number) => {
+    setIsDeleting(true);
     try {
       // Soft delete: update status to inactive instead of deleting
       const response = await fetch(`/api/toys/${id}`, {
@@ -91,347 +108,223 @@ export default function ToysContent({
 
       // Update local state
       setToys((prev) => prev.map((toy) => (toy.id === id ? { ...toy, status: 'inactive' } : toy)));
+      notify.deleted('đồ chơi');
+      setToyToDelete(null);
     } catch (e: any) {
-      alert(e?.message || 'Lỗi cập nhật trạng thái đồ chơi');
+      notify.error(e, 'Lỗi cập nhật trạng thái đồ chơi');
+    } finally {
+      setIsDeleting(false);
     }
   };
+
+  const openEditFromDetail = () => {
+    if (!selectedToy) return;
+    setIsDetailDialogOpen(false);
+    onEdit('toy', selectedToy);
+  };
+
   return (
-    <div className="space-y-6">
-      {/* PAGE HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Quản lý đồ chơi & quà tặng</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {toysLength} vật phẩm trong hệ thống</p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <PageHeader title="Quản lý đồ chơi & quà tặng" description={`Tổng cộng ${toysLength} vật phẩm trong hệ thống`} />
 
       {/* TOOLBAR */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        {/* L E F T - G R O U P */}
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+      <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
+        <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto">
           <form onSubmit={handleSearchSubmit} className="flex gap-2">
             <div className="relative w-[280px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Tìm tên đồ chơi, sản phẩm..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
-                className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <Button
-              type="submit"
-              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-            >
-              <Search className="w-3.5 h-3.5" /> Tìm kiếm
+            <Button type="submit" className={`${ADMIN_BTN_PRIMARY} shrink-0 gap-1.5`}>
+              <Search className="h-4 w-4" /> {ADMIN_TEXT.search}
             </Button>
           </form>
-          <div className="flex items-center gap-2.5 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 h-10">
-            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Chỉ hiện khả dụng</span>
+          <div className="flex h-10 items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
+            <span className="whitespace-nowrap text-xs font-medium text-slate-500">Chỉ hiện khả dụng</span>
             <Switch
               checked={showActiveOnly}
               onCheckedChange={setShowActiveOnly}
-              className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300 cursor-pointer"
+              className="cursor-pointer data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300"
             />
           </div>
         </div>
 
-        {/* R I G H T - G R O U P */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
+        <div className="flex w-full flex-wrap items-center justify-start gap-2.5 xl:w-auto xl:justify-end">
           {hasPermission('toys', 'create') && (
-            <Button
-              onClick={onCreate}
-              className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs"
-            >
-              <Plus className="w-4 h-4" /> Thêm mới
+            <Button onClick={onCreate} className={`${ADMIN_BTN_PRIMARY} gap-2`}>
+              <Plus className="h-4 w-4" /> Thêm mới
             </Button>
           )}
           <Button
             type="button"
             variant="outline"
-            size="icon"
             onClick={() => {
               setLocalSearch('');
               onSearchChange('');
               onRefresh();
             }}
-            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
-            title="Làm mới"
+            className={`${ADMIN_BTN_OUTLINE} gap-2`}
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> {ADMIN_TEXT.refresh}
           </Button>
         </div>
       </div>
-      <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-        <CardContent className="p-0">
+
+      <div className={`${ADMIN_CARD} overflow-hidden`}>
+        {isLoading ? (
+          <TableSkeleton rows={5} />
+        ) : data.length === 0 ? (
+          <EmptyState
+            icon={<Package className="h-6 w-6" />}
+            title={searchQuery || showActiveOnly ? 'Không tìm thấy đồ chơi nào' : 'Chưa có đồ chơi nào trong kho'}
+          />
+        ) : (
           <Table>
-            <TableHeader className="bg-gray-50">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">ID</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Ảnh</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Sản phẩm</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Phân loại</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 text-center">
-                  Đơn giá
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 text-center">
-                  Tồn kho
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3 text-center">
-                  Trạng thái
-                </TableHead>
-                <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
-                  Thao tác
-                </TableHead>
+            <TableHeader className={ADMIN_TABLE_HEAD}>
+              <TableRow className="border-none hover:bg-transparent">
+                <TableHead className={`${ADMIN_TH} py-3`}>Ảnh</TableHead>
+                <TableHead className={`${ADMIN_TH} py-3`}>Sản phẩm</TableHead>
+                <TableHead className={`${ADMIN_TH} py-3`}>Phân loại</TableHead>
+                <TableHead className={`${ADMIN_TH} py-3 text-center`}>Đơn giá</TableHead>
+                <TableHead className={`${ADMIN_TH} py-3 text-center`}>Tồn kho</TableHead>
+                <TableHead className={`${ADMIN_TH} py-3 text-center`}>Trạng thái</TableHead>
+                <TableHead className={`${ADMIN_TH} py-3 pr-6 text-right`}>{ADMIN_TEXT.actionColumn}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, idx) => (
-                  <TableRow key={`sk-${idx}`}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-8 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-10 w-10 rounded-lg" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-16 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-16 mx-auto" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-20 mx-auto" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-24 ml-auto" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center h-32 text-muted-foreground italic">
-                    <div className="flex flex-col items-center gap-2">
-                      <Package size={32} className="opacity-20" />
-                      <span>Không có đồ chơi nào trong kho</span>
+              {data.map((x) => (
+                <TableRow key={x.id} className="h-[52px] border-b border-slate-200 transition-colors hover:bg-slate-50">
+                  <TableCell>
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                      {x.image_url ? (
+                        <img src={x.image_url} alt={x.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <Package size={16} className="text-slate-300" />
+                      )}
                     </div>
                   </TableCell>
-                </TableRow>
-              ) : (
-                data.map((x) => (
-                  <TableRow key={x.id} className="hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]">
-                    <TableCell className="text-center font-mono text-xs text-slate-500">#{x.id}</TableCell>
-                    <TableCell>
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                        {x.image_url ? (
-                          <img src={x.image_url} alt={x.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Package size={16} className="text-slate-300" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-bold text-slate-700">{x.name}</TableCell>
-                    <TableCell>
-                      {x.category ? (
-                        <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[11px] font-medium border border-slate-200">
-                          {x.category}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 italic text-xs">---</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center font-bold text-blue-600">
-                      {x.price.toLocaleString('vi-VN')}đ
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className={`font-bold ${x.stock === 0 ? 'text-red-500' : 'text-slate-700'}`}>
-                        {x.stock}
+                  <TableCell className="font-bold text-slate-700">{x.name}</TableCell>
+                  <TableCell>
+                    {x.category ? (
+                      <span className="rounded border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        {x.category}
                       </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {x.status === 'active' ? (
-                        <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full text-xs font-medium">
-                          Hoạt động
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full text-xs font-medium">
-                          Ngừng
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 rounded-lg hover:bg-blue-50 text-blue-600"
+                    ) : (
+                      <span className="text-xs italic text-slate-400">---</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center font-bold text-blue-600">{x.price.toLocaleString('vi-VN')}đ</TableCell>
+                  <TableCell className="text-center">
+                    <span className={`font-bold ${x.stock === 0 ? 'text-red-500' : 'text-slate-700'}`}>{x.stock}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <StatusBadge status={x.status === 'active' ? 'active' : 'inactive'} />
+                  </TableCell>
+                  <TableCell className="pr-6">
+                    <RowActions>
+                      <RowActionButton
+                        action="view"
                         onClick={() => {
                           setSelectedToy(x);
                           setIsDetailDialogOpen(true);
                         }}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                      {hasPermission('toys', 'edit') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onEdit('toy', x)}
-                          className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600"
-                          title="Chỉnh sửa"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
+                      />
+                      {hasPermission('toys', 'edit') && <RowActionButton action="edit" onClick={() => onEdit('toy', x)} />}
                       {hasPermission('toys', 'delete') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(x.id)}
-                          className="h-8 rounded-lg hover:bg-red-50 text-red-600"
-                          title="Xóa"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <RowActionButton action="delete" onClick={() => setToyToDelete(x)} />
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+                    </RowActions>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-      <Pagination className="mt-4">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.max(1, currentPage - 1));
-              }}
-              aria-disabled={currentPage === 1}
-              className={
-                currentPage === 1 ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'
-              }
-            />
-          </PaginationItem>
-          <PaginationItem>
-            <span className="flex items-center px-3 text-sm text-slate-600">
-              Trang {currentPage} / {totalPages}
-            </span>
-          </PaginationItem>
-          <PaginationItem>
-            <PaginationNext
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.min(totalPages, currentPage + 1));
-              }}
-              aria-disabled={currentPage === totalPages}
-              className={
-                currentPage === totalPages
-                  ? 'pointer-events-none opacity-30'
-                  : 'cursor-pointer rounded-lg border shadow-sm'
-              }
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
+        )}
+      </div>
 
-      {/* Detail Dialog */}
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl">
-          <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-            <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết đồ chơi</DialogTitle>
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsDetailDialogOpen(false)}
-              title="Đóng"
-              className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-            >
-              <X className="w-5 h-5" />
+      <AdminPagination
+        page={currentPage}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        totalLabel={`${toysLength} vật phẩm`}
+      />
+
+      {/* DETAIL DIALOG */}
+      <AdminDialog
+        open={isDetailDialogOpen}
+        onClose={() => setIsDetailDialogOpen(false)}
+        mode="view"
+        size="lg"
+        title="Chi tiết đồ chơi"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setIsDetailDialogOpen(false)} className={ADMIN_BTN_OUTLINE}>
+              {ADMIN_TEXT.close}
             </Button>
-          </DialogHeader>
-
-          {selectedToy && (
-            <div className="space-y-4">
-              {/* Overview */}
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Tên đồ chơi</Label>
-                    <div className="text-sm font-medium">{selectedToy.name}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Danh mục</Label>
-                    <div className="text-sm">{selectedToy.category || '-'}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Giá</Label>
-                    <div className="text-sm font-medium">
-                      {new Intl.NumberFormat('vi-VN').format(selectedToy.price)} VNĐ
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Tồn kho</Label>
-                    <div className="text-sm">{selectedToy.stock}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Trạng thái</Label>
-                    <div className="text-sm">{selectedToy.status === 'active' ? 'Hoạt động' : 'Ngừng'}</div>
-                  </div>
-                </div>
-                {selectedToy.image_url && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Hình ảnh</Label>
-                    <img
-                      src={selectedToy.image_url}
-                      alt={selectedToy.name}
-                      className="w-32 h-32 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-semibold mb-3">Thông tin tạo & cập nhật</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
-                    <div className="text-sm">
-                      {selectedToy.created_at ? new Date(selectedToy.created_at).toLocaleString('vi-VN') : '-'}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
-                    <div className="text-sm">{selectedToy.created_by_staff_name || '-'}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
-                    <div className="text-sm">
-                      {selectedToy.updated_at ? new Date(selectedToy.updated_at).toLocaleString('vi-VN') : '-'}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
-                    <div className="text-sm">{selectedToy.updated_by_staff_name || '-'}</div>
-                  </div>
-                </div>
+            {hasPermission('toys', 'edit') && (
+              <Button type="button" onClick={openEditFromDetail} className={`${ADMIN_BTN_PRIMARY} gap-2`}>
+                <Pencil className="h-4 w-4" /> {ADMIN_TEXT.edit}
+              </Button>
+            )}
+          </>
+        }
+      >
+        {selectedToy && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <DetailField label="Tên đồ chơi">
+                <span className="font-medium">{selectedToy.name}</span>
+              </DetailField>
+              <DetailField label="Danh mục">{selectedToy.category || '-'}</DetailField>
+              <DetailField label="Giá">
+                <span className="font-medium">{new Intl.NumberFormat('vi-VN').format(selectedToy.price)} VNĐ</span>
+              </DetailField>
+              <DetailField label="Tồn kho">{selectedToy.stock}</DetailField>
+              <DetailField label="Trạng thái">
+                <StatusBadge status={selectedToy.status === 'active' ? 'active' : 'inactive'} />
+              </DetailField>
+            </div>
+            {selectedToy.image_url && (
+              <DetailField label="Hình ảnh">
+                <img src={selectedToy.image_url} alt={selectedToy.name} className="h-32 w-32 rounded-lg object-cover" />
+              </DetailField>
+            )}
+            <div className="border-t border-slate-200 pt-4">
+              <h4 className="mb-3 text-sm font-semibold text-slate-700">Thông tin tạo & cập nhật</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <DetailField label="Ngày tạo">
+                  {selectedToy.created_at ? new Date(selectedToy.created_at).toLocaleString('vi-VN') : '-'}
+                </DetailField>
+                <DetailField label="Tạo bởi">{selectedToy.created_by_staff_name || '-'}</DetailField>
+                <DetailField label="Cập nhật lần cuối">
+                  {selectedToy.updated_at ? new Date(selectedToy.updated_at).toLocaleString('vi-VN') : '-'}
+                </DetailField>
+                <DetailField label="Cập nhật bởi">{selectedToy.updated_by_staff_name || '-'}</DetailField>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        )}
+      </AdminDialog>
+
+      {/* DELETE CONFIRM */}
+      <ConfirmDialog
+        open={!!toyToDelete}
+        onOpenChange={(open) => !open && !isDeleting && setToyToDelete(null)}
+        variant="danger"
+        description={
+          <>
+            Bạn có chắc muốn xóa đồ chơi <strong>{toyToDelete?.name}</strong>? Vật phẩm sẽ chuyển sang trạng thái ngừng hoạt động.
+          </>
+        }
+        busy={isDeleting}
+        onConfirm={() => toyToDelete && handleDelete(toyToDelete.id)}
+      />
     </div>
   );
 }

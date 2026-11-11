@@ -3,22 +3,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useIsSuperAdmin, useHasStaffPermission } from '@/hooks/useStaffPermission';
-import { X, FileText } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { MODULES, ACTIONS, MODULE_LABELS, ACTION_LABELS, APPLICABLE_ACTIONS, roleLevelLabel } from './roleConstants';
 import { addRequiredPermissions, removePermissionWithDependents } from '@shared/permission-rules';
 import { formatVnDateTime } from '@/lib/format';
-import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { notify } from '@/components/admin/common/notify';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { ADMIN_BTN_OUTLINE, ADMIN_BTN_PRIMARY, ADMIN_CARD, ADMIN_TABLE_HEAD, ADMIN_TEXT } from '@/components/admin/common/adminTokens';
 
 interface Role {
   id: number;
@@ -92,14 +93,14 @@ export default function RoleDetailPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Cập nhật vai trò thành công');
+      notify.success('Cập nhật vai trò thành công');
       setDirty(false);
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['role', id] });
       navigate('/roles');
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Cập nhật vai trò thất bại');
+      notify.error(err, 'Cập nhật vai trò thất bại');
     }
   });
 
@@ -111,13 +112,13 @@ export default function RoleDetailPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Xóa vai trò thành công');
+      notify.success('Xóa vai trò thành công');
       setIsDeleteDialogOpen(false);
       navigate('/roles');
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Xóa vai trò thất bại');
+      notify.error(err, 'Xóa vai trò thất bại');
     }
   });
 
@@ -128,7 +129,7 @@ export default function RoleDetailPage() {
   const confirmUpdate = async () => {
     if (!id) return;
     if (!roleInfo.name.trim()) {
-      toast.error('Tên vai trò không được để trống');
+      notify.error('Tên vai trò không được để trống');
       setIsSaveDialogOpen(false);
       return;
     }
@@ -305,9 +306,15 @@ export default function RoleDetailPage() {
 
   // Calculate visible actions - hide columns that have no applicable modules
   const visibleActions = useMemo(() => {
-    return ACTIONS.filter((action) => {
+    const applicableActions = ACTIONS.filter((action) => {
       return MODULES.some((module) => APPLICABLE_ACTIONS[module]?.includes(action));
     });
+    // "lock" is an account action: show it next to "reset_password" instead of after the check-in columns
+    const withoutLock = applicableActions.filter((action) => action !== 'lock');
+    if (!applicableActions.includes('lock')) return withoutLock;
+    const resetIndex = withoutLock.indexOf('reset_password');
+    if (resetIndex === -1) return [...withoutLock, 'lock'];
+    return [...withoutLock.slice(0, resetIndex + 1), 'lock', ...withoutLock.slice(resetIndex + 1)];
   }, []);
 
   const handleLogout = () => {
@@ -325,18 +332,9 @@ export default function RoleDetailPage() {
         handleLogout={handleLogout}
         fullWidth
       >
-        <Card>
-          <CardHeader>
-            <CardTitle>Chi tiết vai trò</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className={ADMIN_CARD}>
+          <TableSkeleton rows={4} />
+        </div>
       </AdminLayout>
     );
   }
@@ -350,11 +348,9 @@ export default function RoleDetailPage() {
         handleLogout={handleLogout}
         fullWidth
       >
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center text-gray-500">Không tìm thấy vai trò</div>
-          </CardContent>
-        </Card>
+        <div className={ADMIN_CARD}>
+          <EmptyState title="Không tìm thấy vai trò" />
+        </div>
       </AdminLayout>
     );
   }
@@ -371,12 +367,13 @@ export default function RoleDetailPage() {
         {/* Sticky Tier 1 Header */}
         <div
           ref={headerRef}
-          className="sticky top-0 z-20 bg-white/95 backdrop-blur border border-slate-200/80 p-4 rounded-xl shadow-xs"
+          className="sticky top-0 z-20 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur"
         >
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/roles')} className="rounded-lg">
-                ← Quay lại
+              <Button variant="ghost" size="sm" onClick={() => navigate('/roles')} className="rounded-xl text-slate-600">
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Quay lại
               </Button>
               {isEditMode ? (
                 <div className="flex flex-wrap items-end gap-3">
@@ -431,8 +428,8 @@ export default function RoleDetailPage() {
                   </div>
                   <span className="text-xs text-slate-400 pb-2">{role.staffCount || 0} nhân viên</span>
                   {role.isSystem && (
-                    <span className="bg-amber-100 text-amber-800 text-[11px] font-semibold px-2 py-0.5 rounded-md mb-2">
-                      Vai trò hệ thống
+                    <span className="mb-2">
+                      <StatusBadge tone="warning">Vai trò hệ thống</StatusBadge>
                     </span>
                   )}
                 </div>
@@ -441,9 +438,7 @@ export default function RoleDetailPage() {
                   <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                     {role.name}
                     {role.isSystem && (
-                      <span className="bg-amber-100 text-amber-800 text-[11px] font-semibold px-2 py-0.5 rounded-md">
-                        Vai trò hệ thống
-                      </span>
+                      <StatusBadge tone="warning">Vai trò hệ thống</StatusBadge>
                     )}
                   </h3>
                   {role.description && <p className="text-xs text-slate-500 mt-0.5">{role.description}</p>}
@@ -460,19 +455,16 @@ export default function RoleDetailPage() {
                 <>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={handleCancelEdit}
                     disabled={updateMutation.isPending}
-                    className="rounded-lg"
+                    className={ADMIN_BTN_OUTLINE}
                   >
-                    Hủy
+                    {ADMIN_TEXT.cancel}
                   </Button>
                   <Button
-                    size="sm"
-                    variant={dirty ? 'default' : 'outline'}
                     onClick={handleUpdate}
                     disabled={!dirty || updateMutation.isPending}
-                    className="rounded-lg"
+                    className={`${ADMIN_BTN_PRIMARY} disabled:opacity-50`}
                   >
                     {updateMutation.isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
                   </Button>
@@ -480,24 +472,23 @@ export default function RoleDetailPage() {
               ) : (
                 canEditRole &&
                 (!role.isSystem || isSuperAdmin) && (
-                  <Button size="sm" variant="outline" onClick={handleEditMode} className="rounded-lg">
-                    Chỉnh sửa
+                  <Button variant="outline" onClick={handleEditMode} className={ADMIN_BTN_OUTLINE}>
+                    {ADMIN_TEXT.edit}
                   </Button>
                 )
               )}
               {!role.isSystem && canDeleteRole && (
                 <Button
-                  size="sm"
                   variant="outline"
                   onClick={() => {
                     if ((role.staffCount || 0) > 0) {
-                      toast.error(`Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`);
+                      notify.error(`Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`);
                       return;
                     }
                     setIsDeleteDialogOpen(true);
                   }}
                   disabled={deleteMutation.isPending}
-                  className="rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="h-10 rounded-xl border-red-200 px-4 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
                   Xóa vai trò
                 </Button>
@@ -514,24 +505,24 @@ export default function RoleDetailPage() {
         )}
 
         {/* Permission Matrix */}
-        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+        <div className={`${ADMIN_CARD} overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               {/* Sticky Table Head */}
-              <thead className="bg-slate-100 border-b border-slate-200">
+              <thead className={ADMIN_TABLE_HEAD}>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-slate-100 px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap min-w-[130px] border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                  <th className="sticky left-0 z-10 bg-slate-50 px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide whitespace-nowrap min-w-[130px] border-r border-slate-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                     Module
                   </th>
                   {visibleActions.map((action) => (
                     <th
                       key={action}
-                      className="px-2 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap min-w-[80px] border-r border-slate-200 last:border-r-0"
+                      className="px-2 py-3 text-center text-xs font-bold text-slate-500 min-w-[80px] max-w-[110px] align-middle leading-tight border-r border-slate-200 last:border-r-0"
                     >
                       {ACTION_LABELS[action] || action}
                     </th>
                   ))}
-                  <th className="px-2 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap min-w-[80px]">
+                  <th className="px-2 py-3 text-center text-xs font-bold text-slate-500 whitespace-nowrap min-w-[80px]">
                     Cả hàng
                   </th>
                 </tr>
@@ -618,32 +609,32 @@ export default function RoleDetailPage() {
 
         {/* Role Info Section - shown in view and edit mode */}
         {role && (
-          <Card className="mt-4">
+          <Card className={`mt-4 ${ADMIN_CARD}`}>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="w-4 h-4" /> Thông tin vai trò
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
+                <FileText className="h-4 w-4 text-slate-500" /> Thông tin vai trò
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Ngày tạo</Label>
+                  <Label className="text-sm font-medium text-slate-500">Ngày tạo</Label>
                   <div className="text-sm">
                     {formatVnDateTime(role.created_at)}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Tạo bởi</Label>
+                  <Label className="text-sm font-medium text-slate-500">Tạo bởi</Label>
                   <div className="text-sm">{role.created_by_staff_name || '-'}</div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Cập nhật lần cuối</Label>
+                  <Label className="text-sm font-medium text-slate-500">Cập nhật lần cuối</Label>
                   <div className="text-sm">
                     {formatVnDateTime(role.updated_at)}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Cập nhật bởi</Label>
+                  <Label className="text-sm font-medium text-slate-500">Cập nhật bởi</Label>
                   <div className="text-sm">{role.updated_by_staff_name || '-'}</div>
                 </div>
               </div>
@@ -652,50 +643,27 @@ export default function RoleDetailPage() {
         )}
 
         {/* Delete Dialog */}
-        <ConfirmDeleteDialog
-          isOpen={isDeleteDialogOpen}
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
-          description={
-            <>Bạn có chắc chắn muốn xóa vai trò "{role.name}"? Hành động này không thể hoàn tác.</>
-          }
+          variant="danger"
+          title="Xóa vai trò"
+          description={<>Bạn có chắc chắn muốn xóa vai trò "{role.name}"? Hành động này không thể hoàn tác.</>}
           onConfirm={handleDelete}
-          isDeleting={deleteMutation.isPending}
+          busy={deleteMutation.isPending}
         />
 
         {/* Save Confirm Dialog */}
-        <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-md rounded-2xl">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Xác nhận lưu thay đổi</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSaveDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <p className="py-4">Bạn có chắc chắn muốn lưu thay đổi quyền cho vai trò "{role.name}"?</p>
-            <DialogFooter>
-              <Button
-                variant="ghost"
-                onClick={() => setIsSaveDialogOpen(false)}
-                className="text-slate-500 hover:bg-slate-100"
-              >
-                Hủy
-              </Button>
-              <Button
-                onClick={confirmUpdate}
-                disabled={updateMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-              >
-                {updateMutation.isPending ? 'Đang lưu...' : 'Lưu'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ConfirmDialog
+          open={isSaveDialogOpen}
+          onOpenChange={setIsSaveDialogOpen}
+          variant="info"
+          title="Xác nhận lưu thay đổi"
+          description={<>Bạn có chắc chắn muốn lưu thay đổi quyền cho vai trò "{role.name}"?</>}
+          confirmText={ADMIN_TEXT.save}
+          onConfirm={confirmUpdate}
+          busy={updateMutation.isPending}
+        />
       </div>
     </AdminLayout>
   );

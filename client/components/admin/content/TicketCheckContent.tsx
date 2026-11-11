@@ -7,16 +7,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
-import {
   confirmBookingApi,
   getBookingByCodeApi,
   useTicketApi,
@@ -57,7 +47,10 @@ import {
   Percent,
   MapPin
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_OUTLINE, ADMIN_BTN_PRIMARY, ADMIN_CARD, ADMIN_TABLE_HEAD, ADMIN_TEXT, ADMIN_TH } from '@/components/admin/common/adminTokens';
 import { differenceInDays } from 'date-fns';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useSearchParams } from 'react-router-dom';
@@ -211,10 +204,10 @@ export default function TicketCheckContent() {
     setResendLoading(true);
     try {
       const res = await resendBookingEmailApi(ticketInfo.id);
-      toast.success('Thành công', { description: res.message });
+      notify.success('Thành công', res.message);
       await handleSearch();
     } catch (err: any) {
-      toast.error('Không gửi lại được email', { description: err.message || 'Vui lòng thử lại' });
+      notify.error(err, 'Không gửi lại được email, vui lòng thử lại');
     } finally {
       setResendLoading(false);
     }
@@ -259,13 +252,14 @@ export default function TicketCheckContent() {
         const res = await useTicketApi(ticketInfo.booking_code, isForce);
         if (res?.status === 'success') {
           const isVR = hasVrContent(ticketInfo.booking_type, ticketInfo.vr_items);
-          toast.success('Thành công', {
-            description: isForce
+          notify.success(
+            'Thành công',
+            isForce
               ? 'Đã duyệt du di cho vé quá hạn vào cổng thành công!'
               : isVR
                 ? 'Đã xác nhận khách vào phòng / trải nghiệm'
                 : 'Đã xác nhận cho khách vào cổng'
-          });
+          );
 
           // Cập nhật giao diện ngay lập tức
           setTicketInfo({
@@ -310,7 +304,7 @@ export default function TicketCheckContent() {
           paid_at: new Date().toISOString()
         };
         const res = await confirmBookingApi(payload);
-        toast.success('Thành công', { description: res.message });
+        notify.success('Thành công', res.message);
 
         // Load lại dữ liệu mới nhất từ server
         await handleSearch();
@@ -319,9 +313,7 @@ export default function TicketCheckContent() {
         setConfirmOpen(false);
       }
     } catch (err: any) {
-      toast.error('Lỗi hệ thống', {
-        description: err.message || 'Không thể thực hiện thao tác'
-      });
+      notify.error(err, 'Không thể thực hiện thao tác');
       // Không đóng modal khi lỗi để nhân viên có thể xem thông báo lỗi
     } finally {
       setUseLoading(false); // Tắt hiệu ứng loading
@@ -352,54 +344,48 @@ export default function TicketCheckContent() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border shadow-sm">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            Hệ thống kiểm soát
-          </h1>
-          <p className="text-xs text-slate-500 italic">
-            * Nhập mã đơn hàng hoặc mã vé để tra cứu thông tin phim và trạng thái.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {branches.length > 0 && (
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
-              <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="text-xs font-semibold text-slate-600 shrink-0">Chi nhánh hiện tại:</span>
-              <select
-                value={currentBranchId || ''}
-                onChange={(e) => setCurrentBranchId(Number(e.target.value))}
-                className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer pr-2"
-              >
-                {branches.map((b) => {
-                  const bId = b.id || b.branch_id;
-                  return (
-                    <option key={bId} value={bId}>
-                      {b.name}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          )}
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              setCode('');
-              setTicketInfo(null);
-              setError(null);
-              toast.info('Đã xóa kết quả, sẵn sàng quét vé tiếp theo');
-            }}
-            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 flex items-center justify-center bg-white border-slate-200"
-            title="Xóa kết quả"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Kiểm tra vé"
+        description="Nhập mã đơn hàng hoặc mã vé để tra cứu thông tin phim và trạng thái."
+        actions={
+          <>
+            {branches.length > 0 && (
+              <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
+                <Building2 className="h-4 w-4 shrink-0 text-blue-600" />
+                <span className="shrink-0 text-xs font-semibold text-slate-600">Chi nhánh hiện tại:</span>
+                <select
+                  value={currentBranchId || ''}
+                  onChange={(e) => setCurrentBranchId(Number(e.target.value))}
+                  className="cursor-pointer bg-transparent pr-2 text-xs font-bold text-slate-800 focus:outline-none"
+                >
+                  {branches.map((b) => {
+                    const bId = b.id || b.branch_id;
+                    return (
+                      <option key={bId} value={bId}>
+                        {b.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCode('');
+                setTicketInfo(null);
+                setError(null);
+                notify.info('Đã xóa kết quả, sẵn sàng quét vé tiếp theo');
+              }}
+              className={ADMIN_BTN_OUTLINE}
+              title="Xóa kết quả"
+            >
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {ADMIN_TEXT.refresh}
+            </Button>
+          </>
+        }
+      />
 
       {/* Search Section */}
       <div className="max-w-3xl space-y-4">
@@ -418,10 +404,9 @@ export default function TicketCheckContent() {
           <Button
             onClick={handleSearch}
             disabled={isLoading || !hasPermission('ticket_check', 'scan')}
-            size="lg"
-            className="h-10 px-8 bg-blue-600 hover:bg-blue-700 transition-all active:scale-95 rounded-lg shadow-lg border-0 font-bold text-white"
+            className={`${ADMIN_BTN_PRIMARY} h-14 px-8 text-base`}
           >
-            {isLoading ? <Loader2 className="animate-spin" /> : 'Kiểm tra'}
+            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Kiểm tra'}
           </Button>
         </div>
 
@@ -433,7 +418,7 @@ export default function TicketCheckContent() {
             <p className="font-medium mb-1">Hướng dẫn đối soát nhanh:</p>
             <p>
               Nếu khách thanh toán qua Ngân hàng, tìm nội dung có mã{' '}
-              <span className="font-mono font-bold bg-amber-200 px-1 rounded text-orange-700">CS...</span> (ví dụ: CS172543883901) hoặc Mã vé / ID đơn hàng.
+              <span className="font-mono font-bold bg-amber-200 px-1 rounded text-orange-700">CS...</span> (ví dụ: CS172543883901) hoặc mã vé / mã đơn hàng.
             </p>
           </div>
         </div>
@@ -474,10 +459,10 @@ export default function TicketCheckContent() {
               </div>
               <div className="space-y-1">
                 <h4 className="font-bold text-base text-amber-900 flex items-center gap-2">
-                  ⚠️ Cảnh báo: Vé mua khác chi nhánh!
+                  Cảnh báo: vé mua khác chi nhánh!
                 </h4>
                 <p className="text-xs sm:text-sm text-amber-800 leading-relaxed">
-                  Vé này thuộc <span className="font-black underline bg-amber-200/70 px-1 rounded">{ticketInfo.branch_name || `Chi nhánh #${ticketInfo.branch_id}`}</span>, nhưng bạn đang tra cứu tại <span className="font-black underline bg-amber-200/70 px-1 rounded">{currentBranchName}</span>. Bạn vẫn có thể thực hiện xác nhận vé nếu đồng ý.
+                  Vé này thuộc <span className="font-black underline bg-amber-200/70 px-1 rounded">{ticketInfo.branch_name || 'một chi nhánh khác'}</span>, nhưng bạn đang tra cứu tại <span className="font-black underline bg-amber-200/70 px-1 rounded">{currentBranchName}</span>. Bạn vẫn có thể thực hiện xác nhận vé nếu đồng ý.
                 </p>
               </div>
             </Alert>
@@ -486,7 +471,7 @@ export default function TicketCheckContent() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-8 space-y-6">
               <Card
-                className={`overflow-hidden border-none shadow-2xl shadow-slate-200/50 rounded-2xl transition-all ${ticketInfo.is_used ? 'opacity-60 grayscale-[0.5]' : ''}`}
+                className={`${ADMIN_CARD} overflow-hidden transition-all ${ticketInfo.is_used ? 'opacity-60 grayscale-[0.5]' : ''}`}
               >
                 <CardContent className="p-0">
                   <div
@@ -525,9 +510,6 @@ export default function TicketCheckContent() {
                           </span>
                         )}
 
-                      <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-200/50 px-2 rounded">
-                        ID: #{ticketInfo.id}
-                      </span>
                       {ticketInfo.voucher_code_snapshot ? (
                         <Badge className="bg-orange-500/10 text-orange-700 border border-orange-200 text-[11px] font-bold gap-1 px-2 py-0.5">
                           <Tag className="w-3 h-3" />
@@ -566,20 +548,20 @@ export default function TicketCheckContent() {
                       <h3 className="text-xs font-semibold text-blue-600 mb-4 flex items-center gap-2">
                         <Ticket size={14} /> Chi tiết gói vé phim:
                       </h3>
-                      <div className="border border-blue-100 rounded-xl overflow-hidden mb-4">
+                      <div className="mb-4 overflow-hidden rounded-xl border border-slate-200">
                         <Table>
-                          <TableHeader className="bg-blue-50/60">
-                            <TableRow className="hover:bg-transparent border-none">
-                              <TableHead className="text-[11px] font-bold uppercase text-blue-700 py-3">
+                          <TableHeader className={ADMIN_TABLE_HEAD}>
+                            <TableRow className="border-none hover:bg-transparent">
+                              <TableHead className={ADMIN_TH}>
                                 Tên gói
                               </TableHead>
-                              <TableHead className="text-center text-[11px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className={`text-center ${ADMIN_TH}`}>
                                 SL
                               </TableHead>
-                              <TableHead className="text-right text-[11px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className={`text-right ${ADMIN_TH}`}>
                                 Đơn giá
                               </TableHead>
-                              <TableHead className="text-right text-[11px] font-bold uppercase text-blue-700 py-3">
+                              <TableHead className={`text-right ${ADMIN_TH}`}>
                                 Thành tiền
                               </TableHead>
                             </TableRow>
@@ -594,7 +576,7 @@ export default function TicketCheckContent() {
                                 packageId: pkg.package_id
                               });
                               return (
-                                <TableRow key={`movie-${idx}`} className="border-t border-blue-50 hover:bg-blue-50/30">
+                                <TableRow key={`movie-${idx}`} className="border-t border-slate-100 hover:bg-slate-50">
                                   <TableCell className="py-3">
                                     <p className="text-sm font-semibold text-slate-800 leading-tight">
                                       {pkg.name}
@@ -631,20 +613,20 @@ export default function TicketCheckContent() {
                         <Gamepad2 size={14} /> Danh sách gói trải nghiệm VR:
                       </h3>
                       {vrItems.length > 0 ? (
-                        <div className="border border-purple-100 rounded-xl overflow-hidden">
+                        <div className="overflow-hidden rounded-xl border border-slate-200">
                           <Table>
-                            <TableHeader className="bg-purple-50/60">
-                              <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-[11px] font-bold uppercase text-purple-700 py-3">
+                            <TableHeader className={ADMIN_TABLE_HEAD}>
+                              <TableRow className="border-none hover:bg-transparent">
+                                <TableHead className={ADMIN_TH}>
                                   Tên gói VR
                                 </TableHead>
-                                <TableHead className="text-center text-[11px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className={`text-center ${ADMIN_TH}`}>
                                   SL
                                 </TableHead>
-                                <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className={`text-right ${ADMIN_TH}`}>
                                   Đơn giá
                                 </TableHead>
-                                <TableHead className="text-right text-[11px] font-bold uppercase text-purple-700 py-3">
+                                <TableHead className={`text-right ${ADMIN_TH}`}>
                                   Thành tiền
                                 </TableHead>
                               </TableRow>
@@ -664,7 +646,7 @@ export default function TicketCheckContent() {
                                 return (
                                   <TableRow
                                     key={it.id || `vr-${idx}`}
-                                    className="border-t border-purple-50 hover:bg-purple-50/30"
+                                    className="border-t border-slate-100 hover:bg-slate-50"
                                   >
                                     <TableCell className="py-3">
                                       <div className="flex items-center gap-2">
@@ -675,7 +657,7 @@ export default function TicketCheckContent() {
                                           <p className="text-sm font-semibold text-slate-800 leading-tight">
                                             {it.package_name ||
                                               it.ticket_package?.name ||
-                                              `Gói VR #${it.ticket_package_id || idx + 1}`}
+                                              `Gói VR ${idx + 1}`}
                                             {discounted ? (
                                               <span className="inline-block ml-2 px-1.5 py-[2px] align-middle text-[11px] font-black text-rose-600 bg-rose-50 border border-rose-200 rounded">
                                                 ĐƯỢC GIẢM
@@ -699,7 +681,7 @@ export default function TicketCheckContent() {
                           </Table>
                         </div>
                       ) : (
-                        <div className="text-center py-10 text-slate-400 text-sm bg-purple-50/20 rounded-xl border border-purple-100 border-dashed">
+                        <div className="text-center py-10 text-slate-400 text-sm bg-slate-50 rounded-xl border border-slate-200 border-dashed">
                           (Không có chi tiết gói VR)
                         </div>
                       )}
@@ -730,14 +712,17 @@ export default function TicketCheckContent() {
                     ) : (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-red-500">
-                          Hết hạn (
+                          Hết hạn
                           {(() => {
-                            const days = differenceInDays(new Date(ticketInfo.expiry_date as any), new Date());
-                            return days < 0 ? 'Đã hết hạn' : ` ${days} ngày nữa`;
+                            if (!ticketInfo.expiry_date) return '';
+                            const days = differenceInDays(new Date(ticketInfo.expiry_date), new Date());
+                            if (Number.isNaN(days)) return '';
+                            return days < 0 ? ' (Đã hết hạn)' : ` (${days} ngày nữa)`;
                           })()}
-                          )
                         </p>
-                        <p className="text-sm font-semibold text-red-500">{formatDate(ticketInfo.expiry_date)}</p>
+                        <p className="text-sm font-semibold text-red-500">
+                          {ticketInfo.expiry_date ? formatDate(ticketInfo.expiry_date) : 'Không giới hạn'}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -779,7 +764,7 @@ export default function TicketCheckContent() {
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-              <Card className="md:col-span-4 p-4 flex items-center gap-3 border-none bg-white shadow-xl shadow-slate-100 rounded-2xl">
+              <Card className={`md:col-span-4 flex items-center gap-3 p-4 ${ADMIN_CARD}`}>
                 <div className="p-2 bg-blue-50 rounded-xl text-blue-400 shrink-0">
                   <User size={20} />
                 </div>
@@ -788,7 +773,7 @@ export default function TicketCheckContent() {
                   <p className="font-bold text-slate-700 break-words leading-tight">{ticketInfo.name}</p>
                 </div>
               </Card>
-              <Card className="md:col-span-3 p-4 flex items-center gap-3 border-none bg-white shadow-xl shadow-slate-100 rounded-2xl">
+              <Card className={`md:col-span-3 flex items-center gap-3 p-4 ${ADMIN_CARD}`}>
                 <div className="p-2 bg-emerald-50 rounded-xl text-emerald-400 shrink-0">
                   <Phone size={20} />
                 </div>
@@ -797,7 +782,7 @@ export default function TicketCheckContent() {
                   <p className="font-bold text-slate-700 break-all">{ticketInfo.phone}</p>
                 </div>
               </Card>
-              <Card className="md:col-span-5 p-4 flex items-center gap-3 border-none bg-white shadow-xl shadow-slate-100 rounded-2xl">
+              <Card className={`md:col-span-5 flex items-center gap-3 p-4 ${ADMIN_CARD}`}>
                 <div className="p-2 bg-violet-50 rounded-xl text-violet-400 shrink-0">
                   <Mail size={20} />
                 </div>
@@ -811,7 +796,7 @@ export default function TicketCheckContent() {
 
           <div className="lg:col-span-4 space-y-6">
             <Card
-              className={`border-2 transition-all shadow-xl ${
+              className={`border-2 shadow-sm transition-all ${
                 ticketInfo.expired
                   ? 'border-slate-400 bg-slate-50' // Giao diện khi hết hạn
                   : ticketInfo.valid && !ticketInfo.is_used
@@ -989,11 +974,11 @@ export default function TicketCheckContent() {
                     </p>
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={handleResendEmail}
                       disabled={resendLoading || !hasPermission('ticket_check', 'validate')}
+                      className={ADMIN_BTN_OUTLINE}
                     >
-                      {resendLoading ? 'Đang gửi...' : 'Gửi lại email'}
+                      {resendLoading ? ADMIN_TEXT.busy : 'Gửi lại email'}
                     </Button>
                   </div>
                 )}
@@ -1029,81 +1014,56 @@ export default function TicketCheckContent() {
         );
       })()}
 
-      {/* AlertDialog xác nhận hành động */}
-      <AlertDialog
+      {/* Xác nhận hành động: vào cổng, duyệt vé quá hạn, xác nhận thanh toán */}
+      <ConfirmDialog
         open={confirmOpen}
         onOpenChange={(open) => {
           // Ngăn không cho người dùng tự đóng modal bằng phím Esc hoặc click ra ngoài khi đang loading
           if (!useLoading) setConfirmOpen(open);
         }}
-      >
-        <AlertDialogContent className="rounded-2xl border-none shadow-2xl p-8">
-          <AlertDialogHeader className="space-y-3">
-            <AlertDialogTitle className="text-2xl font-bold text-slate-900">
+        variant={
+          (confirmType as string) === 'force_payment'
+            ? 'danger'
+            : (confirmType as string) === 'force_checkin'
+              ? 'warning'
+              : 'info'
+        }
+        title={
+          confirmType === 'checkin'
+            ? 'Xác nhận vào cổng?'
+            : (confirmType as string) === 'force_checkin'
+              ? 'Duyệt du di vé quá hạn?'
+              : (confirmType as string) === 'force_payment'
+                ? 'Cảnh báo duyệt bỏ qua lỗi SePay'
+                : 'Xác nhận thanh toán?'
+        }
+        description={
+          <>
+            <span className="block">
               {confirmType === 'checkin'
-                ? '⚠️ Xác nhận vào cổng?'
+                ? `Bạn đang thực hiện cho ${ticketInfo?.ticket_count} khách vào cổng. Hành động này không thể hoàn tác.`
                 : (confirmType as string) === 'force_checkin'
-                  ? '⚠️ Duyệt du di vé quá hạn?'
+                  ? `Vé mã ${ticketInfo?.booking_code} đã hết hạn. Bạn có chắc chắn muốn duyệt du di cho khách vào cổng không? Thao tác này sẽ được lưu lại trong nhật ký hệ thống (Audit Log).`
                   : (confirmType as string) === 'force_payment'
-                    ? '⚠️ Cảnh báo duyệt bỏ qua lỗi SePay!'
-                    : '💰 Xác nhận thanh toán?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="text-slate-500 text-base leading-relaxed space-y-3">
-                <p>
-                  {confirmType === 'checkin'
-                    ? `Bạn đang thực hiện cho ${ticketInfo?.ticket_count} khách vào cổng. Hành động này không thể hoàn tác.`
-                    : (confirmType as string) === 'force_checkin'
-                      ? `Vé mã ${ticketInfo?.booking_code} đã hết hạn. Bạn có chắc chắn muốn duyệt du di cho khách vào cổng không? Thao tác này sẽ được lưu lại trong nhật ký hệ thống (Audit Log).`
-                      : (confirmType as string) === 'force_payment'
-                        ? `Hệ thống gặp vấn đề: ${sepayCheckError}. Bạn có chắc chắn ĐÃ NHẬN ĐỦ TIỀN và ép hệ thống xác nhận bỏ qua tự động?`
-                        : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho mã đặt chỗ ${ticketInfo?.booking_code}?`}
-                </p>
-                {isBranchMismatch && (
-                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 text-xs font-semibold flex items-start gap-2.5 text-left mt-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-bold text-amber-950">⚠️ Chú ý lệch chi nhánh:</span> Vé này mua tại{' '}
-                      <span className="font-extrabold underline">{ticketInfo?.branch_name || `Chi nhánh #${ticketInfo?.branch_id}`}</span>, khác với chi nhánh làm việc hiện tại của bạn (<span className="font-extrabold underline">{currentBranchName}</span>).
-                    </div>
-                  </div>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3 mt-6">
-            <AlertDialogCancel disabled={useLoading} className="h-12 px-6 rounded-xl font-bold">
-              Hủy
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                // e.preventDefault() để AlertDialog không tự đóng khi click
-                e.preventDefault();
-                executeAction();
-              }}
-              disabled={useLoading}
-              className={`h-12 px-8 rounded-xl font-bold min-w-[160px] ${
-                confirmType === 'checkin'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : (confirmType as string) === 'force_checkin'
-                    ? 'bg-amber-600 hover:bg-amber-700'
-                    : (confirmType as string) === 'force_payment'
-                      ? 'bg-red-600 hover:bg-red-700 shadow-red-200'
-                      : 'bg-amber-500 hover:bg-amber-600'
-              }`}
-            >
-              {useLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Đang xử lý...
-                </>
-              ) : (
-                'Xác nhận ngay'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                    ? `Hệ thống gặp vấn đề: ${sepayCheckError}. Bạn có chắc chắn ĐÃ NHẬN ĐỦ TIỀN và ép hệ thống xác nhận bỏ qua tự động?`
+                    : `Bạn đã đối soát thành công số tiền ${Number(ticketInfo?.total_price).toLocaleString('vi-VN')}đ cho mã đặt chỗ ${ticketInfo?.booking_code}?`}
+            </span>
+            {isBranchMismatch && (
+              <span className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs font-semibold text-amber-900">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <span>
+                  <span className="font-bold">Chú ý lệch chi nhánh:</span> Vé này mua tại{' '}
+                  <span className="font-extrabold underline">{ticketInfo?.branch_name || 'một chi nhánh khác'}</span>, khác với chi
+                  nhánh làm việc hiện tại của bạn (<span className="font-extrabold underline">{currentBranchName}</span>).
+                </span>
+              </span>
+            )}
+          </>
+        }
+        confirmText="Xác nhận ngay"
+        onConfirm={executeAction}
+        busy={useLoading}
+      />
     </div>
   );
 }

@@ -1,23 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { getUserById } from '@/lib/api';
-import { Search, RefreshCw, Eye, TrendingUp, User, X, Copy } from 'lucide-react';
-import { toast } from 'sonner';
-import { formatVnDateTime, formatVnDate, activeStatusLabel, paymentMethodLabel } from '@/lib/format';
+import { Textarea } from '@/components/ui/textarea';
+import { getUserById, setUserActive } from '@/lib/api';
+import type { AdminUserDetail } from '@/lib/api/users';
+import { Search, RefreshCw, User, Copy, Lock, LockOpen } from 'lucide-react';
+import { formatVnDateTime, formatVnDate, formatVnd, paymentMethodLabel } from '@/lib/format';
 import { useHasStaffPermission } from '@/hooks/useStaffPermission';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton, InlineLoading } from '@/components/admin/common/EmptyState';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_PRIMARY, ADMIN_BTN_OUTLINE, ADMIN_CARD, ADMIN_TABLE_HEAD, ADMIN_TH, ADMIN_TEXT } from '@/components/admin/common/adminTokens';
 
 interface Props {
   data: any[];
@@ -28,10 +25,52 @@ interface Props {
   setUserQuery: (q: string) => void;
   statusFilter?: string;
   setStatusFilter?: (value: string) => void;
-  onEdit: (type: 'user', data: any) => void;
   usersLength: number;
   onRefresh: () => void;
   isLoading?: boolean;
+}
+
+// The customer a lock / unlock confirmation is about
+interface LockTarget {
+  id: number;
+  fullname: string;
+  // true = the account is locked now, so the confirmation unlocks it
+  is_locked: boolean;
+}
+
+const GENDER_LABELS: Record<string, string> = { male: 'Nam', female: 'Nữ', other: 'Khác' };
+
+const LOCK_REASON_MAX_LENGTH = 500;
+
+const FILTER_SELECT_CLASS =
+  'h-10 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20';
+
+const LOCK_BUTTON_CLASS =
+  'inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-600 transition-all hover:bg-red-50';
+
+const UNLOCK_BUTTON_CLASS =
+  'inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-600 transition-all hover:bg-emerald-50';
+
+const getLoginTypeLabel = (loginType?: string) => (loginType || 'email').toUpperCase();
+
+// One "label ... value" line of the info panels
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-2 last:border-b-0">
+      <span className="shrink-0 text-xs font-medium text-slate-500">{label}</span>
+      <span className="min-w-0 break-words text-right text-sm text-slate-900">{children}</span>
+    </div>
+  );
+}
+
+// A boxed number of the booking statistics
+function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className={`${ADMIN_CARD} p-4`}>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+    </div>
+  );
 }
 
 export default function UsersContent({
@@ -43,17 +82,21 @@ export default function UsersContent({
   setUserQuery,
   statusFilter = 'all',
   setStatusFilter,
-  onEdit,
   usersLength,
   onRefresh,
   isLoading = false
 }: Props) {
   const hasPermission = useHasStaffPermission();
+  const canLock = hasPermission('users', 'lock');
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [userDetails, setUserDetails] = useState<any>(null);
+  const [userDetails, setUserDetails] = useState<AdminUserDetail | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [lockTarget, setLockTarget] = useState<LockTarget | null>(null);
+  const [lockReason, setLockReason] = useState('');
+  const [isLockBusy, setIsLockBusy] = useState(false);
+  const [localUserQuery, setLocalUserQuery] = useState(userQuery);
 
   useEffect(() => {
     if (isDetailsOpen && selectedUserId) {
@@ -73,48 +116,32 @@ export default function UsersContent({
     }
   }, [isDetailsOpen, selectedUserId]);
 
-  const formatDateTime = (value: Date | string) => formatVnDateTime(value);
-
-  // Booking payment status, as the owner reads it (anything unknown is shown as it is stored)
-  const PAYMENT_STATUS_STYLES: Record<string, { label: string; className: string }> = {
-    paid: { label: 'ĐÃ THANH TOÁN', className: 'bg-green-100 text-green-700' },
-    pending: { label: 'CHỜ THANH TOÁN', className: 'bg-yellow-100 text-yellow-700' },
-    failed: { label: 'THẤT BẠI', className: 'bg-red-100 text-red-700' },
-    expired: { label: 'HẾT HẠN', className: 'bg-slate-200 text-slate-600' },
-    cancelled: { label: 'ĐÃ HỦY', className: 'bg-slate-200 text-slate-600' },
-    refunded: { label: 'ĐÃ HOÀN TIỀN', className: 'bg-blue-100 text-blue-700' }
-  };
-
-  const getPaymentStatusStyle = (status?: string) =>
-    PAYMENT_STATUS_STYLES[status || ''] || {
-      label: (status || 'KHÔNG RÕ').toUpperCase(),
-      className: 'bg-slate-200 text-slate-600'
-    };
-
-  const GENDER_LABELS: Record<string, string> = { male: 'Nam', female: 'Nữ', other: 'Khác' };
-
-  const getLoginTypeLabel = (loginType?: string) => (loginType || 'email').toUpperCase();
+  useEffect(() => {
+    setLocalUserQuery(userQuery);
+  }, [userQuery]);
 
   const copyText = async (text: string, what: string) => {
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
-      toast.success(`Đã sao chép ${what}`);
+      notify.copied(what);
     } catch {
-      toast.error('Không sao chép được, hãy bôi đen và sao chép thủ công');
+      notify.error('Không sao chép được, hãy bôi đen và sao chép thủ công');
     }
   };
 
   const handleViewDetails = (userId: number) => {
     if (!hasPermission('users', 'view_detail')) return;
+    setUserDetails(null);
     setSelectedUserId(userId);
     setIsDetailsOpen(true);
   };
-  const [localUserQuery, setLocalUserQuery] = useState(userQuery);
 
-  useEffect(() => {
-    setLocalUserQuery(userQuery);
-  }, [userQuery]);
+  const handleCloseDetails = () => {
+    setIsDetailsOpen(false);
+    setUserDetails(null);
+    setSelectedUserId(null);
+  };
 
   const handleSearchUser = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -122,465 +149,380 @@ export default function UsersContent({
     setPage(1);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* PAGE HEADER */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Quản lý người dùng</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {usersLength} người dùng trong hệ thống</p>
-        </div>
-      </div>
+  const openLockConfirm = (target: LockTarget) => {
+    setLockReason('');
+    setLockTarget(target);
+  };
 
-      {/* TOOLBAR */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        {/* L E F T - G R O U P */}
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          <form onSubmit={handleSearchUser} className="flex gap-2">
-            <div className="relative w-[320px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
-                value={localUserQuery}
-                onChange={(e) => setLocalUserQuery(e.target.value)}
-                placeholder="Tìm theo tên, email hoặc SĐT..."
-              />
-            </div>
-            <Button
-              type="submit"
-              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-            >
-              <Search className="w-3.5 h-3.5" /> Tìm kiếm
-            </Button>
-          </form>
+  const handleConfirmLock = async () => {
+    if (!lockTarget) return;
+    const willBeActive = lockTarget.is_locked;
+    setIsLockBusy(true);
+    try {
+      await setUserActive(lockTarget.id, willBeActive, willBeActive ? '' : lockReason.trim());
+      notify.success(willBeActive ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản');
+      // Keep the open detail modal in step with the list
+      setUserDetails((current) => (current && current.id === lockTarget.id ? { ...current, is_active: willBeActive } : current));
+      setLockTarget(null);
+      onRefresh();
+    } catch (err) {
+      notify.error(err);
+    } finally {
+      setIsLockBusy(false);
+    }
+  };
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter?.(e.target.value)}
-            aria-label="Lọc theo trạng thái tài khoản"
-            className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
-          >
-            <option value="all">Tất cả trạng thái</option>
-            <option value="active">Hoạt động</option>
-            <option value="inactive">Ngừng hoạt động</option>
-          </select>
-        </div>
+  const hasFilter = Boolean(userQuery) || statusFilter !== 'all';
 
-        {/* R I G H T - G R O U P */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              setLocalUserQuery('');
-              setUserQuery('');
-              onRefresh();
-            }}
-            className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
-            title="Làm mới"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
-      </div>
-      <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-gray-50">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Người dùng</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Email & SĐT</TableHead>
-                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">
-                  Trạng thái
-                </TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Đăng nhập</TableHead>
-                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3">Lượt đặt</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Đặt gần nhất</TableHead>
-                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Ngày tạo</TableHead>
-                <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
-                  Thao tác
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading
-                ? Array.from({ length: 5 }).map((_, idx) => (
-                    <TableRow key={`sk-${idx}`}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-40" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-10" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-20" />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Skeleton className="h-8 w-16 ml-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : data.map((u) => (
-                    <TableRow
-                      key={u.id}
-                      className="group hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]"
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">
-                            {u.fullname?.charAt(0).toUpperCase() || <User size={14} />}
-                          </div>
-                          <span className="font-bold text-slate-900">{u.fullname}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-slate-700">{u.email}</span>
-                          <span className="text-[11px] text-slate-500 font-mono">{u.phone}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={u.is_active ? 'default' : 'secondary'}
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                            u.is_active
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : 'bg-gray-100 text-gray-600 border-gray-200'
-                          }`}
-                        >
-                          {activeStatusLabel(u.is_active)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-slate-600 font-medium">{getLoginTypeLabel(u.login_type)}</span>
-                      </TableCell>
-                      <TableCell className="text-center text-sm font-semibold text-slate-700">
-                        {u.total_bookings ?? 0}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-slate-600 font-medium">
-                          {u.last_booking_at ? formatDateTime(u.last_booking_at) : 'Chưa đặt'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs text-slate-600 font-medium">{formatDateTime(u.created_at)}</span>
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex justify-end gap-2">
-                          {hasPermission('users', 'view_detail') && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 rounded-lg hover:bg-blue-50 text-blue-600"
-                              onClick={() => handleViewDetails(Number(u.id))}
-                              title="Xem chi tiết"
-                              aria-label={`Xem chi tiết người dùng ${u.fullname}`}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      <Pagination className="mt-4">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.max(1, currentPage - 1));
-              }}
-              aria-disabled={currentPage === 1}
-              className={
-                currentPage === 1 ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'
-              }
+  // TOOLBAR
+  const renderToolbar = () => (
+    <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
+      <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto">
+        <form onSubmit={handleSearchUser} className="flex gap-2">
+          <div className="relative w-[320px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-600/20"
+              value={localUserQuery}
+              onChange={(e) => setLocalUserQuery(e.target.value)}
+              placeholder="Tìm theo tên, email hoặc SĐT..."
+              aria-label="Tìm người dùng"
             />
-          </PaginationItem>
-          <PaginationItem>
-            <span className="flex items-center px-3 text-sm text-slate-600">
-              Trang {currentPage} / {totalPages}
+          </div>
+          <button type="submit" className={`${ADMIN_BTN_PRIMARY} inline-flex shrink-0 items-center gap-2`}>
+            <Search className="h-4 w-4" />
+            {ADMIN_TEXT.search}
+          </button>
+        </form>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter?.(e.target.value)}
+          aria-label="Lọc theo trạng thái tài khoản"
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="all">Tất cả trạng thái</option>
+          <option value="active">{ADMIN_TEXT.active}</option>
+          <option value="inactive">Đã khóa</option>
+        </select>
+      </div>
+
+      <div className="flex w-full flex-wrap items-center justify-start gap-2 xl:w-auto xl:justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            setLocalUserQuery('');
+            setUserQuery('');
+            onRefresh();
+          }}
+          className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {ADMIN_TEXT.refresh}
+        </button>
+      </div>
+    </div>
+  );
+
+  // TABLE
+  const renderRowActions = (u: any) => (
+    <RowActions>
+      {hasPermission('users', 'view_detail') && (
+        <RowActionButton action="view" label={`Xem chi tiết ${u.fullname}`} onClick={() => handleViewDetails(Number(u.id))} />
+      )}
+      {canLock &&
+        (u.is_active ? (
+          <RowActionButton
+            action="lock"
+            onClick={() => openLockConfirm({ id: Number(u.id), fullname: u.fullname, is_locked: false })}
+          />
+        ) : (
+          <RowActionButton
+            action="unlock"
+            onClick={() => openLockConfirm({ id: Number(u.id), fullname: u.fullname, is_locked: true })}
+          />
+        ))}
+    </RowActions>
+  );
+
+  const renderUserRow = (u: any) => (
+    <TableRow key={u.id} className="h-[52px] border-b border-slate-200 transition-colors hover:bg-slate-50">
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
+            {u.fullname?.charAt(0).toUpperCase() || <User size={14} />}
+          </div>
+          <span className="font-semibold text-slate-900">{u.fullname}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-slate-700">{u.email}</span>
+          <span className="font-mono text-[11px] text-slate-500">{u.phone}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-center">
+        <StatusBadge status={u.is_active ? 'active' : 'locked'} />
+      </TableCell>
+      <TableCell>
+        <span className="text-xs font-medium text-slate-600">{getLoginTypeLabel(u.login_type)}</span>
+      </TableCell>
+      <TableCell className="text-center text-sm font-semibold text-slate-700">{u.total_bookings ?? 0}</TableCell>
+      <TableCell>
+        <span className="text-xs font-medium text-slate-600">
+          {u.last_booking_at ? formatVnDateTime(u.last_booking_at) : 'Chưa đặt'}
+        </span>
+      </TableCell>
+      <TableCell className="hidden 2xl:table-cell">
+        <span className="text-xs font-medium text-slate-600">{formatVnDateTime(u.created_at)}</span>
+      </TableCell>
+      <TableCell className="pr-4 text-right">{renderRowActions(u)}</TableCell>
+    </TableRow>
+  );
+
+  const renderTable = () => {
+    if (isLoading) return <TableSkeleton rows={6} />;
+    if (data.length === 0) {
+      return (
+        <EmptyState
+          title={hasFilter ? 'Không tìm thấy người dùng' : 'Chưa có người dùng'}
+          description={hasFilter ? 'Thử đổi từ khóa hoặc bỏ bộ lọc trạng thái.' : undefined}
+        />
+      );
+    }
+    return (
+      <Table>
+        <TableHeader className={ADMIN_TABLE_HEAD}>
+          <TableRow className="border-none hover:bg-transparent">
+            <TableHead className={`${ADMIN_TH} py-3`}>Người dùng</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Email &amp; SĐT</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3 text-center`}>Trạng thái</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Đăng nhập</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3 text-center`}>Lượt đặt</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Đặt gần nhất</TableHead>
+            <TableHead className={`hidden 2xl:table-cell ${ADMIN_TH} py-3`}>Ngày tạo</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3 pr-4 text-right`}>{ADMIN_TEXT.actionColumn}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>{data.map(renderUserRow)}</TableBody>
+      </Table>
+    );
+  };
+
+  // DETAIL MODAL
+  const renderCopyButton = (text: string, what: string) => (
+    <button
+      type="button"
+      onClick={() => copyText(text, what)}
+      title={`Sao chép ${what}`}
+      aria-label={`Sao chép ${what}`}
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+    >
+      <Copy size={12} />
+    </button>
+  );
+
+  const renderAccountInfo = () => (
+    <div className={`${ADMIN_CARD} p-5`}>
+      <h3 className="mb-2 text-sm font-bold text-slate-800">Thông tin tài khoản</h3>
+      <InfoRow label="Trạng thái">
+        <StatusBadge status={userDetails.is_active ? 'active' : 'locked'} />
+      </InfoRow>
+      <InfoRow label="Họ tên">
+        <span className="font-semibold">{userDetails.fullname}</span>
+      </InfoRow>
+      <InfoRow label="Email">
+        <span className="inline-flex items-center gap-1">
+          <span className="break-all">{userDetails.email || 'Chưa cập nhật'}</span>
+          {userDetails.email && renderCopyButton(userDetails.email, 'email')}
+        </span>
+      </InfoRow>
+      <InfoRow label="Số điện thoại">
+        <span className="inline-flex items-center gap-1">
+          <span className="font-mono">{userDetails.phone || 'Chưa cập nhật'}</span>
+          {userDetails.phone && renderCopyButton(userDetails.phone, 'số điện thoại')}
+        </span>
+      </InfoRow>
+      <InfoRow label="Giới tính">
+        {userDetails.gender
+          ? GENDER_LABELS[String(userDetails.gender).toLowerCase()] || userDetails.gender
+          : 'Chưa cập nhật'}
+      </InfoRow>
+      <InfoRow label="Ngày sinh">{userDetails.dob ? formatVnDate(userDetails.dob) : 'Chưa cập nhật'}</InfoRow>
+      <InfoRow label="Loại đăng nhập">{getLoginTypeLabel(userDetails.login_type)}</InfoRow>
+      <InfoRow label="Ngày tạo tài khoản">
+        {userDetails.account_created_at ? formatVnDateTime(userDetails.account_created_at) : '-'}
+      </InfoRow>
+      <InfoRow label="Cập nhật lần cuối">{formatVnDateTime(userDetails.user_updated_at)}</InfoRow>
+    </div>
+  );
+
+  const renderBookingStats = () => (
+    <div className="space-y-3">
+      <h3 className="text-sm font-bold text-slate-800">Thống kê đặt vé</h3>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Tổng số đơn" value={userDetails.total_bookings ?? 0} />
+        <StatTile label="Đơn đã thanh toán" value={userDetails.paid_bookings ?? 0} />
+        <StatTile label="Tổng chi tiêu" value={formatVnd(userDetails.total_spent ?? 0)} />
+        <StatTile
+          label="Đặt gần nhất"
+          value={<span className="text-sm">{userDetails.last_booking_at ? formatVnDateTime(userDetails.last_booking_at) : 'Chưa đặt'}</span>}
+        />
+      </div>
+      <p className="text-xs text-slate-500">Tổng số đơn gồm cả đơn chưa thanh toán và đã hủy. Tổng chi tiêu chỉ tính đơn đã thanh toán.</p>
+    </div>
+  );
+
+  const renderRecentBookings = () => {
+    const bookings: any[] = userDetails.recent_bookings || [];
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-slate-800">Đơn đặt vé gần đây</h3>
+        <div className={`${ADMIN_CARD} overflow-hidden`}>
+          {bookings.length === 0 ? (
+            <EmptyState title="Chưa có đơn đặt vé" />
+          ) : (
+            <Table>
+              <TableHeader className={ADMIN_TABLE_HEAD}>
+                <TableRow className="border-none hover:bg-transparent">
+                  <TableHead className={`${ADMIN_TH} py-2`}>Mã đơn</TableHead>
+                  <TableHead className={`${ADMIN_TH} py-2`}>Phim / gói vé</TableHead>
+                  <TableHead className={`${ADMIN_TH} py-2 text-center`}>Số vé</TableHead>
+                  <TableHead className={`${ADMIN_TH} py-2`}>Thanh toán</TableHead>
+                  <TableHead className={`${ADMIN_TH} py-2 text-center`}>Trạng thái</TableHead>
+                  <TableHead className={`${ADMIN_TH} py-2 text-right`}>Thành tiền</TableHead>
+                  <TableHead className={`${ADMIN_TH} py-2`}>Ngày đặt</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bookings.map((booking: any, row_no: number) => (
+                  <TableRow key={booking.booking_code || row_no} className="border-b border-slate-100">
+                    <TableCell className="font-mono text-xs text-slate-700">{booking.booking_code || '-'}</TableCell>
+                    <TableCell className="text-sm font-medium text-slate-900">
+                      {booking.movie_title || booking.ticket_package_name || 'Không xác định'}
+                    </TableCell>
+                    <TableCell className="text-center text-sm text-slate-700">{booking.ticket_count}</TableCell>
+                    <TableCell className="text-sm text-slate-600">{paymentMethodLabel(booking.payment_method)}</TableCell>
+                    <TableCell className="text-center">
+                      <StatusBadge status={booking.payment_status || 'unknown'} />
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-semibold text-slate-900">{formatVnd(booking.total_price ?? 0)}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{formatVnDateTime(booking.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+        <p className="text-xs text-slate-500">Hiển thị tối đa 10 đơn mới nhất, gồm cả đơn chưa thanh toán và đã hủy.</p>
+      </div>
+    );
+  };
+
+  const renderDetailBody = () => {
+    if (isLoadingDetails) return <InlineLoading />;
+    if (detailsError) {
+      return (
+        <div className="rounded-xl border border-red-100 bg-red-50 py-12 text-center text-sm font-semibold text-red-600">{detailsError}</div>
+      );
+    }
+    if (!userDetails) return <EmptyState title="Không tìm thấy thông tin chi tiết" />;
+    return (
+      <div className="space-y-6">
+        {renderAccountInfo()}
+        {renderBookingStats()}
+        {renderRecentBookings()}
+      </div>
+    );
+  };
+
+  const renderDetailLockButton = () => {
+    if (!canLock || !userDetails) return undefined;
+    const target = { id: Number(userDetails.id), fullname: userDetails.fullname, is_locked: !userDetails.is_active };
+    return userDetails.is_active ? (
+      <button type="button" className={LOCK_BUTTON_CLASS} onClick={() => openLockConfirm(target)}>
+        <Lock className="h-4 w-4" />
+        Khóa tài khoản
+      </button>
+    ) : (
+      <button type="button" className={UNLOCK_BUTTON_CLASS} onClick={() => openLockConfirm(target)}>
+        <LockOpen className="h-4 w-4" />
+        Mở khóa tài khoản
+      </button>
+    );
+  };
+
+  // LOCK / UNLOCK CONFIRMATION
+  const renderLockConfirm = () => {
+    const isUnlock = Boolean(lockTarget?.is_locked);
+    return (
+      <ConfirmDialog
+        open={Boolean(lockTarget)}
+        onOpenChange={(open) => {
+          if (!open && !isLockBusy) setLockTarget(null);
+        }}
+        variant={isUnlock ? 'restore' : 'warning'}
+        title={isUnlock ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+        confirmText={isUnlock ? 'Mở khóa' : 'Khóa tài khoản'}
+        busy={isLockBusy}
+        onConfirm={handleConfirmLock}
+        description={
+          isUnlock ? (
+            <span>
+              Mở khóa tài khoản của <strong>{lockTarget?.fullname}</strong>? Khách hàng sẽ đăng nhập và đặt vé được trở lại.
             </span>
-          </PaginationItem>
-          <PaginationItem>
-            <PaginationNext
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                setPage(Math.min(totalPages, currentPage + 1));
-              }}
-              aria-disabled={currentPage === totalPages}
-              className={
-                currentPage === totalPages
-                  ? 'pointer-events-none opacity-30'
-                  : 'cursor-pointer rounded-lg border shadow-sm'
-              }
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-[700px] rounded-xl p-0 overflow-hidden border border-gray-200 shadow-xl bg-white font-sans [&>button]:hidden">
-          <DialogTitle className="sr-only">Chi tiết người dùng</DialogTitle>
-          <div className="bg-white px-6 py-4 flex items-center justify-between border-b">
-            <div className="flex items-center gap-4">
-              {userDetails?.avatar ? (
-                <img
-                  src={userDetails.avatar}
-                  alt={`Ảnh đại diện của ${userDetails.fullname || 'người dùng'}`}
-                  className="w-12 h-12 rounded-full object-cover border border-blue-100"
+          ) : (
+            <span className="block space-y-3">
+              <span className="block">
+                Khóa tài khoản của <strong>{lockTarget?.fullname}</strong>? Khách hàng sẽ bị đăng xuất khỏi mọi thiết bị và không thể đăng
+                nhập cho đến khi được mở khóa.
+              </span>
+              <span className="block">
+                <label htmlFor="fmi_lock_reason" className="mb-1 block text-xs font-medium text-slate-700">
+                  Lý do khóa (không bắt buộc)
+                </label>
+                <Textarea
+                  id="fmi_lock_reason"
+                  value={lockReason}
+                  maxLength={LOCK_REASON_MAX_LENGTH}
+                  onChange={(e) => setLockReason(e.target.value)}
+                  placeholder="Ví dụ: Nghi ngờ gian lận thanh toán"
+                  rows={3}
+                  className="rounded-xl border-slate-300 text-sm"
                 />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl border border-blue-100">
-                  {userDetails?.fullname?.charAt(0).toUpperCase() || <User size={24} />}
-                </div>
-              )}
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-base font-semibold text-gray-900 tracking-tight leading-none">
-                    {userDetails?.fullname || 'Người dùng'}
-                  </h2>
-                </div>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsDetailsOpen(false)}
-              className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors mr-2"
-              title="Đóng"
-              aria-label="Đóng"
-            >
-              <X size={20} />
-            </Button>
-          </div>
+              </span>
+            </span>
+          )
+        }
+      />
+    );
+  };
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 max-h-[70vh]">
-            {isLoadingDetails ? (
-              <div className="flex items-center justify-center py-20">
-                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-              </div>
-            ) : detailsError ? (
-              <div className="text-center py-20 text-red-600 bg-red-50 rounded-xl border border-red-100 mx-4">
-                <p className="font-bold">{detailsError}</p>
-              </div>
-            ) : userDetails ? (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Basic Info */}
-                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <h3 className="text-xs font-semibold text-gray-500 border-b pb-2 flex items-center gap-2">
-                      <User size={14} className="text-blue-500" /> Thông tin cơ bản
-                    </h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[11px] text-slate-500 font-medium">Trạng thái</p>
-                        <Badge
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                            userDetails.is_active
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : 'bg-gray-100 text-gray-600 border-gray-200'
-                          }`}
-                        >
-                          {activeStatusLabel(userDetails.is_active)}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Họ tên</p>
-                        <p className="text-sm font-bold text-slate-900">{userDetails.fullname}</p>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Số điện thoại</p>
-                        <div className="flex items-center gap-1">
-                          <p className="text-sm font-bold text-slate-900 font-mono">{userDetails.phone || 'Chưa cập nhật'}</p>
-                          {userDetails.phone && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-slate-400 hover:text-slate-700"
-                              onClick={() => copyText(userDetails.phone, 'số điện thoại')}
-                              title="Sao chép số điện thoại"
-                              aria-label="Sao chép số điện thoại"
-                            >
-                              <Copy size={12} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Giới tính</p>
-                        <p className="text-sm text-slate-900">
-                          {userDetails.gender
-                            ? GENDER_LABELS[String(userDetails.gender).toLowerCase()] || userDetails.gender
-                            : 'Chưa cập nhật'}
-                        </p>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Ngày sinh</p>
-                        <p className="text-sm text-slate-900">
-                          {userDetails.dob ? formatVnDate(userDetails.dob) : 'Chưa cập nhật'}
-                        </p>
-                      </div>
-                      <div className="flex flex-col border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium mb-1">Email</p>
-                        <div className="flex items-center gap-1">
-                          <p className="text-sm font-bold text-blue-600 break-all">{userDetails.email}</p>
-                          {userDetails.email && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0 text-slate-400 hover:text-slate-700"
-                              onClick={() => copyText(userDetails.email, 'email')}
-                              title="Sao chép email"
-                              aria-label="Sao chép email"
-                            >
-                              <Copy size={12} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+  return (
+    <div className="space-y-4">
+      <PageHeader title="Quản lý người dùng" description={`Tổng cộng ${usersLength} người dùng trong hệ thống`} />
 
-                  {/* Account Info */}
-                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2 flex items-center gap-2">
-                      <RefreshCw size={14} className="text-blue-500" /> Tài khoản
-                    </h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[11px] text-slate-500 font-medium">Loại đăng nhập</p>
-                        <Badge
-                          variant="outline"
-                          className="text-xs font-medium border-gray-300 text-gray-600 uppercase px-3 py-1"
-                        >
-                          {getLoginTypeLabel(userDetails.login_type)}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Ngày tạo tài khoản</p>
-                        <p className="text-[11px] font-mono text-slate-700">
-                          {userDetails.account_created_at ? formatDateTime(userDetails.account_created_at) : ''}
-                        </p>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Ngày tạo hồ sơ</p>
-                        <p className="text-[11px] font-mono text-slate-700">
-                          {formatDateTime(userDetails.user_created_at)}
-                        </p>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Cập nhật lần cuối</p>
-                        <p className="text-[11px] font-mono text-slate-700">
-                          {formatDateTime(userDetails.user_updated_at)}
-                        </p>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Tạo bởi</p>
-                        <p className="text-[11px] font-mono text-slate-700">
-                          {userDetails.created_by_staff_name || '-'}
-                        </p>
-                      </div>
-                      <div className="flex justify-between items-center border-t pt-2 border-slate-50">
-                        <p className="text-[11px] text-slate-500 font-medium">Cập nhật bởi</p>
-                        <p className="text-[11px] font-mono text-slate-700">
-                          {userDetails.updated_by_staff_name || '-'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {renderToolbar()}
 
-                {/* Booking Stats */}
-                <div className="bg-blue-600 rounded-xl p-5 text-white shadow-lg shadow-blue-200 relative overflow-hidden">
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xs font-semibold text-gray-500 border-b pb-2 flex items-center gap-2">
-                        <TrendingUp size={14} className="text-green-500" /> Thống kê đặt vé
-                      </h3>
-                      <p className="text-sm opacity-60">Tổng số đơn đã tạo (cả chưa thanh toán và đã hủy)</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-4xl font-black">{userDetails.total_bookings}</p>
-                      <p className="text-xs font-medium tracking-tight opacity-70 mt-1">
-                        Đã thanh toán: {userDetails.paid_bookings ?? 0}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="absolute -right-4 -bottom-4 opacity-10 w-24 h-24 rotate-12">
-                    <TrendingUp size={96} />
-                  </div>
-                </div>
+      <div className={`${ADMIN_CARD} overflow-hidden`}>{renderTable()}</div>
 
-                {userDetails.recent_bookings && userDetails.recent_bookings.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold text-gray-500 border-b pb-2 flex items-center gap-2">
-                      <Eye size={14} className="text-blue-500" /> Đơn đặt vé gần đây (tối đa 10 đơn, gồm cả chưa thanh toán và đã hủy)
-                    </h3>
-                    <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                      {userDetails.recent_bookings.map((booking: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="bg-white border border-slate-100 rounded-xl p-4 hover:shadow-md transition-shadow"
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="space-y-1">
-                              <p className="font-bold text-slate-900 leading-tight">
-                                {booking.movie_title || booking.ticket_package_name || 'Không xác định'}
-                              </p>
-                              <div className="flex items-center gap-2 text-[11px] text-slate-500 font-bold uppercase">
-                                <span>{booking.ticket_count} vé</span>
-                                <span>•</span>
-                                <span>{paymentMethodLabel(booking.payment_method)}</span>
-                              </div>
-                            </div>
-                            <Badge
-                              className={`text-xs font-medium px-2 py-0.5 rounded shadow-none border-none ${
-                                getPaymentStatusStyle(booking.payment_status).className
-                              }`}
-                            >
-                              {getPaymentStatusStyle(booking.payment_status).label}
-                            </Badge>
-                          </div>
-                          <div className="flex justify-between items-center border-t border-slate-50 pt-3">
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {formatDateTime(booking.created_at)}
-                            </span>
-                            <span className="text-sm font-black text-slate-900">
-                              {booking.total_price?.toLocaleString('vi-VN') || '0'} đ
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="py-20 text-center text-slate-400">Không tìm thấy thông tin chi tiết</div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AdminPagination page={currentPage} totalPages={totalPages} onPageChange={setPage} totalLabel={`${usersLength} người dùng`} />
+
+      <AdminDialog
+        open={isDetailsOpen}
+        onClose={handleCloseDetails}
+        mode="view"
+        size="lg"
+        icon={<User className="h-5 w-5" />}
+        title={userDetails?.fullname || 'Chi tiết người dùng'}
+        subtitle="Thông tin tài khoản khách hàng"
+        titleExtra={userDetails ? <StatusBadge status={userDetails.is_active ? 'active' : 'locked'} /> : undefined}
+        footer={<AdminDialogFooter onCancel={handleCloseDetails} cancelText={ADMIN_TEXT.close} leading={renderDetailLockButton()} />}
+      >
+        {renderDetailBody()}
+      </AdminDialog>
+
+      {renderLockConfirm()}
     </div>
   );
 }

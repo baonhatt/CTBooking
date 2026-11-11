@@ -5,10 +5,7 @@ import { getTickets, deleteTicketApi, getAdminBranchOptions, getTicketById } fro
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { notify } from '@/components/admin/common/notify';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 
 interface TicketPackage {
@@ -154,7 +151,7 @@ export default function TicketsPage() {
       setTotal(total);
     } catch (error: any) {
       // Show the reason instead of leaving the previous list as if nothing happened
-      toast.error('Không tải được danh sách gói vé', { description: error?.message });
+      notify.error(error, 'Không tải được danh sách gói vé');
     } finally {
       setIsLoading(false);
     }
@@ -204,12 +201,12 @@ export default function TicketsPage() {
     if (!ticketToDelete) return;
     try {
       await deleteTicketApi(ticketToDelete.id);
-      toast.success('Xóa gói vé thành công');
+      notify.deleted('gói vé');
       setIsDeleteDialogOpen(false);
       setTicketToDelete(null);
       handleRefresh();
     } catch (err: any) {
-      toast.error(err.message || 'Xóa gói vé thất bại');
+      notify.error(err, 'Xóa gói vé thất bại');
     }
   };
 
@@ -267,19 +264,23 @@ export default function TicketsPage() {
         isOpen={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         description={
-          <div className="space-y-2">
-            <p>Bạn có chắc chắn muốn xóa gói vé "{ticketToDelete?.name}"?</p>
-            {ticketBookingCount === null && <p className="text-slate-400">Đang kiểm tra số đơn đang dùng gói này...</p>}
+          <span className="block space-y-2">
+            <span className="block">Bạn có chắc chắn muốn xóa gói vé "{ticketToDelete?.name}"?</span>
+            {ticketBookingCount === null && (
+              <span className="block text-slate-400">Đang kiểm tra số đơn đang dùng gói này...</span>
+            )}
             {ticketBookingCount !== null && ticketBookingCount > 0 && (
-              <p className="rounded-lg border border-red-200 bg-red-50 p-3 font-medium text-red-700">
+              <span className="block rounded-lg border border-red-200 bg-red-50 p-3 font-medium text-red-700">
                 Gói này đang có {ticketBookingCount} đơn đặt nên không thể xóa. Hãy tắt gói (chuyển sang "Ngừng hoạt động")
                 để khách không mua được nữa.
-              </p>
+              </span>
             )}
             {ticketBookingCount === 0 && (
-              <p>Gói chưa có đơn nào. Sau khi xóa, gói nằm trong danh sách đã xóa và có thể khôi phục.</p>
+              <span className="block">
+                Gói chưa có đơn nào. Sau khi xóa, gói nằm trong danh sách đã xóa và có thể khôi phục.
+              </span>
             )}
-          </div>
+          </span>
         }
         confirmDisabled={ticketBookingCount === null || ticketBookingCount > 0}
         onConfirm={confirmDelete}

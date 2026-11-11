@@ -709,14 +709,7 @@ export const AdminGate = () => {
 
         <Route
           path="/profile"
-          element={
-            <ProfilePage
-              active="profile"
-              setActive={() => {}}
-              adminEmailState={staff?.email || ''}
-              handleLogout={handleLogout}
-            />
-          }
+          element={<ProfilePage />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

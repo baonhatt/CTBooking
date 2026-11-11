@@ -34,7 +34,8 @@ export const ACTIONS = [
   'toggle_status',
   'scan',
   'validate',
-  'history'
+  'history',
+  'lock'
 ];
 
 export const MODULE_LABELS: Record<string, string> = {
@@ -73,7 +74,8 @@ export const ACTION_LABELS: Record<string, string> = {
   toggle_status: 'Bật/tắt trạng thái',
   scan: 'Quét vé',
   validate: 'Xác nhận vé',
-  history: 'Lịch sử check-in'
+  history: 'Lịch sử check-in',
+  lock: 'Khóa / mở khóa tài khoản'
 };
 
 // Khớp requirePermission trong worker/src/index.ts + route/guard trên client
@@ -81,7 +83,7 @@ export const APPLICABLE_ACTIONS: Record<string, string[]> = {
   staff: ['view', 'create', 'edit', 'delete', 'reset_password', 'view_deleted', 'restore'],
   roles: ['view', 'create', 'edit', 'delete', 'view_deleted', 'restore'],
   dashboard: ['view', 'view_revenue'],
-  users: ['view', 'view_detail'],
+  users: ['view', 'view_detail', 'lock'],
   movies: ['view', 'create', 'edit', 'delete', 'toggle_status', 'view_deleted', 'restore'],
   showtimes: ['view', 'create', 'edit', 'delete'],
   toys: ['view', 'create', 'edit', 'delete', 'view_deleted', 'restore'],

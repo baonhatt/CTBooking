@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { request } from '@/lib/api/http';
 import { useStaffPermission } from '@/hooks/useStaffPermission';
-import { toast } from 'sonner';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_PRIMARY, ADMIN_CARD, ADMIN_INPUT, ADMIN_TEXT } from '@/components/admin/common/adminTokens';
 
 // ====================================================================================================================
 // TYPES AND CONSTANTS
@@ -97,7 +100,7 @@ function OtpCard({ title, description, savedConfig, canEdit, isSaving, onSave }:
   const fieldPrefix = `fmi_${useId()}_`;
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+    <section className={ADMIN_CARD}>
       <div className="flex items-start justify-between gap-4 p-5 border-b border-slate-100">
         <div>
           <h2 className="text-base font-bold text-slate-900">{title}</h2>
@@ -133,7 +136,7 @@ function OtpCard({ title, description, savedConfig, canEdit, isSaving, onSave }:
                 value={draft[field.key]}
                 disabled={!canEdit}
                 onChange={(event) => setDraft({ ...draft, [field.key]: event.target.value })}
-                className={`w-28 ${errors[field.key] ? 'border-red-400' : ''}`}
+                className={`w-28 ${ADMIN_INPUT} ${errors[field.key] ? 'border-red-400' : ''}`}
               />
               <span className="text-sm text-slate-500">{field.unit}</span>
             </div>
@@ -142,14 +145,14 @@ function OtpCard({ title, description, savedConfig, canEdit, isSaving, onSave }:
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-slate-100 bg-slate-50/60 rounded-b-2xl">
+      <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-slate-100 bg-slate-50/60 rounded-b-xl">
         {isDirty && <span className="text-xs text-amber-600">Có thay đổi chưa lưu</span>}
         <button
           onClick={handleSave}
           disabled={!isDirty || isSaving || !canEdit}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`${ADMIN_BTN_PRIMARY} disabled:opacity-40 disabled:cursor-not-allowed`}
         >
-          {isSaving ? 'Đang lưu...' : 'Lưu'}
+          {isSaving ? 'Đang lưu...' : ADMIN_TEXT.save}
         </button>
       </div>
     </section>
@@ -172,6 +175,8 @@ export default function SettingsPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [savingKey, setSavingKey] = useState<'staff' | 'customer' | null>(null);
+  // Two-factor toggle waiting for the user's confirmation
+  const [pendingToggle, setPendingToggle] = useState<{ kind: 'staff' | 'customer'; config: OtpConfig; message: string } | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -195,7 +200,7 @@ export default function SettingsPage() {
   };
 
   // Saves one card only: the server takes each config under its own key
-  const saveConfig = async (kind: 'staff' | 'customer', nextConfig: OtpConfig) => {
+  const requestSave = (kind: 'staff' | 'customer', nextConfig: OtpConfig) => {
     if (!canManageSettings || !isLoaded) return;
     const savedConfig = kind === 'staff' ? staffConfig : customerConfig;
 
@@ -211,22 +216,27 @@ export default function SettingsPage() {
           ? 'Bật xác thực OTP cho khách hàng? Khách sẽ nhận mã OTP qua email khi đăng nhập.'
           : 'Tắt xác thực OTP cho khách hàng?';
       }
-      if (!window.confirm(message)) return;
+      setPendingToggle({ kind, config: nextConfig, message });
+      return;
     }
+    void saveConfig(kind, nextConfig);
+  };
 
+  const saveConfig = async (kind: 'staff' | 'customer', nextConfig: OtpConfig) => {
+    if (!canManageSettings || !isLoaded) return;
     setSavingKey(kind);
     try {
       await request('/api/admin/settings', {
         method: 'POST',
         body: JSON.stringify(kind === 'staff' ? { admin_otp_settings: nextConfig } : { otp_settings: nextConfig })
       });
-      toast.success('Đã lưu cấu hình thành công!');
+      notify.success('Đã lưu cấu hình thành công');
       if (kind === 'staff') setStaffConfig(nextConfig);
       else setCustomerConfig(nextConfig);
     } catch (err: any) {
       console.error('Failed to save admin settings:', err);
       // The server says why a value was refused (for example a number outside its range)
-      toast.error(err?.message || 'Có lỗi xảy ra khi lưu cấu hình');
+      notify.error(err, 'Có lỗi xảy ra khi lưu cấu hình');
     } finally {
       setSavingKey(null);
     }
@@ -246,12 +256,10 @@ export default function SettingsPage() {
       handleLogout={handleLogout}
     >
       <div className="max-w-3xl mx-auto space-y-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Cấu hình hệ thống</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Xác thực OTP khi đăng nhập. Thay đổi áp dụng ngay cho các mã OTP tạo sau đó.
-          </p>
-        </div>
+        <PageHeader
+          title="Cấu hình hệ thống"
+          description="Xác thực OTP khi đăng nhập. Thay đổi áp dụng ngay cho các mã OTP tạo sau đó."
+        />
 
         {loadFailed && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between gap-3">
@@ -268,7 +276,7 @@ export default function SettingsPage() {
           savedConfig={staffConfig}
           canEdit={canManageSettings && isLoaded}
           isSaving={savingKey === 'staff'}
-          onSave={(config) => saveConfig('staff', config)}
+          onSave={(config) => requestSave('staff', config)}
         />
 
         <OtpCard
@@ -277,9 +285,25 @@ export default function SettingsPage() {
           savedConfig={customerConfig}
           canEdit={canManageSettings && isLoaded}
           isSaving={savingKey === 'customer'}
-          onSave={(config) => saveConfig('customer', config)}
+          onSave={(config) => requestSave('customer', config)}
         />
       </div>
+
+      <ConfirmDialog
+        open={pendingToggle !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingToggle(null);
+        }}
+        variant="warning"
+        title="Thay đổi xác thực 2 lớp"
+        description={pendingToggle?.message}
+        confirmText="Xác nhận"
+        onConfirm={() => {
+          const toggle = pendingToggle;
+          setPendingToggle(null);
+          if (toggle) void saveConfig(toggle.kind, toggle.config);
+        }}
+      />
     </AdminLayout>
   );
 }

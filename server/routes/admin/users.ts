@@ -1,4 +1,6 @@
-import { eq, or, desc, count, sql, and } from 'drizzle-orm';
+import { eq, or, desc, count, sql, and, inArray } from 'drizzle-orm';
+import { formatDateForDb } from '../../lib/date-utils';
+import { logAuditAction } from '../../lib/audit-logger';
 
 export async function getUsersImpl(
   anyDb: any,
@@ -136,6 +138,15 @@ export async function getUserByIdImpl(
     .select({ count: count() })
     .from(tables.bookings)
     .where(and(eq(tables.bookings.user_id, id), eq(tables.bookings.payment_status, 'paid')));
+  // Money the customer really paid, and the time of the latest order (any status)
+  const [paidTotalRow] = await anyDb
+    .select({ total: sql<number>`coalesce(sum(${tables.bookings.total_price}), 0)` })
+    .from(tables.bookings)
+    .where(and(eq(tables.bookings.user_id, id), eq(tables.bookings.payment_status, 'paid')));
+  const [lastBookingRow] = await anyDb
+    .select({ lastAt: sql<string | null>`max(${tables.bookings.created_at})` })
+    .from(tables.bookings)
+    .where(eq(tables.bookings.user_id, id));
   const bookings = bookingsdata.map((row: any) => {
     return {
       ...row.booking,
@@ -158,6 +169,7 @@ export async function getUserByIdImpl(
     user_updated_at: user.updated_at,
     recent_bookings: bookings.map((b: any) => ({
       id: b.id,
+      booking_code: b.booking_code || '',
       movie_title: b.movie?.title || '',
       ticket_package_name: b.ticket_package?.name || '',
       ticket_count: b.ticket_count,
@@ -168,9 +180,72 @@ export async function getUserByIdImpl(
     })),
     total_bookings: Number(totalBookingsRow?.count || 0),
     paid_bookings: Number(paidBookingsRow?.count || 0),
+    total_spent: Number(paidTotalRow?.total || 0),
+    last_booking_at: lastBookingRow?.lastAt || null,
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null
   };
 
   return mapped;
+}
+
+// Lock or unlock a customer: sets accounts.is_active for every account of the user.
+// Locking also deletes the user's tokens so every session ends at once. The reason goes into the audit log.
+export async function setUserActiveImpl(
+  anyDb: any,
+  tables: { users: any; accounts: any; tokens: any; auditLogs: any },
+  id: number,
+  isActive: boolean,
+  reason: string,
+  staffInfo: { id: number; email: string; fullname: string }
+) {
+  const user = await anyDb.query.users.findFirst({
+    where: eq(tables.users.id, id),
+    with: { accounts: true }
+  });
+  if (!user || !user.accounts || user.accounts.length === 0) {
+    const err: any = new Error('Không tìm thấy khách hàng');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const accountIds: number[] = user.accounts.map((account: any) => account.id);
+  const wasActive = user.accounts.some((account: any) => account.is_active !== false);
+  const cleanReason = String(reason || '').trim().slice(0, 500);
+
+  await anyDb
+    .update(tables.accounts)
+    .set({ is_active: isActive, updated_at: formatDateForDb(new Date()) })
+    .where(inArray(tables.accounts.id, accountIds));
+
+  if (!isActive) {
+    await anyDb.delete(tables.tokens).where(inArray(tables.tokens.account_id, accountIds));
+  }
+
+  const customerName = user.fullname || user.accounts[0]?.email || '';
+  const newValues: Record<string, unknown> = {
+    fullname: customerName,
+    email: user.accounts[0]?.email || '',
+    is_active: isActive
+  };
+  if (cleanReason) newValues.reason = cleanReason;
+  await logAuditAction(
+    anyDb,
+    tables.auditLogs,
+    isActive ? 'unlock' : 'lock',
+    'user',
+    id,
+    `${isActive ? 'Mở khóa' : 'Khóa'} tài khoản khách hàng: ${customerName}${cleanReason ? ` - Lý do: ${cleanReason}` : ''}`,
+    staffInfo.id,
+    staffInfo.email,
+    staffInfo.fullname,
+    JSON.stringify({ fullname: customerName, email: user.accounts[0]?.email || '', is_active: wasActive }),
+    JSON.stringify(newValues)
+  );
+
+  return {
+    status: 'success',
+    message: isActive ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản',
+    is_active: isActive
+  };
 }

@@ -14,6 +14,9 @@ import {
   LOCKED_MESSAGE
 } from '../../lib/login-throttle';
 
+// Shown when a staff member has locked the customer account (accounts.is_active = false)
+export const ACCOUNT_LOCKED_MESSAGE = 'Tài khoản đã bị khóa, vui lòng liên hệ hỗ trợ';
+
 export async function loginImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Login>) {
   const email = payload.email || '';
   const password = payload.password || '';
@@ -26,6 +29,10 @@ export async function loginImpl(anyDb: any, tables: { accounts: any; users: any 
   const isPasswordValid = await bcrypt.compare(password, useracc.password || '');
   if (!isPasswordValid) {
     return { status: 400, message: 'Mật khẩu không đúng!' };
+  }
+  // Locked accounts cannot sign in (checked after the password so the lock state is not leaked to strangers)
+  if (useracc.is_active === false) {
+    return { status: 403, message: ACCOUNT_LOCKED_MESSAGE };
   }
   const user = await anyDb.query.users.findFirst({
     where: eq(tables.users.id, useracc.user_id)
@@ -60,6 +67,10 @@ export async function loginWithSessionImpl(
   const isPasswordValid = await bcrypt.compare(password, useracc.password || '');
   if (!isPasswordValid) {
     return { status: 400, message: 'Mật khẩu không đúng!' };
+  }
+  // Locked accounts cannot sign in (checked after the password so the lock state is not leaked to strangers)
+  if (useracc.is_active === false) {
+    return { status: 403, message: ACCOUNT_LOCKED_MESSAGE };
   }
   const user = await anyDb.query.users.findFirst({
     where: eq(tables.users.id, useracc.user_id)
@@ -120,7 +131,7 @@ export async function validateSessionTokenImpl(
   anyDb: any,
   tables: { tokens: any },
   token: string
-): Promise<{ valid: boolean; accountId?: number; userId?: number }> {
+): Promise<{ valid: boolean; accountId?: number; userId?: number; locked?: boolean }> {
   if (!token) return { valid: false };
 
   const tokenRecord = await anyDb.query.tokens.findFirst({
@@ -139,6 +150,11 @@ export async function validateSessionTokenImpl(
       await anyDb.delete(tables.tokens).where(eq(tables.tokens.id, tokenRecord.id));
       return { valid: false };
     }
+  }
+
+  // A locked account has no valid session (its tokens are also deleted when the account is locked)
+  if (tokenRecord.account?.is_active === false) {
+    return { valid: false, locked: true };
   }
 
   return {
@@ -164,6 +180,9 @@ export async function validateOTPImpl(
   });
   if (!useracc) {
     return { status: 404, message: 'Tài khoản không tồn tại!' };
+  }
+  if (useracc.is_active === false) {
+    return { status: 403, message: ACCOUNT_LOCKED_MESSAGE };
   }
 
   // Wrong codes are limited per account (max_otp_attempts from the settings), so a 6-digit code cannot be guessed
@@ -222,6 +241,9 @@ export async function resendOTPImpl(
   });
   if (!useracc) {
     return { status: 404, message: 'Tài khoản không tồn tại!' };
+  }
+  if (useracc.is_active === false) {
+    return { status: 403, message: ACCOUNT_LOCKED_MESSAGE };
   }
 
   const user = await anyDb.query.users.findFirst({

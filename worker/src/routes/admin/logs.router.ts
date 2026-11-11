@@ -8,7 +8,7 @@ import { getRestrictBranchIds } from './admin-helpers';
 
 import { getEmailLogsImpl } from '../../../../server/routes/admin/email-logs';
 import { getAuditLogsImpl } from '../../../../server/lib/audit-logger';
-import { getUsersImpl, getUserByIdImpl } from '../../../../server/routes/admin/users';
+import { getUsersImpl, getUserByIdImpl, setUserActiveImpl } from '../../../../server/routes/admin/users';
 import { getEmailPreviewImpl } from '../../../../server/routes/admin/email-preview';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const logsRouter = new Hono<{ Bindings: any; Variables: Variables }>();
@@ -114,6 +114,35 @@ logsRouter.get('/api/admin/users/:id', requireStaffAuth, requirePermission('user
   }
 });
 
+
+// PATCH /api/admin/users/:id/active - lock or unlock a customer account. Body: { is_active: boolean, reason?: string }
+logsRouter.patch('/api/admin/users/:id/active', requireStaffAuth, requirePermission('users', 'lock'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id) || id <= 0) return c.json({ status: 'error', message: 'Mã khách hàng không hợp lệ' }, 400);
+
+    const body: any = await c.req.json().catch(() => ({}));
+    if (typeof body?.is_active !== 'boolean') {
+      return c.json({ status: 'error', message: 'Thiếu trạng thái tài khoản (is_active)' }, 400);
+    }
+
+    const db = drizzle(c.env.cinema_db, { schema });
+
+    const r = await setUserActiveImpl(
+      db,
+      { users: schema.users, accounts: schema.accounts, tokens: schema.tokens, auditLogs: schema.auditLogs },
+      id,
+      body.is_active,
+      String(body.reason || ''),
+      { id: c.get('staffId') as number, email: c.get('staffEmail') as string, fullname: c.get('staffFullname') as string }
+    );
+
+    return c.json(r);
+  } catch (err: any) {
+    const errStatus = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, errStatus as any);
+  }
+});
 
 
 // ============================================================

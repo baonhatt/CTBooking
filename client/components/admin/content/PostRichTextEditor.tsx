@@ -43,13 +43,40 @@ import {
 } from 'ckeditor5';
 import 'ckeditor5/ckeditor5.css';
 import { uploadAdminImage, uploadDirectToCloudinary } from '@/lib/api/uploads';
-import { toast } from 'sonner';
+import { notify } from '@/components/admin/common/notify';
 
 type PostRichTextEditorProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
 };
+
+// Editor frame: card look + toolbar buttons of one size/radius, blue when active (same as the admin buttons)
+const EDITOR_FRAME_CLASS = [
+  'mb-2 post-editor-scroll rounded-xl border border-slate-200 bg-white shadow-sm',
+  // Frame and content area
+  '[&_.ck.ck-editor]:border-0',
+  '[&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[300px]',
+  '[&_.ck.ck-editor__main>.ck-editor__editable]:border-0',
+  '[&_.ck.ck-editor__main>.ck-editor__editable]:px-4',
+  '[&_.ck.ck-editor__main>.ck-editor__editable]:py-3',
+  '[&_.ck.ck-editor__main>.ck-editor__editable]:text-sm',
+  '[&_.ck.ck-editor__main>.ck-editor__editable]:leading-6',
+  '[&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full [&_.ck-content_.image>img]:h-auto',
+  // Toolbar bar
+  '[&_.ck.ck-top_.ck-sticky-panel_.ck-toolbar]:border-0',
+  '[&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50',
+  '[&_.ck.ck-toolbar]:p-1.5 [&_.ck.ck-toolbar]:rounded-t-xl',
+  // Toolbar buttons: same height, radius and text colour
+  '[&_.ck.ck-toolbar_.ck-button]:min-h-8 [&_.ck.ck-toolbar_.ck-button]:rounded-lg',
+  '[&_.ck.ck-toolbar_.ck-button]:text-slate-600',
+  '[&_.ck.ck-toolbar_.ck-button:not(.ck-disabled):hover]:bg-slate-200/70',
+  // Active state: blue
+  '[&_.ck.ck-toolbar_.ck-button.ck-on]:bg-blue-50 [&_.ck.ck-toolbar_.ck-button.ck-on]:text-blue-700',
+  '[&_.ck.ck-toolbar_.ck-button.ck-on:not(.ck-disabled):hover]:bg-blue-100',
+  // Separators
+  '[&_.ck.ck-toolbar__separator]:bg-slate-300'
+].join(' ');
 
 function normalizeInitialContent(value?: string) {
   if (!value) return '';
@@ -236,7 +263,7 @@ export function PostRichTextEditor({ value, onChange, disabled }: PostRichTextEd
 
   return (
     <div>
-      <div className=" mb-2 post-editor-scroll rounded-xl border border-slate-200 bg-white shadow-sm [&_.ck.ck-editor]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:min-h-[300px] [&_.ck.ck-editor__main>.ck-editor__editable]:border-0 [&_.ck.ck-editor__main>.ck-editor__editable]:px-4 [&_.ck.ck-editor__main>.ck-editor__editable]:py-3 [&_.ck.ck-editor__main>.ck-editor__editable]:text-sm [&_.ck.ck-editor__main>.ck-editor__editable]:leading-6 [&_.ck.ck-top_.ck-sticky-panel_.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-0 [&_.ck.ck-toolbar]:border-b [&_.ck.ck-toolbar]:border-slate-200 [&_.ck.ck-toolbar]:bg-slate-50 [&_.ck-content_.image>img]:rounded-xl [&_.ck-content_.image>img]:max-w-full [&_.ck-content_.image>img]:h-auto">
+      <div className={EDITOR_FRAME_CLASS}>
         <CKEditor
           editor={ClassicEditor}
           disabled={disabled}
@@ -255,12 +282,10 @@ export function PostRichTextEditor({ value, onChange, disabled }: PostRichTextEd
               adapter.upload = async () => {
                 try {
                   const result = await originalUpload();
-                  toast.success('Đã chèn ảnh vào nội dung');
+                  notify.success('Đã chèn ảnh vào nội dung');
                   return result;
                 } catch (error: any) {
-                  toast.error('Lỗi tải ảnh lên', {
-                    description: error?.message || 'Không thể tải ảnh lên'
-                  });
+                  notify.error(error, 'Không thể tải ảnh lên');
                   throw error;
                 } finally {
                   setIsUploadingImage(false);

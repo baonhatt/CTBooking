@@ -4,19 +4,10 @@ import AdminLayout from '@/admin/layouts/AdminLayout';
 import MoviesContent from '@/components/admin/content/MoviesContent';
 import { useStaffPermission, useStaffBranchIds } from '@/hooks/useStaffPermission';
 import { MovieEditModal } from '@/components/admin/dialogs/MovieEditModal';
-import { toast } from 'sonner';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { notify } from '@/components/admin/common/notify';
 
 export default function MoviesPage() {
   const navigate = useNavigate();
@@ -62,6 +53,7 @@ export default function MoviesPage() {
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [movieToDelete, setMovieToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load branches accessible by staff (always, not just canViewBranches)
   useEffect(() => {
@@ -223,14 +215,10 @@ export default function MoviesPage() {
         [String(id)]: newStatus ? 'active' : 'inactive'
       }));
 
-      toast.success(response.status == 'success' ? 'Thành công' : 'Thất bại', {
-        description: response.message
-      });
+      if (response.status == 'success') notify.success(newStatus ? 'Đã kích hoạt phim' : 'Đã ngừng hoạt động phim', response.message);
+      else notify.error(response.message || 'Cập nhật trạng thái thất bại');
     } catch (e: any) {
-      toast.error('Lỗi', {
-        description: e?.message || 'Có lỗi xảy ra'
-      });
-    } finally {
+      notify.error(e);
     }
   };
   const handleDelete = (id: number) => {
@@ -239,17 +227,16 @@ export default function MoviesPage() {
   };
   const handleConfirmDelete = async () => {
     if (!movieToDelete) return;
+    setIsDeleting(true);
     try {
       await deleteMovieApi(movieToDelete);
-      toast.success('Thành công', {
-        description: 'Phim đã được xóa'
-      });
+      notify.deleted('phim');
       setDeleteDialogOpen(false);
       handleRefresh();
     } catch (e: any) {
-      toast.error('Lỗi', {
-        description: e?.message || 'Có lỗi xảy ra'
-      });
+      notify.error(e);
+    } finally {
+      setIsDeleting(false);
     }
   };
   const handleLogout = () => {
@@ -305,20 +292,15 @@ export default function MoviesPage() {
         branchesProp={branches}
         onRefresh={handleRefresh}
       />
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa phim</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa phim này? Hành động này không thể hoàn tác.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>Xóa</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => !isDeleting && setDeleteDialogOpen(open)}
+        variant="danger"
+        title="Xác nhận xóa phim"
+        description="Bạn có chắc chắn muốn xóa phim này? Phim sẽ được chuyển vào danh sách phim đã xóa."
+        busy={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </AdminLayout>
   );
 }

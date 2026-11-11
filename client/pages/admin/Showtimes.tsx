@@ -4,7 +4,7 @@ import ShowtimesContent, { type BranchesStatus } from '@/components/admin/conten
 import { getShowtimesAdmin, getAdminBranchOptions } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '@/components/admin/common/notify';
 import type { ShowtimeItem } from '@/lib/api/showtimes';
 
 export default function ShowtimesPage() {
@@ -60,7 +60,7 @@ export default function ShowtimesPage() {
     } catch (error) {
       console.error('Error loading branches:', error);
       setBranchesStatus('error');
-      toast.error('Không tải được danh sách chi nhánh');
+      notify.error('Không tải được danh sách chi nhánh');
     }
   }, [loadSchedules]);
 
@@ -75,7 +75,7 @@ export default function ShowtimesPage() {
       setFailedBranchIds((prev) => prev.filter((id) => id !== branchId));
     } catch (err: any) {
       setFailedBranchIds((prev) => (prev.includes(branchId) ? prev : [...prev, branchId]));
-      toast.error(err.message || 'Không tải được lịch chiếu');
+      notify.error(err, 'Không tải được lịch chiếu');
     }
   }, []);
 

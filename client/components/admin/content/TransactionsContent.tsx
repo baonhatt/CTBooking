@@ -1,21 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -23,20 +9,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { getTransactionById, getTransactions, exportTransactions } from '@/lib/api';
+import { getTransactionById, exportTransactions } from '@/lib/api';
 import { EMPTY_VALUE, formatVnd, formatVnDateTime, paymentMethodLabel } from '@/lib/format';
 import { exportTransactionsData } from '@/lib/exportUtils';
 import {
-  CheckCircle2,
   CheckCheck,
   CheckIcon,
   Clock,
   Copy,
   TicketIcon,
-  Timer,
   UserIcon,
-  X,
-  XCircle,
   Search,
   Loader2,
   RefreshCw,
@@ -46,12 +28,27 @@ import {
   Gamepad2,
   Film,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Tag
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge, type StatusTone } from '@/components/admin/common/StatusBadge';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton, InlineLoading } from '@/components/admin/common/EmptyState';
+import { notify } from '@/components/admin/common/notify';
+import {
+  ADMIN_BTN_PRIMARY,
+  ADMIN_BTN_OUTLINE,
+  ADMIN_CARD,
+  ADMIN_TABLE_HEAD,
+  ADMIN_TH,
+  ADMIN_TEXT
+} from '@/components/admin/common/adminTokens';
 import {
   parseApplicableIds,
   isLineDiscounted,
@@ -189,20 +186,24 @@ const parsePackageName = (name: string, t?: Tx) => {
   );
 };
 
-// Page numbers to show: first, last, and two either side of the current page, with 'gap' for skipped runs
-const getPageWindow = (currentPage: number, totalPages: number): Array<number | 'gap'> => {
-  const pageNumbers: Array<number | 'gap'> = [];
-  let previousShown = 0;
-  for (let pageNo = 1; pageNo <= totalPages; pageNo++) {
-    const isEdge = pageNo === 1 || pageNo === totalPages;
-    const isNearCurrent = Math.abs(pageNo - currentPage) <= 2;
-    if (!isEdge && !isNearCurrent) continue;
-    if (pageNo - previousShown > 1) pageNumbers.push('gap');
-    pageNumbers.push(pageNo);
-    previousShown = pageNo;
+// Status shown in the list: payment status first, then the ticket use state of a paid order
+const getTxListStatus = (tx: Tx): { text: string; tone: StatusTone } => {
+  if (tx.paymentStatus === 'expired') return { text: 'Đã hết hạn', tone: 'neutral' };
+  if (tx.paymentStatus === 'failed' || tx.paymentStatus === 'cancelled') return { text: 'Đã hủy', tone: 'danger' };
+  if (tx.paymentStatus === 'pending') return { text: 'Chờ thanh toán', tone: 'warning' };
+  if (tx.paymentStatus === 'paid') {
+    if (tx.is_used) return { text: 'Đã sử dụng', tone: 'info' };
+    if (tx.expired) return { text: 'Đã quá hạn', tone: 'warning' };
+    return { text: 'Đang đợi dùng', tone: 'success' };
   }
-  return pageNumbers;
+  return { text: 'Không rõ', tone: 'neutral' };
 };
+
+const FILTER_SELECT_CLASS =
+  'h-10 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20';
+
+const ICON_BUTTON_CLASS =
+  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:bg-slate-50 active:scale-95';
 
 interface Props {
   data: Tx[];
@@ -356,20 +357,6 @@ export default function TransactionsContent({
     </div>
   );
 
-  const TicketStatusBadge = ({ paymentStatus, isUsed }) => {
-    if (paymentStatus === 'pending') {
-      return (
-        <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 py-1">
-          <span className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse" /> CHỜ THANH TOÁN
-        </Badge>
-      );
-    }
-    if (isUsed) {
-      return <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-1 font-bold">ĐÃ SỬ DỤNG</Badge>;
-    }
-    return <Badge className="bg-green-100 text-green-700 border-green-200 py-1 font-bold">SẴN SÀNG SỬ DỤNG</Badge>;
-  };
-
   // One date format for the whole screen, always in Vietnam time
   const formatDate = (date) => formatVnDateTime(date);
   const CopyableText = ({ text, label }: { text: string; label?: string }) => {
@@ -380,18 +367,18 @@ export default function TransactionsContent({
       try {
         await navigator.clipboard.writeText(text);
         setCopied(true);
-        toast.success(`Đã sao chép ${label || ''}`);
+        notify.copied(label || '');
         setTimeout(() => setCopied(false), 2000);
       } catch {
         // The clipboard can be blocked (no permission, not https), so say so instead of claiming success
-        toast.error('Không sao chép được, hãy chọn và sao chép thủ công');
+        notify.error('Không sao chép được, hãy chọn và sao chép thủ công');
       }
     };
 
     return (
-      <div
+      <span
         onClick={handleCopy}
-        className="group flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+        className="group inline-flex cursor-pointer items-center gap-2 transition-all hover:opacity-80"
       >
         <span className="font-mono">{text}</span>
         {copied ? (
@@ -399,7 +386,7 @@ export default function TransactionsContent({
         ) : (
           <Copy size={14} className="text-slate-400 group-hover:text-blue-500" />
         )}
-      </div>
+      </span>
     );
   };
   const isSuperAdmin = useIsSuperAdmin();
@@ -425,7 +412,7 @@ export default function TransactionsContent({
   const handleExportAll = async () => {
     try {
       setIsExporting(true);
-      toast.info('Đang chuẩn bị dữ liệu xuất...');
+      notify.info('Đang chuẩn bị dữ liệu xuất...');
       const res = await exportTransactions({
         searchText: txQuery,
         status: txStatus,
@@ -439,19 +426,20 @@ export default function TransactionsContent({
       });
       const items = res?.items || [];
       if (items.length === 0) {
-        toast.error('Không tìm thấy giao dịch nào phù hợp với bộ lọc');
+        notify.error('Không tìm thấy giao dịch nào phù hợp với bộ lọc');
         return;
       }
       exportTransactionsData(items, branches, 'danh_sach_giao_dich_tat_ca');
       if (res?.truncated) {
-        toast.warning('Chỉ xuất ' + items.length + ' trong ' + res.total + ' dòng', {
-          description: 'Hãy thu hẹp bộ lọc (khoảng ngày, chi nhánh) rồi xuất lại phần còn lại.'
-        });
+        notify.warning(
+          `Chỉ xuất ${items.length} trong ${res.total} dòng`,
+          'Hãy thu hẹp bộ lọc (khoảng ngày, chi nhánh) rồi xuất lại phần còn lại.'
+        );
       } else {
-        toast.success(`Đã xuất thành công ${items.length} giao dịch ra file Excel/CSV!`);
+        notify.success(`Đã xuất thành công ${items.length} giao dịch ra file Excel/CSV`);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi xuất dữ liệu');
+      notify.error(err, 'Lỗi xuất dữ liệu');
     } finally {
       setIsExporting(false);
     }
@@ -459,52 +447,63 @@ export default function TransactionsContent({
 
   const handleExportCurrentPage = () => {
     if (!data || data.length === 0) {
-      toast.error('Không có dữ liệu trên trang hiện tại để xuất');
+      notify.error('Không có dữ liệu trên trang hiện tại để xuất');
       return;
     }
     exportTransactionsData(data, branches, `danh_sach_giao_dich_trang_${currentPage}`);
-    toast.success(`Đã xuất ${data.length} giao dịch trang ${currentPage} ra file Excel/CSV!`);
+    notify.success(`Đã xuất ${data.length} giao dịch trang ${currentPage} ra file Excel/CSV`);
   };
 
+  // One badge for the state of the open transaction, used in the modal title and in its payment section
+  const renderTxStatusBadge = (showCountdown: boolean) => {
+    const paymentStatus = txDetails?.payment_info?.payment_status;
+    const isUsed = txDetails?.booking_details?.is_used;
+    const isExpired = txDetails?.payment_info?.expired;
+    if (paymentStatus === 'paid') {
+      if (isUsed) return <StatusBadge tone="info">Đã sử dụng</StatusBadge>;
+      if (isExpired) return <StatusBadge tone="warning">Đã quá hạn</StatusBadge>;
+      return <StatusBadge tone="success">Đang đợi dùng</StatusBadge>;
+    }
+    if (paymentStatus === 'pending') {
+      return (
+        <span className="inline-flex items-center gap-2">
+          {showCountdown && txDetails?.payment_expires_at && <CountdownTimer targetDate={txDetails.payment_expires_at} />}
+          <StatusBadge status="pending" />
+        </span>
+      );
+    }
+    if (paymentStatus === 'expired') return <StatusBadge status="expired" />;
+    if (paymentStatus === 'failed' || paymentStatus === 'cancelled') return <StatusBadge tone="danger">Đã hủy</StatusBadge>;
+    return null;
+  };
+
+  const hasListFilter = Boolean(txQuery || fromDate || toDate || paymentMethod || bookingTypeFilter !== 'all');
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              Lịch sử giao dịch
-              <Badge
-                variant="secondary"
-                className="rounded-full bg-slate-100 text-slate-600 px-2 py-0 h-5 text-[11px] font-bold"
-              >
-                {transactionsLength}
-              </Badge>
-            </h1>
-            <p className="text-xs text-slate-500">Quản lý, đối soát và xuất file thống kê doanh thu hệ thống.</p>
-          </div>
-          <div className="flex items-center gap-2">
+    <div className="space-y-4">
+      <PageHeader
+        title="Lịch sử giao dịch"
+        description={`${transactionsLength} giao dịch. Quản lý, đối soát và xuất file thống kê doanh thu hệ thống.`}
+        actions={
+          <>
             {canExport && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
+                  <button
+                    type="button"
                     disabled={isExporting}
-                    className="h-10 px-4 rounded-xl border-emerald-300 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100 font-semibold shadow-xs flex items-center gap-2 text-xs transition-all"
+                    className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2 disabled:opacity-50`}
                   >
-                    {isExporting ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                    ) : (
-                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                    )}
+                    {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                     <span>Xuất Excel / CSV</span>
-                  </Button>
+                  </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="rounded-xl w-60 p-1.5 shadow-lg border-slate-200">
+                <DropdownMenuContent align="end" className="w-60 rounded-xl border-slate-200 p-1.5 shadow-lg">
                   <DropdownMenuItem
                     onClick={handleExportAll}
-                    className="cursor-pointer gap-2.5 py-2.5 px-3 text-xs font-medium rounded-lg hover:bg-emerald-50 hover:text-emerald-900"
+                    className="cursor-pointer gap-2.5 rounded-lg px-3 py-2.5 text-xs font-medium hover:bg-slate-50"
                   >
-                    <Download className="w-4 h-4 text-emerald-600" />
+                    <Download className="h-4 w-4 text-slate-600" />
                     <div className="flex flex-col">
                       <span className="font-semibold">Xuất toàn bộ theo bộ lọc</span>
                       <span className="text-[11px] text-slate-400">({transactionsLength} giao dịch)</span>
@@ -512,9 +511,9 @@ export default function TransactionsContent({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleExportCurrentPage}
-                    className="cursor-pointer gap-2.5 py-2.5 px-3 text-xs font-medium rounded-lg hover:bg-blue-50 hover:text-blue-900 border-t border-slate-100"
+                    className="cursor-pointer gap-2.5 rounded-lg border-t border-slate-100 px-3 py-2.5 text-xs font-medium hover:bg-slate-50"
                   >
-                    <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                    <FileSpreadsheet className="h-4 w-4 text-slate-600" />
                     <div className="flex flex-col">
                       <span className="font-semibold">Xuất trang hiện tại</span>
                       <span className="text-[11px] text-slate-400">({data.length} giao dịch)</span>
@@ -524,28 +523,19 @@ export default function TransactionsContent({
               </DropdownMenu>
             )}
 
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onRefresh}
-              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10"
-              title="Làm mới"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
+            <button type="button" onClick={onRefresh} className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {ADMIN_TEXT.refresh}
+            </button>
+          </>
+        }
+      />
 
-        <div className="h-px bg-slate-100 my-2" />
-
+      <div className={`${ADMIN_CARD} flex flex-col gap-4 p-4`}>
         {/* ROW 1: Primary — tìm kiếm + phân loại + trạng thái */}
         <div className="flex flex-wrap items-center gap-3">
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setTxQuery(localTxQuery);
-              setPage(1);
-            }}
+            onSubmit={handleSearchTx}
             className="flex flex-1 min-w-[260px] max-w-md gap-2"
           >
             <div className="relative flex-1">
@@ -555,15 +545,13 @@ export default function TransactionsContent({
                 placeholder="Tìm email, SĐT hoặc mã đặt chỗ..."
                 value={localTxQuery}
                 onChange={(e) => setLocalTxQuery(e.target.value)}
-                className="pl-10 h-10 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all"
+                className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-10 transition-all focus:bg-white focus:ring-2 focus:ring-blue-600/20"
               />
             </div>
-            <Button
-              type="submit"
-              className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-            >
-              <Search className="w-3.5 h-3.5" /> Tìm
-            </Button>
+            <button type="submit" className={`${ADMIN_BTN_PRIMARY} inline-flex shrink-0 items-center gap-2`}>
+              <Search className="h-4 w-4" />
+              {ADMIN_TEXT.search}
+            </button>
           </form>
 
           {/* Pills loại booking */}
@@ -625,7 +613,7 @@ export default function TransactionsContent({
               value={sortKey}
               aria-label="Sắp xếp theo"
               onChange={(e) => setSortKey(e.target.value as any)}
-              className="h-10 px-3 bg-white border rounded-xl text-xs w-44 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className={`${FILTER_SELECT_CLASS} w-44`}
             >
               <option value="created_at">Thời gian tạo</option>
               <option value="paid_at">Thời gian thanh toán</option>
@@ -636,7 +624,7 @@ export default function TransactionsContent({
               value={paymentMethod}
               aria-label="Phương thức thanh toán"
               onChange={(e) => setPaymentMethod?.(e.target.value)}
-              className="h-10 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className={`${FILTER_SELECT_CLASS} w-40`}
             >
               <option value="">Tất cả phương thức</option>
               <option value="cash">Tiền mặt</option>
@@ -649,7 +637,7 @@ export default function TransactionsContent({
                 value={selectedBranchId || 'all'}
                 aria-label="Chi nhánh"
                 onChange={(e) => setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                className="h-10 px-3 bg-white border rounded-xl text-xs w-40 cursor-pointer shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className={`${FILTER_SELECT_CLASS} w-40`}
               >
                 {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
                 {branches.map((branch) => (
@@ -666,20 +654,20 @@ export default function TransactionsContent({
 
           {/* Sort dir + Clear */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
+            <button
+              type="button"
               onClick={() => setSortDir?.(sortDir === 'asc' ? 'desc' : 'asc')}
-              className="rounded-xl border-slate-200 hover:bg-slate-50 active:scale-95 transition-all shadow-sm w-10 h-10 shrink-0"
+              className={ICON_BUTTON_CLASS}
               title={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+              aria-label={sortDir === 'asc' ? 'Tăng dần' : 'Giảm dần'}
             >
-              {sortDir === 'desc' ? <SortDesc className="w-4 h-4 text-slate-600" /> : <SortAsc className="w-4 h-4 text-slate-600" />}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-100 w-10 h-10 rounded-xl transition-all shadow-sm shrink-0"
+              {sortDir === 'desc' ? <SortDesc className="h-4 w-4" /> : <SortAsc className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              className={ICON_BUTTON_CLASS}
               title="Xóa bộ lọc"
+              aria-label="Xóa bộ lọc"
               onClick={() => {
                 setTxQuery('');
                 setTxStatus?.('paid');
@@ -690,132 +678,52 @@ export default function TransactionsContent({
                 setToDate?.('');
                 setBookingTypeFilter?.('all');
                 setPage(1);
-                toast.info('Đã đặt lại bộ lọc');
+                notify.info('Đã đặt lại bộ lọc');
               }}
             >
-              <FilterX size={16} />
-            </Button>
+              <FilterX className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
 
       {/* Bảng dữ liệu đã tối ưu cột */}
-      <Card className="border border-gray-200 rounded-xl shadow-sm bg-white overflow-hidden">
-        <CardContent className="p-0">
+      <div className={`${ADMIN_CARD} overflow-hidden`}>
+        <div>
           <Table className="w-full">
-            <TableHeader className="bg-gray-50 border-b">
+            <TableHeader className={ADMIN_TABLE_HEAD}>
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-[110px] px-2 text-center text-xs">Mã đặt chỗ</TableHead>
-                <TableHead className="w-[110px] px-2.5 text-xs">Chi nhánh</TableHead>
-                <TableHead className="w-[175px] px-2.5 text-xs">Người dùng</TableHead>
-                <TableHead className="text-center w-[72px] px-1.5 text-xs">Loại</TableHead>
-                <TableHead className="w-[162px] px-2.5 text-xs">Sản phẩm</TableHead>
-                <TableHead className="text-center w-[58px] px-1 text-xs whitespace-nowrap">SL</TableHead>
-                <TableHead className="w-[95px] px-2 text-xs">Doanh thu</TableHead>
-                <TableHead className="w-[130px] px-2 text-xs">Thời gian</TableHead>
-                <TableHead className="text-center w-[76px] px-1 text-xs whitespace-nowrap">Phương thức</TableHead>
-                <TableHead className="text-right w-[115px] pr-3 pl-1 text-xs">
-                  Thao tác
-                </TableHead>
+                <TableHead className={`w-[110px] px-2 text-center ${ADMIN_TH}`}>Mã đặt chỗ</TableHead>
+                <TableHead className={`w-[110px] px-2.5 ${ADMIN_TH}`}>Chi nhánh</TableHead>
+                <TableHead className={`w-[175px] px-2.5 ${ADMIN_TH}`}>Người dùng</TableHead>
+                <TableHead className={`w-[72px] px-1.5 text-center ${ADMIN_TH}`}>Loại</TableHead>
+                <TableHead className={`w-[162px] px-2.5 ${ADMIN_TH}`}>Sản phẩm</TableHead>
+                <TableHead className={`w-[58px] whitespace-nowrap px-1 text-center ${ADMIN_TH}`}>SL</TableHead>
+                <TableHead className={`w-[95px] px-2 ${ADMIN_TH}`}>Doanh thu</TableHead>
+                <TableHead className={`w-[130px] px-2 ${ADMIN_TH}`}>Thời gian</TableHead>
+                <TableHead className={`w-[76px] whitespace-nowrap px-1 text-center ${ADMIN_TH}`}>Phương thức</TableHead>
+                <TableHead className={`w-[90px] pl-1 pr-3 text-right ${ADMIN_TH}`}>{ADMIN_TEXT.actionColumn}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading
-                ? Array.from({ length: 5 }).map((_, idx) => (
-                    <TableRow key={`sk-${idx}`}>
-                      <TableCell colSpan={10} className="px-3">
-                        <Skeleton className="h-10 w-full" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                : data.map((t) => {
-                    // 1. Tối ưu logic xác định trạng thái hiển thị
-                    const getStatusConfig = () => {
-                      // Trường hợp 1: Thanh toán quá hạn (expired - chưa thanh toán)
-                      if (t.paymentStatus === 'expired') {
-                        return {
-                          text: 'Đã hết hạn',
-                          style: 'border-slate-200 bg-slate-100 text-slate-500 font-medium',
-                          icon: <Clock size={10} className="mr-1 mt-[1px] text-slate-400" />,
-                          modalIcon: <Clock size={14} className="text-slate-400" />,
-                          ticketText: 'Đã hết hạn',
-                          ticketStyle: 'bg-slate-100 text-slate-500 border-slate-200'
-                        };
-                      }
-
-                      // Trường hợp 2: Thanh toán thất bại hoặc Đã Hủy
-                      if (t.paymentStatus === 'failed' || t.paymentStatus === 'cancelled') {
-                        return {
-                          text: 'Đã hủy',
-                          style: 'border-red-200 bg-red-50 text-red-700',
-                          icon: <XCircle size={10} className="mr-1 mt-[1px]" />,
-                          modalIcon: <XCircle size={14} />,
-                          ticketText: 'Đã hủy',
-                          ticketStyle: 'bg-red-100 text-red-700 border-red-200 animate-pulse'
-                        };
-                      }
-
-                      // Trường hợp 3: Chờ thanh toán
-                      if (t.paymentStatus === 'pending') {
-                        return {
-                          text: 'Chờ thanh toán',
-                          style: 'border-yellow-200 bg-yellow-50 text-yellow-700',
-                          icon: <Timer size={10} className="mr-1 mt-[1px]" />,
-                          modalIcon: <Timer size={14} />,
-                          ticketText: 'Chờ thanh toán',
-                          ticketStyle: 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                        };
-                      }
-
-                      // Trường hợp 4: Đã thanh toán (Cần check thêm expired và is_used)
-                      if (t.paymentStatus === 'paid') {
-                        // Ưu tiên check Đã sử dụng
-                        if (t.is_used) {
-                          return {
-                            text: 'Đã sử dụng',
-                            style: 'border-blue-200 bg-blue-50 text-blue-700',
-                            icon: <CheckCircle2 size={10} className="mr-1 mt-[1px]" />,
-                            modalIcon: <CheckCircle2 size={14} />,
-                            ticketText: 'Đã sử dụng',
-                            ticketStyle: 'bg-blue-100 text-blue-700 border-blue-200'
-                          };
-                        }
-
-                        // Check Hết hạn (Đã thanh toán nhưng quá hạn sử dụng vé)
-                        if (t.expired) {
-                          return {
-                            text: 'Đã quá hạn',
-                            style: 'border-amber-300 bg-amber-50 text-amber-800 font-bold',
-                            icon: <Clock size={10} className="mr-1 mt-[1px] text-amber-600" />,
-                            modalIcon: <Clock size={14} className="text-amber-600" />,
-                            ticketText: 'Đã quá hạn',
-                            ticketStyle: 'bg-amber-100 text-amber-800 border-amber-300 font-bold'
-                          };
-                        }
-
-                        // Còn lại là Đang đợi dùng
-                        return {
-                          text: 'Đang đợi dùng',
-                          style: 'border-green-200 bg-green-50 text-green-700',
-                          icon: <Timer size={10} className="mr-1 mt-[1px] animate-pulse" />,
-                          modalIcon: <Timer size={14} />,
-                          ticketText: 'Đang đợi dùng',
-                          ticketStyle: 'bg-green-100 text-green-700 border-green-200 font-bold'
-                        };
-                      }
-
-                      return {
-                        text: 'Không rõ',
-                        style: 'bg-gray-100 text-gray-400',
-                        icon: null,
-                        modalIcon: null,
-                        ticketText: 'Không rõ',
-                        ticketStyle: 'bg-gray-100 text-gray-400'
-                      };
-                    };
-
-                    const config = getStatusConfig();
-
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="p-0">
+                    <TableSkeleton rows={5} />
+                  </TableCell>
+                </TableRow>
+              ) : data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="p-0">
+                    <EmptyState
+                      title={hasListFilter ? 'Không tìm thấy giao dịch' : 'Chưa có giao dịch'}
+                      description={hasListFilter ? 'Thử đổi từ khóa hoặc khoảng thời gian.' : undefined}
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.map((t) => {
+                    const config = getTxListStatus(t);
                     return (
                       <TableRow
                         key={t.id}
@@ -846,11 +754,12 @@ export default function TransactionsContent({
                             {t.voucher_code && (
                               <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-mono text-[11px] font-bold truncate max-w-[110px]" title={t.voucher_code}>
-                                  🏷️ {t.voucher_code}
+                                  <Tag size={10} className="mr-1 shrink-0" />
+                                  {t.voucher_code}
                                 </span>
                                 {t.sale_name && (
                                   <span className="text-[11px] text-blue-600 font-semibold truncate max-w-[55px]" title={t.sale_name}>
-                                    👤 {t.sale_name}
+                                    {t.sale_name}
                                   </span>
                                 )}
                               </div>
@@ -859,17 +768,17 @@ export default function TransactionsContent({
                         </TableCell>
                         <TableCell className="text-center px-1.5">
                           {t.booking_type === 'combo_vr' ? (
-                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-nowrap text-[11px]">
+                            <StatusBadge tone="warning" className="gap-1 px-1.5 text-[11px]">
                               <Film size={9} /> Phim, VR
-                            </Badge>
+                            </StatusBadge>
                           ) : t.booking_type === 'vr' ? (
-                            <Badge className="bg-purple-100 text-purple-700 border-purple-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[11px]">
+                            <StatusBadge tone="neutral" className="gap-1 px-1.5 text-[11px]">
                               <Gamepad2 size={9} /> VR
-                            </Badge>
+                            </StatusBadge>
                           ) : (
-                            <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-0.5 px-1.5 font-bold flex items-center justify-center gap-1 mx-auto w-fit text-[11px]">
+                            <StatusBadge tone="info" className="gap-1 px-1.5 text-[11px]">
                               <Film size={9} /> Phim
-                            </Badge>
+                            </StatusBadge>
                           )}
                         </TableCell>
                         <TableCell className="px-2.5 font-medium text-[11px] text-slate-700 leading-tight">
@@ -888,7 +797,6 @@ export default function TransactionsContent({
                         </TableCell>
                         <TableCell className="text-[11px] text-slate-500 font-medium px-2">
                           {(() => {
-                            const config = getStatusConfig();
                             // Cancelled, failed and expired orders show when they stopped, paid orders when they were paid
                             const isStopped = ['failed', 'cancelled', 'expired'].includes(t.paymentStatus);
                             const dateToUse =
@@ -915,13 +823,9 @@ export default function TransactionsContent({
                                     TT: {formatVnDateTime(t.paidAt)}
                                   </span>
                                 )}
-                                <Badge
-                                  variant="outline"
-                                  className={`${config.style} px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap w-fit uppercase flex items-center`}
-                                >
-                                  {config.icon}
+                                <StatusBadge tone={config.tone} className="w-fit">
                                   {config.text}
-                                </Badge>
+                                </StatusBadge>
                               </div>
                             );
                           })()}
@@ -931,199 +835,70 @@ export default function TransactionsContent({
                           <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-600 leading-tight block">{paymentMethodLabel(t.paymentMethod)}</span>
                         </TableCell>
 
-                        <TableCell className="text-right pr-3 pl-1">
-                          <div className="flex justify-end items-center gap-1.5">
+                        <TableCell className="pl-1 pr-3 text-right">
+                          <RowActions>
                             {(t.paymentStatus === 'paid' || t.paymentStatus === 'pending') && !t.is_used && !t.expired && (
-                              <Button
-                                variant="outline"
-                                size="sm"
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   navigate('/ticket-check?code=' + t.booking_code);
                                 }}
-                                className="h-7 w-7 p-0 text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-600 hover:text-white transition-all shadow-sm shrink-0"
                                 title="Soát vé nhanh"
+                                aria-label="Soát vé nhanh"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-teal-600 transition-colors hover:border-teal-200 hover:bg-teal-50"
                               >
-                                <TicketIcon size={13} />
-                              </Button>
+                                <TicketIcon className="h-4 w-4" />
+                              </button>
                             )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewDetails(t)}
-                              className="h-7 px-2.5 hover:bg-blue-600 hover:text-white transition-all shadow-sm text-xs font-medium whitespace-nowrap"
-                            >
-                              Xem chi tiết
-                            </Button>
-                          </div>
+                            <RowActionButton action="view" onClick={() => handleViewDetails(t)} />
+                          </RowActions>
                         </TableCell>
                       </TableRow>
                     );
-                  })}
+                  })
+              )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground italic">Hiển thị {data.length} giao dịch trên trang này.</p>
-        <Pagination>
-          <PaginationContent className="flex-wrap">
-
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPage(Math.max(1, currentPage - 1));
-                }}
-                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-            {getPageWindow(currentPage, totalPages).map((pageItem, index) =>
-              pageItem === 'gap' ? (
-                <PaginationItem key={`gap-${index}`}>
-                  <PaginationEllipsis />
-                </PaginationItem>
-              ) : (
-                <PaginationItem key={pageItem}>
-                  <PaginationLink
-                    href="#"
-                    isActive={currentPage === pageItem}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage(pageItem);
-                    }}
-                  >
-                    {pageItem}
-                  </PaginationLink>
-                </PaginationItem>
-              )
-            )}
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPage(Math.min(totalPages, currentPage + 1));
-                }}
-                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+        </div>
       </div>
 
-      {/* --- MODAL CHI TIẾT GIAO DỊCH (TỐI ƯU TOÀN DIỆN) --- */}
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        {/* ✅ THAY ĐỔI: max-w-6xl -> max-w-4xl để layout gọn hơn */}
-        <DialogContent className="max-w-4xl p-0 border border-gray-200 shadow-xl rounded-xl overflow-hidden bg-white flex flex-col max-h-[95vh] [&>button]:hidden">
-          {/* HEADER CỐ ĐỊNH */}
-          <div className="bg-white p-6 border-b shrink-0">
-            <div className="flex justify-between items-start">
-              <div>
-                <DialogTitle className="text-xl font-bold text-gray-900">Chi tiết giao dịch</DialogTitle>
-                <div className="flex items-center gap-4 text-gray-600 text-[13px] mt-1.5">
-                  <span className="flex items-center gap-2">
-                    Mã đặt chỗ:
-                    <span className="font-bold text-gray-900">
-                      <CopyableText text={headerBookingCode} label="mã đặt chỗ" />
-                    </span>
-                  </span>
-                  <span>
-                    Tổng tiền: <span className="font-bold text-emerald-700">{formatVnd(headerTotalPrice)}</span>
-                  </span>
-                </div>
-              </div>
+      <AdminPagination
+        page={currentPage}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        totalLabel={`${transactionsLength} giao dịch`}
+      />
 
-              <div className="flex items-center gap-3">
-                {(() => {
-                  const paymentStatus = txDetails?.payment_info?.payment_status;
-                  const isUsed = txDetails?.booking_details?.is_used;
-                  const isExpired = txDetails?.payment_info?.expired;
-
-                  if (paymentStatus === 'paid') {
-                    if (isUsed) {
-                      return (
-                        <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full border border-blue-100 flex items-center gap-2">
-                          <CheckCircle2 size={14} className="text-blue-600" />
-                          <span className="text-[11px] font-medium tracking-tight">Đã sử dụng</span>
-                        </div>
-                      );
-                    }
-                    if (isExpired) {
-                      return (
-                        <div className="bg-amber-50 text-amber-800 px-3 py-1.5 rounded-full border border-amber-300 flex items-center gap-2 font-bold shadow-xs">
-                          <Clock size={14} className="text-amber-600" />
-                          <span className="text-[11px] tracking-tight">Đã quá hạn</span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="bg-green-50 text-green-600 px-3 py-1.5 rounded-full border border-green-100 flex items-center gap-2">
-                        <Timer size={14} className="text-green-600 animate-pulse" />
-                        <span className="text-[11px] font-medium tracking-tight">Đang đợi dùng</span>
-                      </div>
-                    );
-                  }
-
-                  if (paymentStatus === 'pending') {
-                    return (
-                      <div className="flex items-center gap-2">
-                        {txDetails?.payment_expires_at && (
-                          <CountdownTimer targetDate={txDetails.payment_expires_at} />
-                        )}
-                        <div className="bg-yellow-50 text-yellow-600 px-3 py-1.5 rounded-full border border-yellow-100 flex items-center gap-2">
-                          <Timer size={14} className="text-yellow-600 animate-pulse" />
-                          <span className="text-[11px] font-medium tracking-tight">Chờ thanh toán</span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (paymentStatus === 'expired') {
-                    return (
-                      <div className="bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full border border-slate-200 flex items-center gap-2 font-medium">
-                        <Clock size={14} className="text-slate-400" />
-                        <span className="text-[11px] tracking-tight">Đã hết hạn</span>
-                      </div>
-                    );
-                  }
-
-                  if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
-                    return (
-                      <div className="bg-red-50 text-red-600 px-3 py-1.5 rounded-full border border-red-100 flex items-center gap-2">
-                        <XCircle size={14} className="text-red-600" />
-                        <span className="text-[11px] font-medium tracking-tight">Đã hủy</span>
-                      </div>
-                    );
-                  }
-
-                  return null;
-                })()}
-
-
-                <button
-                  onClick={() => setIsDetailsOpen(false)}
-                  aria-label="Đóng"
-                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* NỘI DUNG CUỘN */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+      {/* --- MODAL CHI TIẾT GIAO DỊCH --- */}
+      <AdminDialog
+        open={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        mode="view"
+        size="lg"
+        title="Chi tiết giao dịch"
+        subtitle={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="flex items-center gap-2">
+              Mã đặt chỗ:
+              <span className="font-bold text-slate-900">
+                <CopyableText text={headerBookingCode} label="mã đặt chỗ" />
+              </span>
+            </span>
+            <span>
+              Tổng tiền: <span className="font-bold text-emerald-700">{formatVnd(headerTotalPrice)}</span>
+            </span>
+          </span>
+        }
+        titleExtra={renderTxStatusBadge(true)}
+        footer={<AdminDialogFooter onCancel={() => setIsDetailsOpen(false)} cancelText={ADMIN_TEXT.close} />}
+      >
+        <div>
             {isLoadingDetails ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                <span className="text-slate-500 text-sm italic">Đang tải dữ liệu...</span>
-              </div>
+              <InlineLoading />
             ) : detailsError ? (
-              <div className="text-center py-12 bg-red-50/50 rounded-lg border border-red-100 m-4">
-                <p className="text-red-600 italic text-sm">{detailsError}</p>
+              <div className="rounded-xl border border-red-100 bg-red-50 py-12 text-center text-sm font-semibold text-red-600">
+                {detailsError}
               </div>
             ) : txDetails ? (
               <div className="space-y-8">
@@ -1147,12 +922,7 @@ export default function TransactionsContent({
                           bold
                           color="text-slate-900"
                         />
-                        <Badge
-                          variant={txDetails.user?.is_active ? 'default' : 'destructive'}
-                          className="text-[11px] h-5"
-                        >
-                          {txDetails.user?.is_active ? 'Hoạt động' : 'Vô hiệu'}
-                        </Badge>
+                        <StatusBadge status={txDetails.user?.is_active ? 'active' : 'locked'} />
                       </div>
                     </div>
                   </div>
@@ -1493,64 +1263,7 @@ export default function TransactionsContent({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        {/* LOGIC MỚI: Tương tự như badge ở list và header detail */}
-                        {(() => {
-                          const paymentStatus = txDetails.payment_info?.payment_status;
-                          const isUsed = txDetails.booking_details?.is_used;
-                          const isExpired = txDetails.payment_info?.expired;
-
-                          if (paymentStatus === 'paid') {
-                            if (isUsed) {
-                              return (
-                                <Badge className="bg-blue-100 text-blue-700 border-blue-200 py-1.5 font-bold flex items-center gap-1.5 text-xs">
-                                  <CheckCircle2 size={14} />
-                                  ĐÃ SỬ DỤNG
-                                </Badge>
-                              );
-                            }
-                            if (isExpired) {
-                              return (
-                                <Badge className="bg-slate-600 text-white border-slate-700 py-1.5 font-bold uppercase text-[11px] flex items-center gap-1.5">
-                                  <Clock size={14} />
-                                  ĐÃ QUÁ HẠN
-                                </Badge>
-                              );
-                            }
-                            return (
-                              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 py-1.5 font-bold flex items-center gap-1.5 text-xs">
-                                <Timer size={14} className="animate-pulse" />
-                                ĐANG ĐỢI DÙNG
-                              </Badge>
-                            );
-                          }
-
-                          if (paymentStatus === 'pending') {
-                            return (
-                              <Badge className="bg-orange-100 text-orange-700 border-orange-200 py-1.5 flex items-center gap-1.5 text-xs">
-                                <Timer size={14} className="animate-pulse" />
-                                CHỜ THANH TOÁN
-                              </Badge>
-                            );
-                          }
-
-                          if (paymentStatus === 'failed') {
-                            return (
-                              <Badge className="bg-red-100 text-red-700 border-red-200 py-1.5 font-bold flex items-center gap-1.5 text-xs">
-                                <XCircle size={14} />
-                                ĐÃ HỦY
-                              </Badge>
-                            );
-                          }
-
-                          return (
-                            <Badge
-                              variant="secondary"
-                              className="bg-slate-100 text-slate-500 border-slate-200 py-1.5 text-xs"
-                            >
-                              KHÔNG KHẢ DỤNG
-                            </Badge>
-                          );
-                        })()}
+                        {renderTxStatusBadge(false) ?? <StatusBadge tone="neutral">Không khả dụng</StatusBadge>}
                       </div>
                     </div>
 
@@ -1698,20 +1411,8 @@ export default function TransactionsContent({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* FOOTER CỐ ĐỊNH */}
-          <div className="p-5 bg-slate-50 border-t flex justify-end shrink-0 gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setIsDetailsOpen(false)}
-              className="h-11 px-12 border-slate-300 hover:bg-white font-bold text-sm uppercase"
-            >
-              Đóng cửa sổ
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </AdminDialog>
     </div>
   );
 }

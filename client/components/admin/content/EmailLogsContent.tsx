@@ -1,41 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { getEmailLogsApi, resendBookingEmailApi } from '@/lib/api';
 import { formatVnDateTime } from '@/lib/format';
-import { toast } from 'sonner';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { notify } from '@/components/admin/common/notify';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
+  ADMIN_BTN_PRIMARY,
+  ADMIN_BTN_OUTLINE,
+  ADMIN_CARD,
+  ADMIN_TABLE_HEAD,
+  ADMIN_TH,
+  ADMIN_TEXT
+} from '@/components/admin/common/adminTokens';
 import {
   Search,
   RefreshCw,
-  Eye,
   Mail,
   Key,
   Ticket,
   Clock,
   CheckCircle2,
-  XCircle,
   AlertCircle,
   FileJson,
   Copy,
@@ -57,15 +47,46 @@ const email_type_label = (emailType: string) => EMAIL_TYPE_LABELS[emailType] || 
 const recipient_type_label = (recipientType?: string | null) =>
   recipientType === 'staff' ? 'Nhân viên' : 'Khách hàng';
 
+// Email status as a standard badge: sent / failed / anything else is still waiting in the queue
+const email_status_key = (emailStatus: string) => (emailStatus === 'sent' || emailStatus === 'failed' ? emailStatus : 'queued');
+
 // The clipboard can be blocked (no permission, not https), so a failure is reported instead of ignored
 const copy_text = async (text: string, what: string) => {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success(`Đã sao chép ${what}`);
+    notify.copied(what);
   } catch {
-    toast.error('Không sao chép được, hãy chọn và sao chép thủ công');
+    notify.error('Không sao chép được, hãy chọn và sao chép thủ công');
   }
 };
+
+const FILTER_SELECT_CLASS =
+  'h-10 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20';
+
+const getTypeIcon = (type: string) => {
+  switch (type) {
+    case 'welcome':
+      return <UserIcon size={14} className="text-blue-500" />;
+    case 'reset_password':
+    case 'otp':
+    case 'staff_otp':
+      return <Key size={14} className="text-amber-500" />;
+    case 'booking_confirmation':
+      return <Ticket size={14} className="text-emerald-500" />;
+    default:
+      return <Mail size={14} className="text-slate-500" />;
+  }
+};
+
+// A small boxed fact of the detail modal
+function InfoBox({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className={`${ADMIN_CARD} flex flex-col gap-1 p-4`}>
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      <span className="break-words text-sm font-semibold text-slate-900">{children}</span>
+    </div>
+  );
+}
 
 export default function EmailLogsContent() {
   const [data, setData] = useState<any[]>([]);
@@ -138,52 +159,14 @@ export default function EmailLogsContent() {
     try {
       setIsResending(true);
       const res = await resendBookingEmailApi(Number(selectedLog.booking_id));
-      toast.success(res?.message || 'Đã đưa email xác nhận vào hàng đợi gửi.');
+      notify.success(res?.message || 'Đã đưa email xác nhận vào hàng đợi gửi.');
       setIsResendConfirmOpen(false);
       setIsDetailsOpen(false);
       fetchData();
     } catch (err: any) {
-      toast.error(err?.message || 'Không gửi lại được email');
+      notify.error(err, 'Không gửi lại được email');
     } finally {
       setIsResending(false);
-    }
-  };
-
-  const getStatusBadge = (s: string) => {
-    switch (s) {
-      case 'sent':
-        return (
-          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none px-2 py-0.5 rounded-lg flex items-center gap-1 w-fit font-bold text-[11px]">
-            <CheckCircle2 size={12} /> ĐÃ GỬI
-          </Badge>
-        );
-      case 'failed':
-        return (
-          <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none px-2 py-0.5 rounded-lg flex items-center gap-1 w-fit font-bold text-[11px]">
-            <XCircle size={12} /> THẤT BẠI
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none px-2 py-0.5 rounded-lg flex items-center gap-1 w-fit font-bold text-[11px]">
-            <Clock size={12} /> ĐANG CHỜ
-          </Badge>
-        );
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'welcome':
-        return <UserIcon size={14} className="text-blue-500" />;
-      case 'reset_password':
-      case 'otp':
-      case 'staff_otp':
-        return <Key size={14} className="text-amber-500" />;
-      case 'booking_confirmation':
-        return <Ticket size={14} className="text-emerald-500" />;
-      default:
-        return <Mail size={14} className="text-slate-500" />;
     }
   };
 
@@ -192,74 +175,235 @@ export default function EmailLogsContent() {
     setIsDetailsOpen(true);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header & Filters */}
-      <div className="flex flex-col gap-6 bg-white p-6 rounded-3xl border shadow-sm">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-              <Mail size={24} />
-            </div>
-            <div className="flex flex-col gap-1">
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">Lịch sử email</h1>
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-                Ghi lại tất cả thông báo gửi tới khách hàng
-              </p>
-            </div>
+  // TOOLBAR
+  const renderToolbar = () => (
+    <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
+      <div className="flex w-full flex-wrap items-center gap-3 xl:w-auto">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative w-[320px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-600/20"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo email người nhận..."
+              aria-label="Tìm theo email người nhận"
+            />
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={fetchData}
-              className="rounded-xl hover:rotate-180 transition-all duration-500 h-10 w-10 border-slate-200"
-              title="Làm mới"
+          <button type="submit" className={`${ADMIN_BTN_PRIMARY} inline-flex shrink-0 items-center gap-2`}>
+            <Search className="h-4 w-4" />
+            {ADMIN_TEXT.search}
+          </button>
+        </form>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Lọc theo trạng thái" className={FILTER_SELECT_CLASS}>
+          <option value="all">Tất cả trạng thái</option>
+          <option value="sent">Đã gửi thành công</option>
+          <option value="failed">Gửi thất bại</option>
+          <option value="pending">Đang chờ xử lý</option>
+        </select>
+        <select
+          value={emailType}
+          onChange={(e) => setEmailType(e.target.value)}
+          aria-label="Lọc theo loại email"
+          className={FILTER_SELECT_CLASS}
+        >
+          <option value="all">Tất cả loại email</option>
+          <option value="welcome">Chào mừng</option>
+          <option value="reset_password">Quên mật khẩu</option>
+          <option value="booking_confirmation">Xác nhận đặt vé</option>
+          <option value="otp">Mã OTP khách hàng</option>
+          <option value="staff_otp">Mã OTP nhân viên</option>
+        </select>
+      </div>
+      <button type="button" onClick={fetchData} className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}>
+        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        {ADMIN_TEXT.refresh}
+      </button>
+    </div>
+  );
+
+  // TABLE
+  const renderLogRow = (log: any) => (
+    <TableRow key={log.id} className="border-b border-slate-200 transition-colors hover:bg-slate-50">
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <span className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            {log.recipient}
+            <span
+              className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                log.recipient_type === 'staff' ? 'bg-violet-100 text-violet-700' : 'bg-sky-100 text-sky-700'
+              }`}
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
+              {recipient_type_label(log.recipient_type)}
+            </span>
+          </span>
+          <span className="line-clamp-1 text-[11px] italic text-slate-500">{log.subject}</span>
+          {log.booking_code && <span className="font-mono text-[11px] text-blue-600">Mã đặt chỗ: {log.booking_code}</span>}
+          {log.status === 'failed' && log.error_message && (
+            <span className="line-clamp-1 text-[11px] text-red-600" title={log.error_message}>
+              Lỗi: {log.error_message}
+            </span>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-slate-100 p-2">{getTypeIcon(log.email_type)}</div>
+          <span className="text-xs font-semibold text-slate-700">{email_type_label(log.email_type)}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-center">
+        <StatusBadge status={email_status_key(log.status)} />
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+            <Clock size={10} className="text-slate-400" />
+            {formatDateTime(log.created_at)}
           </div>
+          {log.sent_at && (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+              <CheckCircle2 size={10} />
+              Gửi lúc: {formatDateTime(log.sent_at)}
+            </div>
+          )}
+        </div>
+      </TableCell>
+      <TableCell className="pr-4 text-right">
+        <RowActions>
+          <RowActionButton action="view" label="Xem chi tiết email" onClick={() => handleViewDetails(log)} />
+        </RowActions>
+      </TableCell>
+    </TableRow>
+  );
+
+  const renderTable = () => {
+    if (isLoading) return <TableSkeleton rows={6} />;
+    if (data.length === 0) {
+      const isFiltered = status !== 'all' || emailType !== 'all' || Boolean(appliedSearch);
+      return <EmptyState title={isFiltered ? 'Không tìm thấy email nào' : 'Chưa có email nào'} />;
+    }
+    return (
+      <Table>
+        <TableHeader className={ADMIN_TABLE_HEAD}>
+          <TableRow className="border-none hover:bg-transparent">
+            <TableHead className={ADMIN_TH}>Người nhận &amp; tiêu đề</TableHead>
+            <TableHead className={ADMIN_TH}>Loại email</TableHead>
+            <TableHead className={`${ADMIN_TH} text-center`}>Trạng thái</TableHead>
+            <TableHead className={ADMIN_TH}>Thời gian</TableHead>
+            <TableHead className={`${ADMIN_TH} pr-4 text-right`}>{ADMIN_TEXT.actionColumn}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>{data.map(renderLogRow)}</TableBody>
+      </Table>
+    );
+  };
+
+  // DETAIL MODAL
+  const renderDetailBody = () => {
+    if (!selectedLog) return null;
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InfoBox label="Người nhận">
+            <span className="flex items-start gap-2 break-all">
+              {selectedLog.recipient}
+              <button
+                type="button"
+                onClick={() => copy_text(selectedLog.recipient, 'email người nhận')}
+                className="shrink-0 text-slate-400 hover:text-blue-600"
+                aria-label="Sao chép email người nhận"
+                title="Sao chép email người nhận"
+              >
+                <Copy size={14} />
+              </button>
+            </span>
+          </InfoBox>
+          <InfoBox label="Loại email">{email_type_label(selectedLog.email_type)}</InfoBox>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
-          <div className="md:col-span-2">
-            <form onSubmit={handleSearch} className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border-transparent focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm border font-medium h-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm theo email người nhận..."
-              />
-            </form>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <InfoBox label="Nhà cung cấp">{selectedLog.provider || 'Hệ thống'}</InfoBox>
+          <InfoBox label="Tài khoản">
+            {selectedLog.recipient_type === 'staff' ? (
+              'Nhân viên'
+            ) : selectedLog.user_id ? (
+              'Khách có tài khoản'
+            ) : (
+              <span className="font-medium italic text-slate-400">Khách vãng lai</span>
+            )}
+          </InfoBox>
+          <InfoBox label="Mã đặt chỗ">{selectedLog.booking_code || '-'}</InfoBox>
+        </div>
+
+        <InfoBox label="Tiêu đề">{selectedLog.subject}</InfoBox>
+
+        {selectedLog.error_message && (
+          <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertCircle size={18} />
+              <span className="text-sm font-semibold">Thông báo lỗi chi tiết</span>
+              <button
+                type="button"
+                onClick={() => copy_text(selectedLog.error_message, 'thông báo lỗi')}
+                className="ml-auto text-red-400 hover:text-red-700"
+                aria-label="Sao chép thông báo lỗi"
+                title="Sao chép thông báo lỗi"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-red-200 bg-white p-3 text-sm font-medium text-red-900">
+              <code className="whitespace-pre-wrap">{selectedLog.error_message}</code>
+            </div>
           </div>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="h-10 bg-slate-50 border-transparent focus:ring-2 focus:ring-blue-500 rounded-xl px-4 text-sm font-bold text-slate-700 outline-none border"
-          >
-            <option value="all">TẤT CẢ TRẠNG THÁI</option>
-            <option value="sent">ĐÃ GỬI THÀNH CÔNG</option>
-            <option value="failed">GỬI THẤT BẠI</option>
-            <option value="pending">ĐANG CHỜ XỬ LÝ</option>
-          </select>
-          <select
-            value={emailType}
-            onChange={(e) => setEmailType(e.target.value)}
-            className="h-10 bg-slate-50 border-transparent focus:ring-2 focus:ring-blue-500 rounded-xl px-4 text-sm font-bold text-slate-700 outline-none border"
-          >
-            <option value="all">TẤT CẢ LOẠI EMAIL</option>
-            <option value="welcome">Chào mừng</option>
-            <option value="reset_password">QUÊN MẬT KHẨU</option>
-            <option value="booking_confirmation">XÁC NHẬN ĐẶT VÉ</option>
-            <option value="otp">MÃ OTP KHÁCH HÀNG</option>
-            <option value="staff_otp">MÃ OTP NHÂN VIÊN</option>
-          </select>
+        )}
+
+        {selectedLog.metadata && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-slate-500">
+              <FileJson size={16} />
+              <span className="text-sm font-semibold">Dữ liệu đi kèm (Metadata)</span>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white p-4 font-mono text-xs text-blue-600">
+              <pre className="max-h-40 overflow-x-auto whitespace-pre-wrap leading-relaxed">{formatMetadata(selectedLog.metadata)}</pre>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-500">Khởi tạo lúc</span>
+            <span className="text-sm font-semibold text-slate-700">{formatDateTime(selectedLog.created_at)}</span>
+          </div>
+          <div className="flex flex-col gap-1 text-right">
+            <span className="text-xs font-medium text-slate-500">Gửi thành công lúc</span>
+            <span className="text-sm font-semibold text-slate-700">{formatDateTime(selectedLog.sent_at)}</span>
+          </div>
         </div>
       </div>
+    );
+  };
+
+  const renderResendButton = () =>
+    canResend(selectedLog) ? (
+      <button
+        type="button"
+        onClick={() => setIsResendConfirmOpen(true)}
+        className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}
+      >
+        <Send size={14} /> Gửi lại
+      </button>
+    ) : undefined;
+
+  return (
+    <div className="space-y-4">
+      <PageHeader title="Lịch sử email" description="Ghi lại tất cả thông báo gửi tới khách hàng" />
+
+      {renderToolbar()}
 
       {loadError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <span>{loadError}</span>
           <button onClick={fetchData} className="font-semibold underline">
             Tải lại
@@ -267,343 +411,34 @@ export default function EmailLogsContent() {
         </div>
       )}
 
-      {/* Table */}
-      <Card className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-4 py-4 px-6">
-              <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
-                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                <span>Đang tải nhật ký email...</span>
-              </div>
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
-                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-              </div>
-            </div>
-          ) : (
-          <Table>
-            <TableHeader className="bg-slate-50/80">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-[11px] uppercase font-bold text-slate-500">Người nhận & tiêu đề</TableHead>
-                <TableHead className="text-[11px] uppercase font-bold text-slate-500">Loại email</TableHead>
-                <TableHead className="text-center text-[11px] uppercase font-bold text-slate-500">Trạng thái</TableHead>
-                <TableHead className="text-[11px] uppercase font-bold text-slate-500">Thời gian</TableHead>
-                <TableHead className="text-right text-[11px] uppercase font-bold text-slate-500 pr-6">
-                  Thao tác
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-40 text-center">
-                    <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
-                      <Mail size={40} className="opacity-20" />
-                      <p className="font-bold text-sm">Không tìm thấy bản ghi email nào</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((log) => (
-                  <TableRow
-                    key={log.id}
-                    className="group hover:bg-slate-50/80 transition-colors border-b last:border-0 h-20"
-                  >
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="font-black text-slate-900 text-sm flex items-center gap-2">
-                          {log.recipient}
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
-                              log.recipient_type === 'staff' ? 'bg-violet-100 text-violet-700' : 'bg-sky-100 text-sky-700'
-                            }`}
-                          >
-                            {recipient_type_label(log.recipient_type)}
-                          </span>
-                        </span>
-                        <span className="text-[11px] text-slate-500 line-clamp-1 italic">{log.subject}</span>
-                        {log.booking_code && (
-                          <span className="text-[11px] font-mono text-blue-600">Mã đặt chỗ: {log.booking_code}</span>
-                        )}
-                        {log.status === 'failed' && log.error_message && (
-                          <span className="text-[11px] text-rose-600 line-clamp-1" title={log.error_message}>
-                            Lỗi: {log.error_message}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-white transition-colors">
-                          {getTypeIcon(log.email_type)}
-                        </div>
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">
-                          {email_type_label(log.email_type)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">{getStatusBadge(log.status)}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
-                          <Clock size={10} className="text-slate-400" />
-                          {formatDateTime(log.created_at)}
-                        </div>
-                        {log.sent_at && (
-                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
-                            <CheckCircle2 size={10} />
-                            Gửi lúc: {formatDateTime(log.sent_at)}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right pr-6">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 rounded-xl hover:bg-blue-600 hover:text-white text-blue-600 transition-all shadow-sm hover:shadow-lg hover:shadow-blue-200"
-                        onClick={() => handleViewDetails(log)}
-                        aria-label="Xem chi tiết email"
-                      >
-                        <Eye size={18} />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          )}
-        </CardContent>
-      </Card>
+      <div className={`${ADMIN_CARD} overflow-hidden`}>{renderTable()}</div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination className="mt-4">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (page > 1) setPage(page - 1);
-                }}
-                className={page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-            {Array.from({ length: totalPages }).map((_, i) => (
-              <PaginationItem key={i}>
-                <PaginationLink
-                  href="#"
-                  isActive={page === i + 1}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(i + 1);
-                  }}
-                  className="cursor-pointer"
-                >
-                  {i + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (page < totalPages) setPage(page + 1);
-                }}
-                className={page === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} totalLabel={`${total} email`} />
 
-      {/* Details Dialog */}
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl p-0 border-none shadow-2xl rounded-2xl flex flex-col overflow-hidden bg-white [&>button]:hidden">
-          <DialogHeader className="p-6 bg-white border-b border-gray-200 text-gray-900 shrink-0 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="relative z-10 flex flex-col gap-4">
-              <div className="flex items-start justify-between">
-                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
-                  {selectedLog && getTypeIcon(selectedLog.email_type)}
-                </div>
-                {selectedLog && getStatusBadge(selectedLog.status)}
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-bold text-gray-900 leading-tight">Chi tiết nhật ký email</DialogTitle>
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 break-all">
-                  {selectedLog?.recipient}
-                </p>
-              </div>
-            </div>
-          </DialogHeader>
+      <AdminDialog
+        open={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        mode="view"
+        size="md"
+        icon={selectedLog ? getTypeIcon(selectedLog.email_type) : <Mail className="h-5 w-5" />}
+        title="Chi tiết nhật ký email"
+        subtitle={selectedLog?.recipient}
+        titleExtra={selectedLog ? <StatusBadge status={email_status_key(selectedLog.status)} /> : undefined}
+        footer={<AdminDialogFooter onCancel={() => setIsDetailsOpen(false)} cancelText={ADMIN_TEXT.close} leading={renderResendButton()} />}
+      >
+        {renderDetailBody()}
+      </AdminDialog>
 
-          <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-white max-h-[70vh]">
-            {selectedLog && (
-              <div className="space-y-8">
-                {/* Header Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Người nhận</span>
-                    <span className="font-bold text-slate-900 break-all flex items-start gap-2">
-                      {selectedLog.recipient}
-                      <button
-                        type="button"
-                        onClick={() => copy_text(selectedLog.recipient, 'email người nhận')}
-                        className="shrink-0 text-slate-400 hover:text-blue-600"
-                        aria-label="Sao chép email người nhận"
-                        title="Sao chép email người nhận"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    </span>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Loại email</span>
-                    <span className="font-bold text-slate-900 uppercase tracking-tighter">
-                      {email_type_label(selectedLog.email_type)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Connection & IDs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Nhà cung cấp</span>
-                    <span className="font-bold text-blue-400 uppercase tracking-tight">
-                      {selectedLog.provider || 'Hệ thống'}
-                    </span>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tài khoản</span>
-                    <span className="font-bold text-slate-900">
-                      {selectedLog.recipient_type === 'staff' ? (
-                        'Nhân viên'
-                      ) : selectedLog.user_id ? (
-                        'Khách có tài khoản'
-                      ) : (
-                        <span className="text-slate-400 italic font-medium">Khách vãng lai</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Mã đặt chỗ</span>
-                    <span className="font-bold text-slate-900">
-                      {selectedLog.booking_code || '-'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Subject */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2">
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tiêu đề</span>
-                  <span className="font-bold text-slate-900 leading-relaxed italic">"{selectedLog.subject}"</span>
-                </div>
-
-                {/* Error Message if exists (regardless of status, though usually failed/pending) */}
-                {selectedLog.error_message && (
-                  <div className="p-5 bg-rose-50 rounded-3xl border border-rose-100 flex flex-col gap-3 shadow-sm">
-                    <div className="flex items-center gap-2 text-rose-600">
-                      <AlertCircle size={18} />
-                      <span className="text-xs font-black uppercase tracking-widest">Thông báo lỗi chi tiết</span>
-                      <button
-                        type="button"
-                        onClick={() => copy_text(selectedLog.error_message, 'thông báo lỗi')}
-                        className="ml-auto text-rose-400 hover:text-rose-700"
-                        aria-label="Sao chép thông báo lỗi"
-                        title="Sao chép thông báo lỗi"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                    <div className="p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-rose-200 text-sm font-medium text-rose-900 overflow-x-auto">
-                      <code className="whitespace-pre-wrap">{selectedLog.error_message}</code>
-                    </div>
-                  </div>
-                )}
-
-                {/* Metadata */}
-                {selectedLog.metadata && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <FileJson size={16} />
-                      <span className="text-[11px] font-black uppercase tracking-widest">
-                        Dữ liệu đi kèm (Metadata)
-                      </span>
-                    </div>
-                    <div className="p-5 bg-gray-50 rounded-xl text-blue-600 text-xs font-mono overflow-hidden shadow-inner">
-                      <pre className="overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-40 custom-scrollbar">
-                        {formatMetadata(selectedLog.metadata)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-
-                {/* Timestamps */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Khởi tạo lúc</span>
-                    <span className="text-xs font-bold text-slate-600">{formatDateTime(selectedLog.created_at)}</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">
-                      Gửi thành công lúc
-                    </span>
-                    <span className="text-xs font-bold text-slate-600 text-right">
-                      {formatDateTime(selectedLog.sent_at)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter className="bg-slate-50 border-t border-gray-200 p-4">
-            {canResend(selectedLog) && (
-              <Button variant="outline" onClick={() => setIsResendConfirmOpen(true)} className="gap-2">
-                <Send size={14} /> Gửi lại
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirm before sending the confirmation email of an order again */}
-      <AlertDialog open={isResendConfirmOpen} onOpenChange={setIsResendConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Gửi lại email xác nhận?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Email xác nhận đặt vé{selectedLog?.booking_code ? ` (mã đặt chỗ ${selectedLog.booking_code})` : ''} sẽ được gửi
-              lại tới địa chỉ email ghi trên đơn.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResending}>Hủy</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isResending}
-              onClick={(event) => {
-                // Keep the dialog open until the request finishes
-                event.preventDefault();
-                handleResend();
-              }}
-            >
-              {isResending ? 'Đang gửi...' : 'Gửi lại'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={isResendConfirmOpen}
+        onOpenChange={setIsResendConfirmOpen}
+        variant="info"
+        title="Gửi lại email xác nhận?"
+        confirmText="Gửi lại"
+        busy={isResending}
+        onConfirm={handleResend}
+        description={`Email xác nhận đặt vé${selectedLog?.booking_code ? ` (mã đặt chỗ ${selectedLog.booking_code})` : ''} sẽ được gửi lại tới địa chỉ email ghi trên đơn.`}
+      />
     </div>
   );
 }

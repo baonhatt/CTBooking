@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { request } from '@/lib/api/http';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Monitor, Smartphone, Code, ScanFace, FileCode2, Eye, Copy } from 'lucide-react';
-import { toast } from 'sonner';
+import { Monitor, Smartphone, Code, ScanFace, FileCode2, Eye, Copy } from 'lucide-react';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_OUTLINE, ADMIN_CARD } from '@/components/admin/common/adminTokens';
+import { EmptyState, InlineLoading } from '@/components/admin/common/EmptyState';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TemplateConfig {
@@ -41,36 +43,55 @@ export default function EmailPreviewPage() {
     if (!currentTemplate) return;
     try {
       await navigator.clipboard.writeText(currentTemplate.html);
-      toast.success('Đã sao chép mã nguồn email');
+      notify.success('Đã sao chép mã nguồn email');
     } catch {
-      toast.error('Không sao chép được, hãy chọn mã nguồn và sao chép thủ công');
+      notify.error('Không sao chép được, hãy chọn mã nguồn và sao chép thủ công');
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-12 h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      <div className="p-12">
+        <InlineLoading />
       </div>
     );
   }
 
-  if (error || !currentTemplate) {
+  if (error) {
     return (
-      <div className="p-8 text-center text-red-500">
-        <ScanFace className="w-12 h-12 mx-auto mb-4" />
-        <h3 className="font-bold">Lỗi tải dữ liệu mẫu email</h3>
-        <p className="text-sm">Vui lòng thử lại sau.</p>
+      <div className={`${ADMIN_CARD} mx-2 mt-2`}>
+        <EmptyState
+          icon={<ScanFace className="h-6 w-6" />}
+          title="Không tải được dữ liệu mẫu email"
+          description="Vui lòng thử lại sau."
+        />
+      </div>
+    );
+  }
+
+  if (templates.length === 0) {
+    return (
+      <div className={`${ADMIN_CARD} mx-2 mt-2`}>
+        <EmptyState icon={<ScanFace className="h-6 w-6" />} title="Chưa có mẫu email nào" />
+      </div>
+    );
+  }
+
+  // Templates exist but the default tab is not selected yet (first render before the effect runs)
+  if (!currentTemplate) {
+    return (
+      <div className="p-12">
+        <InlineLoading />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.16))] bg-slate-50 md:flex-row shadow-inner overflow-hidden border border-slate-200 mt-2 mx-2 rounded-2xl">
+    <div className="flex flex-col h-[calc(100vh-theme(spacing.16))] bg-slate-50 md:flex-row overflow-hidden border border-slate-200 mt-2 mx-2 rounded-xl shadow-sm">
       {/* SIDEBAR */}
       <div className="w-full md:w-[280px] shrink-0 bg-white border-r border-slate-200 flex flex-col">
         <div className="p-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
-          <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center border border-indigo-100 text-indigo-500">
+          <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center border border-blue-100 text-blue-600">
             <Eye className="w-4 h-4" />
           </div>
           <h2 className="font-bold text-slate-800 text-sm">Danh sách mẫu email</h2>
@@ -83,7 +104,7 @@ export default function EmailPreviewPage() {
                 onClick={() => setActiveTab(tmpl.id)}
                 className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-start gap-3
                   ${activeTab === tmpl.id 
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' 
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20' 
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
               >
@@ -124,7 +145,7 @@ export default function EmailPreviewPage() {
               variant="ghost"
               size="sm"
               onClick={() => setRenderMode('render')}
-              className={`h-7 px-3 text-xs font-semibold rounded-md ${renderMode === 'render' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`h-7 px-3 text-xs font-semibold rounded-md ${renderMode === 'render' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Eye className="w-3.5 h-3.5 mr-1.5" />
               Xem trước
@@ -133,7 +154,7 @@ export default function EmailPreviewPage() {
               variant="ghost"
               size="sm"
               onClick={() => setRenderMode('source')}
-              className={`h-7 px-3 text-xs font-semibold rounded-md ${renderMode === 'source' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`h-7 px-3 text-xs font-semibold rounded-md ${renderMode === 'source' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               <Code className="w-3.5 h-3.5 mr-1.5" />
               Mã nguồn
@@ -144,7 +165,7 @@ export default function EmailPreviewPage() {
             variant="outline"
             size="sm"
             onClick={copy_source}
-            className="h-7 px-3 text-xs font-semibold shrink-0"
+            className={`${ADMIN_BTN_OUTLINE} h-8 shrink-0 px-3 text-xs`}
             title="Sao chép mã nguồn HTML của mẫu đang chọn"
           >
             <Copy className="w-3.5 h-3.5 mr-1.5" />
@@ -154,7 +175,7 @@ export default function EmailPreviewPage() {
 
         <div className="flex-1 p-4 md:p-8 overflow-y-auto w-full flex justify-center">
           {renderMode === 'render' ? (
-            <Card className={`overflow-hidden transition-all duration-300 mx-auto shadow-xl border-slate-200 border-x-4 border-t-8 border-b-8 rounded-xl ${
+            <Card className={`overflow-hidden transition-all duration-300 mx-auto border-slate-200 border-x-4 border-t-8 border-b-8 rounded-xl shadow-sm ${
               viewMode === 'mobile' ? 'max-w-[375px] w-full min-h-[667px]' : 'w-full max-w-4xl'
             } bg-white flex flex-col`}>
               {/* An empty sandbox blocks scripts, forms and navigation inside the previewed email */}

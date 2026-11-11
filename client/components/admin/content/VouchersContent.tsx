@@ -13,14 +13,11 @@ import {
     Sparkles,
     Gamepad2,
     Film,
-    ToggleLeft,
-    ToggleRight,
     Tag,
     RotateCcw,
     Loader2,
     Search,
-    FilterX,
-    ShieldAlert,
+    Check,
     Copy,
     FileText,
     User,
@@ -30,36 +27,13 @@ import {
     ArrowUpDown
 } from 'lucide-react';
 import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
-import { formatDistanceToNow, isAfter, isBefore } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { isAfter, isBefore } from 'date-fns';
 import { formatVnDate, formatVnDateTime } from '@/lib/format';
 import { request } from '@/lib/api/http';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious
-} from '@/components/ui/pagination';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger
-} from '@/components/ui/alert-dialog';
-import { XCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -67,7 +41,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
-import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import {
     createVoucherApi,
@@ -78,9 +51,25 @@ import {
     listStaffOptionsApi,
     type VoucherListFilters
 } from '@/lib/api';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { FormField, FormSection } from '@/components/admin/common/FormField';
+import { notify } from '@/components/admin/common/notify';
+import {
+    ADMIN_INPUT,
+    ADMIN_BTN_OUTLINE,
+    ADMIN_BTN_PRIMARY,
+    ADMIN_CARD,
+    ADMIN_TABLE_HEAD,
+    ADMIN_TEXT,
+    ADMIN_TH
+} from '@/components/admin/common/adminTokens';
 
 interface VoucherItem {
     id: number;
@@ -126,7 +115,6 @@ interface Props {
     onCreate: () => void;
     onEdit: (v: VoucherItem) => void;
     onRefresh: () => Promise<void>;
-    setVouchers: React.Dispatch<React.SetStateAction<VoucherItem[]>>;
     isEditOpen: boolean;
     setIsEditOpen: (open: boolean) => void;
     editData: any;
@@ -193,6 +181,42 @@ function FieldError({ message }: { message?: string }) {
         </p>
     );
 }
+
+// A voucher is "permanent" when it has neither a start nor an end date
+const is_voucher_permanent = (voucher: any): boolean => {
+    if (!voucher || !voucher.id) return false;
+    return !voucher.valid_until && !voucher.valid_from;
+};
+
+// Number list as a sorted copy (order does not matter for ids); null stays null so "all" differs from "none"
+const sorted_id_list = (ids: unknown): number[] | null => {
+    if (!Array.isArray(ids)) return null;
+    return ids.map((id) => Number(id)).sort((a, b) => a - b);
+};
+
+// Every editable field of the voucher form in a fixed shape, so two states can be compared by content
+const voucher_form_snapshot = (form: any, permanent: boolean): string => {
+    const source = form || {};
+    return JSON.stringify({
+        code: source.code || '',
+        name: source.name || '',
+        sale_staff_id: source.sale_staff_id ? Number(source.sale_staff_id) : null,
+        note: (source.note !== undefined ? source.note : source.description) || '',
+        scope: source.scope || 'all',
+        discount_type: source.discount_type || 'percent',
+        discount_value: Number(source.discount_value || 0),
+        max_discount: Number(source.max_discount || 0),
+        min_order_value: Number(source.min_order_value || 0),
+        usage_limit: source.usage_limit === null || source.usage_limit === undefined ? null : Number(source.usage_limit),
+        per_user_limit: Number(source.per_user_limit ?? 1),
+        valid_from: permanent ? null : source.valid_from || null,
+        valid_until: permanent ? null : source.valid_until || null,
+        permanent,
+        applicable_ticket_package_ids: sorted_id_list(source.applicable_ticket_package_ids),
+        branch_ids: sorted_id_list(source.branch_ids),
+        is_active: !!(source.is_active ?? true)
+    });
+};
 
 const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -296,6 +320,11 @@ export default function VouchersContent(props: Props) {
     const { isLoading = false } = props as any;
 
     const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
+    // The voucher a confirm dialog is about (one dialog for the whole list, not one per row)
+    const [voucherToDelete, setVoucherToDelete] = useState<VoucherItem | null>(null);
+    const [voucherToRestore, setVoucherToRestore] = useState<VoucherItem | null>(null);
+    // Asks before the edit form is cancelled while it has unsaved changes
+    const [askDiscardEdit, setAskDiscardEdit] = useState(false);
     const [isRestoringId, setIsRestoringId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isTogglingId, setIsTogglingId] = useState<number | null>(null);
@@ -307,76 +336,66 @@ export default function VouchersContent(props: Props) {
     const [detailPackages, setDetailPackages] = useState<any[]>([]);
     const [localSearchText, setLocalSearchText] = useState(searchText);
     const [voucherToToggle, setVoucherToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
-    const [isPermanent, setIsPermanent] = useState(false);
+    // Initialised from the voucher being edited, so the first render of the dialog already shows the right value
+    const [isPermanent, setIsPermanent] = useState(() => (isEditOpen ? is_voucher_permanent(editData) : false));
+    // Which voucher the form was last set up for ('' = dialog closed); re-syncs isPermanent during render, before paint
+    const form_key = isEditOpen && editData ? String(editData.id || 0) : '';
+    const [synced_form_key, setSyncedFormKey] = useState(form_key);
+    if (synced_form_key !== form_key) {
+        setSyncedFormKey(form_key);
+        if (form_key) setIsPermanent(is_voucher_permanent(editData));
+    }
+    // The form as it was right after it was set up; null until the open effect has initialised it
+    const [initial_form_snapshot, setInitialFormSnapshot] = useState<string | null>(null);
     const [isCodeEditable, setIsCodeEditable] = useState(false);
     const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<VoucherField, string>>>({});
     const [redemptionLimitStep, setRedemptionLimitStep] = useState(0);
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+    // Dirty = any editable field differs from the snapshot taken when the form was set up
     const isDirty = React.useMemo(() => {
-        if (!isEditOpen || !editData) return false;
+        if (!isEditOpen || !editData || initial_form_snapshot === null) return false;
+        return voucher_form_snapshot(editData, isPermanent) !== initial_form_snapshot;
+    }, [isEditOpen, editData, isPermanent, initial_form_snapshot]);
 
-        if (!editData.id || editData.id === 0) {
-            return !!(
-                (editData.name && editData.name.trim() !== '') ||
-                (editData.note && editData.note.trim() !== '') ||
-                (editData.description && editData.description.trim() !== '') ||
-                Number(editData.min_order_value || 0) > 0 ||
-                Number(editData.max_discount || 0) > 0 ||
-                Number(editData.usage_limit || 0) > 0 ||
-                editData.discount_type !== 'percent' ||
-                Number(editData.discount_value || 0) !== 10 ||
-                editData.scope !== 'all' ||
-                editData.sale_staff_id != null
-            );
+    // Called by AdminDialog after the unsaved-changes prompt (if any) was accepted
+    const close_edit_dialog = () => {
+        setAskDiscardEdit(false);
+        setIsEditOpen(false);
+        setEditData({});
+    };
+
+    // The footer "Hủy" button: ask first when the form has unsaved changes
+    const request_close_edit = () => {
+        if (isDirty) {
+            setAskDiscardEdit(true);
+            return;
         }
-
-        const original = data.find(v => v.id === editData.id);
-        if (!original) return false;
-
-        if (editData.code !== original.code) return true;
-        if (editData.name !== original.name) return true;
-        if (String(editData.discount_type) !== String(original.discount_type)) return true;
-        if (Number(editData.discount_value || 0) !== Number(original.discount_value || 0)) return true;
-        if (editData.note !== original.note && editData.note !== original.description) return true;
-        if (Number(editData.max_discount || 0) !== Number(original.max_discount || 0)) return true;
-        if (Number(editData.min_order_value || 0) !== Number(original.min_order_value || 0)) return true;
-
-        return false;
-    }, [isEditOpen, editData, data]);
-
-    const { handleOpenChange: handleEditOpenChange, UnsavedAlert: EditAlert } = useConfirmUnsaved({
-        isDirty: isDirty,
-        isSubmitting: isSaving,
-        onConfirmClose: () => {
-            setIsEditOpen(false);
-            setEditData({});
-        }
-    });
+        close_edit_dialog();
+    };
 
     useEffect(() => {
         if (isEditOpen && editData) {
             // Always reset code editability (and old form errors) when dialog opens
             setIsCodeEditable(false);
             setFieldErrors({});
+            let initialForm = editData;
             if (!editData.id || editData.id === 0) {
                 // When creating new voucher: if no dates provided, initialize to today start & end
                 if (!editData.valid_from && !editData.valid_until) {
-                    setEditData({
+                    initialForm = {
                         ...editData,
                         valid_from: getTodayStartIso(),
                         valid_until: getTodayEndIso()
-                    });
-                    setIsPermanent(false);
-                } else {
-                    setIsPermanent(false);
+                    };
+                    setEditData(initialForm);
                 }
-            } else {
-                // When editing existing: permanent if both are empty/null or valid_until is null
-                const isPerm = !editData.valid_until && !editData.valid_from;
-                setIsPermanent(isPerm);
             }
+            // Snapshot AFTER the defaults above, so opening the form never counts as a change
+            setInitialFormSnapshot(voucher_form_snapshot(initialForm, is_voucher_permanent(initialForm)));
+        } else {
+            setInitialFormSnapshot(null);
         }
     }, [isEditOpen, editData?.id]);
 
@@ -496,18 +515,18 @@ export default function VouchersContent(props: Props) {
 
     const handleCopyBookingCode = (bookingCode: string) => {
         navigator.clipboard.writeText(bookingCode);
-        toast.success('Đã sao chép mã đặt chỗ');
+        notify.copied('mã đặt chỗ');
     };
 
     const handleToggleStatus = async (id: number, currentStatus: boolean) => {
         setIsTogglingId(id);
         try {
             await toggleVoucherStatusApi(id);
-            toast.success(!currentStatus ? 'Đã bật voucher' : 'Đã ẩn voucher');
+            notify.success(!currentStatus ? 'Đã bật voucher' : 'Đã ẩn voucher');
             setVoucherToToggle(null);
             onRefresh();
         } catch (err: any) {
-            toast.error(err.message || 'Lỗi khi thay đổi trạng thái');
+            notify.error(err, 'Lỗi khi thay đổi trạng thái');
         } finally {
             setIsTogglingId(null);
         }
@@ -517,10 +536,11 @@ export default function VouchersContent(props: Props) {
         setIsDeletingId(voucher.id);
         try {
             await deleteVoucherApi(voucher.id);
-            toast.success('Xóa voucher thành công');
+            notify.deleted('voucher');
+            setVoucherToDelete(null);
             onRefresh();
         } catch (err: any) {
-            toast.error(err.message || 'Xóa voucher thất bại');
+            notify.error(err, 'Xóa voucher thất bại');
         } finally {
             setIsDeletingId(null);
         }
@@ -531,10 +551,11 @@ export default function VouchersContent(props: Props) {
         setIsRestoringId(voucher.id);
         try {
             await restoreVoucherApi(voucher.id);
-            toast.success('Phục hồi voucher thành công');
+            notify.restored('voucher');
+            setVoucherToRestore(null);
             onRefresh();
         } catch (err: any) {
-            toast.error(err.message || 'Phục hồi thất bại');
+            notify.error(err, 'Khôi phục thất bại');
         } finally {
             setIsRestoringId(null);
         }
@@ -550,10 +571,10 @@ export default function VouchersContent(props: Props) {
         try {
             if (editData.id && editData.id > 0) {
                 await updateVoucherApi(editData.id, payload);
-                toast.success('Cập nhật voucher thành công');
+                notify.saved('voucher');
             } else {
                 await createVoucherApi(payload);
-                toast.success('Tạo voucher thành công');
+                notify.created('voucher');
             }
             setConfirmSaveData(null);
             setIsEditOpen(false);
@@ -566,7 +587,7 @@ export default function VouchersContent(props: Props) {
                 setConfirmSaveData(null);
                 show_field_errors({ code: message });
             } else {
-                toast.error(message);
+                notify.error(message);
             }
         } finally {
             setIsSaving(false);
@@ -633,7 +654,7 @@ export default function VouchersContent(props: Props) {
         if (!editData) return;
         const payload = { ...editData };
         if (!['percent', 'fixed'].includes(payload.discount_type)) {
-            toast.error('Loại giảm giá không hợp lệ');
+            notify.error('Loại giảm giá không hợp lệ');
             return;
         }
         const value = Number(payload.discount_value);
@@ -726,7 +747,7 @@ export default function VouchersContent(props: Props) {
     const handleCopyCode = (code: string) => {
         if (!code) return;
         navigator.clipboard.writeText(code);
-        toast.success('Đã sao chép mã voucher');
+        notify.copied('mã voucher');
     };
 
     // Column header; a button that sorts the list when the page supports it
@@ -735,7 +756,7 @@ export default function VouchersContent(props: Props) {
         const SortIcon = isSorted ? (sortDir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
         return (
             <TableHead
-                className={`text-xs font-semibold text-gray-600 uppercase py-3.5 ${extraClass}`}
+                className={`${ADMIN_TH} py-3.5 ${extraClass}`}
                 aria-sort={isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
             >
                 {onSortChange && !isDeletedView ? (
@@ -746,7 +767,7 @@ export default function VouchersContent(props: Props) {
                         title="Bấm để sắp xếp"
                     >
                         {label}
-                        <SortIcon className={`w-3 h-3 ${isSorted ? 'text-purple-600' : 'text-gray-400'}`} />
+                        <SortIcon className={`w-3 h-3 ${isSorted ? 'text-blue-600' : 'text-gray-400'}`} />
                     </button>
                 ) : (
                     label
@@ -755,24 +776,38 @@ export default function VouchersContent(props: Props) {
         );
     };
 
+    // Nothing in the list: "Chưa có" when the list is really empty, "Không tìm thấy" when a filter hides everything
+    const renderEmptyState = () => {
+        if (isDeletedView) return <EmptyState title="Chưa có voucher nào bị xóa" icon={<Tag className="h-6 w-6" />} />;
+        const isFiltered = !!searchText || statusFilter !== 'all' || scopeFilter !== 'all';
+        const createLabel =
+            scopeFilter === 'movie' ? 'Thêm voucher phim' : scopeFilter === 'all' ? 'Thêm voucher' : 'Thêm voucher VR';
+        if (isFiltered) {
+            return <EmptyState title="Không tìm thấy voucher phù hợp" icon={<Tag className="h-6 w-6" />} />;
+        }
+        return (
+            <EmptyState
+                title="Chưa có voucher nào"
+                description={hasPermission('vouchers', 'create') ? `Bấm "${createLabel}" để tạo ưu đãi đầu tiên` : undefined}
+                icon={<Tag className="h-6 w-6" />}
+            />
+        );
+    };
+
     return (
         <div className="space-y-6 font-sans">
             {/* PAGE HEADER */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl font-bold text-slate-800">
-                        {isDeletedView ? 'Quản lý mã giảm giá đã xóa' : 'Quản lý mã giảm giá'}
-                    </h1>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                        {isDeletedView
-                            ? `Tổng cộng ${data.length} voucher trong thùng rác`
-                            : `Tổng cộng ${data.length} voucher trong hệ thống`}
-                    </p>
-                </div>
-            </div>
+            <PageHeader
+                title={isDeletedView ? 'Quản lý mã giảm giá đã xóa' : 'Quản lý mã giảm giá'}
+                description={
+                    isDeletedView
+                        ? `Đang hiển thị ${data.length} voucher trong thùng rác`
+                        : `Đang hiển thị ${data.length} voucher`
+                }
+            />
 
             {/* TOOLBAR */}
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+            <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
                 <div className="flex flex-wrap items-center gap-3 flex-1 w-full xl:w-auto">
                     {/* Search Form */}
                     <form onSubmit={handleSearchSubmit} className="flex flex-1 min-w-[260px] max-w-md gap-2">
@@ -783,7 +818,7 @@ export default function VouchersContent(props: Props) {
                                 placeholder="Tìm mã hoặc tên voucher..."
                                 value={localSearchText}
                                 onChange={(e) => setLocalSearchText(e.target.value)}
-                                className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-purple-500 rounded-xl transition-all outline-none text-sm h-10"
+                                className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm h-10"
                             />
                             {localSearchText && (
                                 <button
@@ -800,11 +835,8 @@ export default function VouchersContent(props: Props) {
                                 </button>
                             )}
                         </div>
-                        <Button
-                            type="submit"
-                            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0 h-10 shadow-sm"
-                        >
-                            <Search className="w-3.5 h-3.5" /> Tìm kiếm
+                        <Button type="submit" className={`${ADMIN_BTN_PRIMARY} flex shrink-0 items-center gap-1.5`}>
+                            <Search className="w-3.5 h-3.5" /> {ADMIN_TEXT.search}
                         </Button>
                     </form>
 
@@ -869,7 +901,7 @@ export default function VouchersContent(props: Props) {
                                 setStatusFilter(e.target.value);
                                 setPage(1);
                             }}
-                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
+                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
                         >
                             <option value="all">Mọi tình trạng</option>
                             <option value="expired">Đã hết hạn</option>
@@ -889,7 +921,7 @@ export default function VouchersContent(props: Props) {
                                 setSelectedBranchId(e.target.value === 'all' ? 'all' : Number(e.target.value));
                                 setPage(1);
                             }}
-                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
+                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
                         >
                             {isSuperAdmin && <option value="all">Tất cả chi nhánh</option>}
                             {branches.map((b) => (
@@ -907,7 +939,7 @@ export default function VouchersContent(props: Props) {
                                 setSelectedSaleId(e.target.value);
                                 setPage(1);
                             }}
-                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none shadow-sm cursor-pointer h-10"
+                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer h-10"
                         >
                             <option value="all">Tất cả Sale</option>
                             {staffList.map((st) => (
@@ -922,10 +954,10 @@ export default function VouchersContent(props: Props) {
                         <Button
                             variant="outline"
                             onClick={() => navigate('/deleted/vouchers')}
-                            className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50"
+                            className={`${ADMIN_BTN_OUTLINE} flex items-center gap-2`}
                         >
                             <Trash2 className="w-4 h-4 text-slate-500" />
-                            <span className="hidden sm:inline text-xs font-semibold">Xem đã xóa</span>
+                            <span className="hidden sm:inline">Xem đã xóa</span>
                         </Button>
                     )}
 
@@ -933,17 +965,17 @@ export default function VouchersContent(props: Props) {
                         <Button
                             variant="outline"
                             onClick={() => navigate('/vouchers')}
-                            className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm border-slate-200"
+                            className={`${ADMIN_BTN_OUTLINE} flex items-center gap-2`}
                         >
                             <RotateCcw className="w-4 h-4" />
-                            <span className="text-xs font-semibold">Về danh sách</span>
+                            <span>Về danh sách</span>
                         </Button>
                     )}
 
                     {!isDeletedView && hasPermission('vouchers', 'create') && (
                         <Button
                             onClick={onCreate}
-                            className="bg-purple-600 hover:bg-purple-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs transition-all whitespace-nowrap"
+                            className={`${ADMIN_BTN_PRIMARY} gap-2 whitespace-nowrap`}
                         >
                             <Plus className="w-4 h-4" />
                             {scopeFilter === 'movie'
@@ -956,10 +988,10 @@ export default function VouchersContent(props: Props) {
 
                     <Button
                         variant="outline"
-                        size="icon"
                         onClick={onRefresh}
-                        className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 border-slate-200"
-                        title="Làm mới"
+                        className={`${ADMIN_BTN_OUTLINE} w-10 shrink-0 px-0`}
+                        title={ADMIN_TEXT.refresh}
+                        aria-label="Làm mới danh sách"
                     >
                         <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                     </Button>
@@ -967,561 +999,305 @@ export default function VouchersContent(props: Props) {
             </div>
 
             {/* TABLE */}
-            <Card className="border border-gray-200 rounded-xl shadow-sm bg-white overflow-hidden">
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader className="bg-gray-50 border-b border-gray-200">
-                            <TableRow className="hover:bg-transparent border-none">
-                                {sort_head('Mã voucher', 'code')}
-                                {sort_head('Tên chương trình', 'name')}
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5">Phạm vi & Sale</TableHead>
-                                {sort_head('Mức giảm', 'discount_value')}
-                                {sort_head('Đã dùng / Còn lại', 'used_count')}
-                                {sort_head('Thời gian hiệu lực', 'valid_until', 'min-w-[150px]')}
-                                <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3.5 min-w-[120px]">
-                                    Chi nhánh
-                                </TableHead>
-                                <TableHead className="text-center text-xs font-semibold text-gray-600 uppercase py-3.5">
-                                    Trạng thái
-                                </TableHead>
-                                <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3.5 pr-6">
-                                    Thao tác
-                                </TableHead>
+            <div className={`${ADMIN_CARD} overflow-hidden`}>
+                <Table className="[&_td]:px-3 [&_th]:px-3">
+                    <TableHeader className={ADMIN_TABLE_HEAD}>
+                        <TableRow className="hover:bg-transparent border-none">
+                            {sort_head('Mã voucher', 'code')}
+                            {sort_head('Tên chương trình', 'name')}
+                            {sort_head('Mức giảm', 'discount_value')}
+                            {sort_head('Đã dùng / Còn lại', 'used_count')}
+                            {sort_head('Thời gian hiệu lực', 'valid_until', 'min-w-[140px]')}
+                            <TableHead className={`${ADMIN_TH} hidden min-w-[120px] py-3.5 2xl:table-cell`}>Chi nhánh</TableHead>
+                            <TableHead className={`${ADMIN_TH} py-3.5 text-center`}>Trạng thái</TableHead>
+                            <TableHead className={`${ADMIN_TH} py-3.5 pr-4 text-right`}>{ADMIN_TEXT.actionColumn}</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? (
+                            <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={8} className="p-0">
+                                    <TableSkeleton rows={5} />
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                Array.from({ length: 5 }).map((_, idx) => (
-                                    <TableRow key={`sk-${idx}`}>
+                        ) : data.length === 0 ? (
+                            <TableRow className="hover:bg-transparent">
+                                <TableCell colSpan={8} className="p-0">
+                                    {renderEmptyState()}
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            data.map((v) => {
+                                const expired = isExpired(v);
+                                const future = isFuture(v);
+                                const used = v.used_count ?? v.redemption_total_count ?? 0;
+                                const limit = v.usage_limit;
+                                const remaining = limit ? Math.max(0, Number(limit) - used) : null;
+                                const isOutOfQuota = !!limit && used >= Number(limit);
+                                const isLowQuota = !!limit && !isOutOfQuota && used >= Number(limit) * LOW_QUOTA_SHARE;
+                                return (
+                                    <TableRow
+                                        key={v.id}
+                                        className={`group border-b border-slate-100 transition-colors hover:bg-slate-50 ${expired ? 'opacity-60' : future ? 'opacity-70' : ''}`}
+                                    >
                                         <TableCell>
-                                            <Skeleton className="h-4 w-24" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-36" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-24" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-20" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-20" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-36" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-20" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-5 w-14 mx-auto rounded-full" />
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Skeleton className="h-8 w-28 ml-auto rounded-lg" />
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : data.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} className="py-16 text-center">
-                                        <div className="flex flex-col items-center gap-2 text-slate-400">
-                                            <Tag className="w-10 h-10 opacity-40" />
-                                            <p className="text-sm font-medium">
-                                                {isDeletedView ? 'Chưa có voucher nào bị xóa' : 'Chưa có voucher nào trong hệ thống'}
-                                            </p>
-                                            {!isDeletedView && hasPermission('vouchers', 'create') && (
-                                                <p className="text-xs">
-                                                    Bấm "
-                                                    {scopeFilter === 'movie'
-                                                        ? 'Thêm voucher phim'
-                                                        : scopeFilter === 'all'
-                                                            ? 'Thêm voucher'
-                                                            : 'Thêm voucher VR'}
-                                                    " để tạo ưu đãi đầu tiên
-                                                </p>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                data.map((v) => {
-                                    const expired = isExpired(v);
-                                    const future = isFuture(v);
-                                    const used = v.used_count ?? v.redemption_total_count ?? 0;
-                                    const limit = v.usage_limit;
-                                    const remaining = limit ? Math.max(0, Number(limit) - used) : null;
-                                    const isOutOfQuota = !!limit && used >= Number(limit);
-                                    const isLowQuota = !!limit && !isOutOfQuota && used >= Number(limit) * LOW_QUOTA_SHARE;
-                                    return (
-                                        <TableRow
-                                            key={v.id}
-                                            className={`group hover:bg-gray-50/80 transition-colors border-b border-gray-100 ${expired ? 'opacity-60' : future ? 'opacity-70' : ''
-                                                }`}
-                                        >
-                                            <TableCell>
+                                            <div className="flex flex-col items-start gap-1.5">
                                                 <span
                                                     onClick={() => handleCopyCode(v.code)}
-                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50/50 hover:bg-purple-100/80 text-purple-700 border border-purple-200 font-mono font-bold text-xs tracking-wider cursor-pointer active:scale-95 transition-all"
+                                                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50/50 px-2.5 py-1 font-mono text-xs font-bold tracking-wider text-purple-700 transition-all hover:bg-purple-100/80 active:scale-95"
                                                     title="Bấm để sao chép mã"
                                                 >
                                                     {v.code}
-                                                    <Copy className="w-3 h-3 text-purple-400 opacity-70" />
+                                                    <Copy className="h-3 w-3 text-purple-400 opacity-70" />
                                                 </span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-800 leading-tight truncate max-w-[220px]" title={v.name}>
-                                                        {v.name}
+                                                {/* Below 2xl the Branch column is hidden, so the branches sit under the code */}
+                                                <div className="2xl:hidden">
+                                                    <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col items-start gap-1">
+                                                <p className="max-w-[200px] truncate text-sm font-semibold leading-tight text-slate-800 2xl:max-w-[260px]" title={v.name}>
+                                                    {v.name}
+                                                </p>
+                                                {v.min_order_value && v.min_order_value > 0 ? (
+                                                    <p className="text-[11px] text-slate-500">
+                                                        Đơn tối thiểu: <b>{formatMoney(v.min_order_value)}</b>
                                                     </p>
-                                                    {v.min_order_value && v.min_order_value > 0 ? (
-                                                        <p className="text-[11px] text-slate-500 mt-0.5">
-                                                            Đơn tối thiểu: <b>{formatMoney(v.min_order_value)}</b>
-                                                        </p>
-                                                    ) : null}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <div>
-                                                        {v.scope === 'movie' ? (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-blue-200 bg-blue-50 text-blue-700 text-[11px] font-semibold gap-1"
-                                                            >
-                                                                <Film size={10} /> Phim
-                                                            </Badge>
-                                                        ) : v.scope === 'all' ? (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-semibold gap-1"
-                                                            >
-                                                                <TicketIcon size={10} /> Toàn đơn
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold gap-1"
-                                                            >
-                                                                <Gamepad2 size={10} /> VR
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    {v.sale_name ? (
-                                                        <p className="text-[11px] text-slate-500 truncate max-w-[120px]" title={v.sale_name}>
-                                                            👤 {v.sale_name}
-                                                        </p>
-                                                    ) : null}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                {v.discount_type === 'percent' ? (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-amber-300 bg-amber-50 text-amber-800 text-xs font-bold gap-1"
-                                                    >
-                                                        <Percent className="w-3 h-3" />
-                                                        {v.discount_value}%
-                                                        {v.max_discount ? (
-                                                            <span className="text-[11px] ml-0.5 opacity-75 font-normal">
-                                                                (tối đa {formatMoney(v.max_discount)})
-                                                            </span>
-                                                        ) : null}
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-bold gap-1"
-                                                    >
-                                                        <CircleDollarSign className="w-3 h-3" />
-                                                        {formatMoney(v.discount_value)}
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="text-xs font-medium text-slate-700">
-                                                        <span className="text-purple-600 font-bold">{used}</span>
-                                                        <span className="text-slate-400 mx-1">/</span>
-                                                        <span className={limit ? 'text-slate-700 font-semibold' : 'text-slate-400'}>
-                                                            {limit ? Number(limit).toLocaleString() : '∞'}
-                                                        </span>
-                                                    </span>
-                                                    {remaining !== null ? (
-                                                        isOutOfQuota ? (
-                                                            <Badge variant="destructive" className="w-fit text-[11px] font-semibold px-2 py-0">
-                                                                Hết lượt
-                                                            </Badge>
-                                                        ) : (
-                                                            <span
-                                                                className={`text-[11px] font-semibold ${isLowQuota ? 'text-amber-600' : 'text-slate-500'}`}
-                                                            >
-                                                                Còn {remaining.toLocaleString()} lượt{isLowQuota ? ' - sắp hết' : ''}
-                                                            </span>
-                                                        )
-                                                    ) : null}
-                                                    {v.total_revenue !== undefined && v.total_revenue > 0 ? (
-                                                        <span className="text-[11px] font-semibold text-emerald-600">
-                                                            Thu: {formatMoney(v.total_revenue)}
-                                                        </span>
-                                                    ) : null}
-                                                    {v.per_user_limit ? (
-                                                        <span className="text-[11px] text-slate-400">{v.per_user_limit} lượt/user</span>
-                                                    ) : null}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    {expired ? (
-                                                        <Badge variant="destructive" className="w-fit text-[11px] font-semibold px-2 py-0.5">
-                                                            Hết hiệu lực
+                                                ) : null}
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    {v.scope === 'movie' ? (
+                                                        <Badge variant="outline" className="gap-1 border-blue-200 bg-blue-50 text-[11px] font-semibold text-blue-700">
+                                                            <Film size={10} /> Phim
                                                         </Badge>
-                                                    ) : future ? (
-                                                        <Badge variant="secondary" className="w-fit text-[11px] font-semibold px-2 py-0.5">
-                                                            Chưa bắt đầu
+                                                    ) : v.scope === 'all' ? (
+                                                        <Badge variant="outline" className="gap-1 border-indigo-200 bg-indigo-50 text-[11px] font-semibold text-indigo-700">
+                                                            <TicketIcon size={10} /> Toàn đơn
                                                         </Badge>
                                                     ) : (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="w-fit text-[11px] font-semibold px-2 py-0.5 border-emerald-300 text-emerald-700 bg-emerald-50"
-                                                        >
-                                                            Đang hiệu lực
+                                                        <Badge variant="outline" className="gap-1 border-purple-200 bg-purple-50 text-[11px] font-semibold text-purple-700">
+                                                            <Gamepad2 size={10} /> VR
                                                         </Badge>
                                                     )}
-                                                    <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                                                        <CalendarDays className="w-3 h-3 text-slate-400 shrink-0" />
-                                                        {v.valid_from ? (
-                                                            <>
-                                                                {formatVnDate(v.valid_from)}
-                                                                {v.valid_until ? <> → {formatVnDate(v.valid_until)}</> : ' → Vĩnh viễn'}
-                                                            </>
-                                                        ) : v.valid_until ? (
-                                                            <>→ hết {formatVnDate(v.valid_until)}</>
-                                                        ) : (
-                                                            <span className="text-slate-400 font-medium">Vĩnh viễn</span>
-                                                        )}
+                                                    {v.sale_name ? (
+                                                        <span className="inline-flex max-w-[120px] items-center gap-1 truncate text-[11px] text-slate-500" title={v.sale_name}>
+                                                            <User className="h-3 w-3 shrink-0" /> {v.sale_name}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {v.discount_type === 'percent' ? (
+                                                <div className="flex flex-col items-start gap-0.5">
+                                                    <Badge variant="outline" className="gap-1 whitespace-nowrap border-amber-300 bg-amber-50 text-xs font-bold text-amber-800">
+                                                        <Percent className="h-3 w-3" />
+                                                        {v.discount_value}%
+                                                    </Badge>
+                                                    {v.max_discount ? (
+                                                        <span className="text-[11px] text-slate-500">tối đa {formatMoney(v.max_discount)}</span>
+                                                    ) : null}
+                                                </div>
+                                            ) : (
+                                                <Badge variant="outline" className="gap-1 whitespace-nowrap border-emerald-300 bg-emerald-50 text-xs font-bold text-emerald-800">
+                                                    <CircleDollarSign className="h-3 w-3" />
+                                                    {formatMoney(v.discount_value)}
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="text-xs font-medium text-slate-700">
+                                                    <span className="font-bold text-purple-600">{used}</span>
+                                                    <span className="mx-1 text-slate-400">/</span>
+                                                    <span className={limit ? 'font-semibold text-slate-700' : 'text-slate-400'}>
+                                                        {limit ? Number(limit).toLocaleString() : '∞'}
                                                     </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                {isDeletedView ? (
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        <Badge variant="destructive" className="text-[11px]">
-                                                            Đã xóa
-                                                        </Badge>
-                                                        {v.deleted_at && (
-                                                            <span className="text-[11px] text-slate-500">
-                                                                {formatVnDateTime(v.deleted_at)}
-                                                            </span>
-                                                        )}
-                                                        {v.deleted_by_staff_name && (
-                                                            <span className="text-[11px] text-slate-500">bởi {v.deleted_by_staff_name}</span>
-                                                        )}
-                                                    </div>
-                                                ) : isTogglingId === v.id ? (
-                                                    <Loader2 className="w-4 h-4 animate-spin mx-auto text-slate-400" />
+                                                </span>
+                                                {remaining !== null ? (
+                                                    isOutOfQuota ? (
+                                                        <StatusBadge tone="danger" className="w-fit">
+                                                            Hết lượt
+                                                        </StatusBadge>
+                                                    ) : (
+                                                        <span className={`text-[11px] font-semibold ${isLowQuota ? 'text-amber-600' : 'text-slate-500'}`}>
+                                                            Còn {remaining.toLocaleString()} lượt{isLowQuota ? ' - sắp hết' : ''}
+                                                        </span>
+                                                    )
+                                                ) : null}
+                                                {v.total_revenue !== undefined && v.total_revenue > 0 ? (
+                                                    <span className="text-[11px] font-semibold text-emerald-600">Thu: {formatMoney(v.total_revenue)}</span>
+                                                ) : null}
+                                                {v.per_user_limit ? (
+                                                    <span className="text-[11px] text-slate-400">{v.per_user_limit} lượt/người dùng</span>
+                                                ) : null}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col items-start gap-1">
+                                                {expired ? (
+                                                    <StatusBadge tone="danger">Hết hiệu lực</StatusBadge>
+                                                ) : future ? (
+                                                    <StatusBadge tone="info">Chưa bắt đầu</StatusBadge>
                                                 ) : (
-                                                    <div className="flex items-center justify-center">
-                                                        {hasPermission('vouchers', 'toggle_status') ? (
-                                                            <AlertDialog
-                                                                open={voucherToToggle?.id === v.id}
-                                                                onOpenChange={(open) => {
-                                                                    if (!open) setVoucherToToggle(null);
-                                                                }}
-                                                            >
-                                                                <AlertDialogTrigger asChild>
-                                                                    <Switch
-                                                                        checked={!!v.is_active}
-                                                                        className="scale-100 transition-all border-2 border-transparent cursor-pointer"
-                                                                        style={{
-                                                                            opacity: 1,
-                                                                            backgroundColor: v.is_active ? '#10b981' : '#d1d5db',
-                                                                            boxShadow: 'none'
-                                                                        }}
-                                                                        onClick={(e) => {
-                                                                            e.preventDefault();
-                                                                            setVoucherToToggle({
-                                                                                id: v.id,
-                                                                                currentStatus: !!v.is_active
-                                                                            });
-                                                                        }}
-                                                                    />
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent className="max-w-md rounded-2xl font-sans bg-white">
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
-                                                                            {voucherToToggle?.currentStatus ? (
-                                                                                <>
-                                                                                    <XCircle className="w-5 h-5 text-red-500" />
-                                                                                    Xác nhận ẩn voucher
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                                                                                    Xác nhận kích hoạt voucher
-                                                                                </>
-                                                                            )}
-                                                                        </AlertDialogTitle>
-                                                                        <AlertDialogDescription className="text-slate-500 text-sm">
-                                                                            Voucher <b className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">{v.code}</b> —{' '}
-                                                                            {v.name}
-                                                                            <br />
-                                                                            {voucherToToggle?.currentStatus ? (
-                                                                                <>
-                                                                                    Voucher sẽ <strong>không còn áp dụng được</strong> cho khách hàng.
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    Voucher sẽ <strong>hiển thị công khai</strong> và sẵn sàng cho khách hàng áp
-                                                                                    dụng.
-                                                                                </>
-                                                                            )}
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter className="mt-3">
-                                                                        <AlertDialogCancel
-                                                                            className="rounded-lg border-slate-200"
-                                                                            onClick={() => setVoucherToToggle(null)}
-                                                                        >
-                                                                            Hủy
-                                                                        </AlertDialogCancel>
-                                                                        <AlertDialogAction
-                                                                            disabled={isTogglingId === v.id}
-                                                                            onClick={(e) => {
-                                                                                e.preventDefault();
-                                                                                if (voucherToToggle) {
-                                                                                    handleToggleStatus(voucherToToggle.id, voucherToToggle.currentStatus);
-                                                                                }
-                                                                            }}
-                                                                            className={`rounded-lg text-white ${voucherToToggle?.currentStatus
-                                                                                    ? 'bg-red-600 hover:bg-red-700'
-                                                                                    : 'bg-emerald-600 hover:bg-emerald-700'
-                                                                                }`}
-                                                                        >
-                                                                            {isTogglingId === v.id ? (
-                                                                                <span className="flex items-center gap-2">
-                                                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                                                    Đang xử lý...
-                                                                                </span>
-                                                                            ) : voucherToToggle?.currentStatus ? (
-                                                                                'Đồng ý ẩn'
-                                                                            ) : (
-                                                                                'Đồng ý kích hoạt'
-                                                                            )}
-                                                                        </AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        ) : (
-                                                            <Switch
-                                                                checked={!!v.is_active}
-                                                                disabled
-                                                                className="scale-100 transition-all cursor-not-allowed border-2 border-transparent"
-                                                                style={{
-                                                                    opacity: 0.4,
-                                                                    backgroundColor: v.is_active ? '#10b981' : '#d1d5db',
-                                                                    boxShadow: 'none'
-                                                                }}
-                                                            />
-                                                        )}
-                                                    </div>
+                                                    <StatusBadge tone="success">Đang hiệu lực</StatusBadge>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-right pr-6">
-                                                <div className="inline-flex flex-nowrap gap-1">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-8 rounded-lg hover:bg-slate-50 text-slate-600 border-slate-200"
-                                                        onClick={() => openDetail(v)}
-                                                        aria-label="Xem chi tiết"
-                                                        title="Xem chi tiết"
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                    {!isDeletedView && hasPermission('vouchers', 'edit') && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 rounded-lg hover:bg-yellow-50 text-yellow-600 border-yellow-200"
-                                                            onClick={() => onEdit(v)}
-                                                            title="Sửa"
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
+                                                <span className="flex items-center gap-1 text-[11px] text-slate-500">
+                                                    <CalendarDays className="h-3 w-3 shrink-0 text-slate-400" />
+                                                    {v.valid_from ? (
+                                                        <>
+                                                            {formatVnDate(v.valid_from)}
+                                                            {v.valid_until ? <> → {formatVnDate(v.valid_until)}</> : ' → Vĩnh viễn'}
+                                                        </>
+                                                    ) : v.valid_until ? (
+                                                        <>→ hết {formatVnDate(v.valid_until)}</>
+                                                    ) : (
+                                                        <span className="font-medium text-slate-400">Vĩnh viễn</span>
                                                     )}
-                                                    {isDeletedView && restoreVoucherApi && onRestore && hasPermission('vouchers', 'restore') && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            disabled={isRestoringId === v.id}
-                                                            className="h-8 rounded-lg hover:bg-emerald-50 text-emerald-600 border-emerald-200"
-                                                            onClick={() => handleRestore(v)}
-                                                            title="Phục hồi"
-                                                        >
-                                                            {isRestoringId === v.id ? (
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                            ) : (
-                                                                <RotateCcw className="h-4 w-4" />
-                                                            )}
-                                                        </Button>
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="hidden 2xl:table-cell">
+                                            <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            {isDeletedView ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <StatusBadge tone="danger">Đã xóa</StatusBadge>
+                                                    {v.deleted_at && (
+                                                        <span className="text-[11px] text-slate-500">{formatVnDateTime(v.deleted_at)}</span>
                                                     )}
-                                                    {!isDeletedView && onDelete && hasPermission('vouchers', 'delete') && (
-                                                        <AlertDialog>
-                                                            <AlertDialogTrigger asChild>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    disabled={isDeletingId === v.id}
-                                                                    className="h-8 rounded-lg hover:bg-red-50 text-red-600 border-red-200"
-                                                                    title="Xóa voucher"
-                                                                >
-                                                                    {isDeletingId === v.id ? (
-                                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    ) : (
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    )}
-                                                                </Button>
-                                                            </AlertDialogTrigger>
-                                                            <AlertDialogContent className="max-w-md rounded-2xl border border-slate-200 shadow-xl">
-                                                                <AlertDialogHeader>
-                                                                    <AlertDialogTitle className="text-slate-800 flex items-center gap-2">
-                                                                        <Trash2 className="w-5 h-5 text-red-500" />
-                                                                        Xác nhận xóa voucher?
-                                                                    </AlertDialogTitle>
-                                                                    <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
-                                                                        Voucher <b className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">{v.code}</b> (
-                                                                        {v.name}) sẽ được chuyển vào danh sách đã xóa.
-                                                                        <br />
-                                                                        Bạn có thể phục hồi lại từ mục "Xem đã xóa".
-                                                                    </AlertDialogDescription>
-                                                                </AlertDialogHeader>
-                                                                <AlertDialogFooter>
-                                                                    <AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel>
-                                                                    <AlertDialogAction
-                                                                        className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
-                                                                        onClick={() => handleDeleteConfirm(v)}
-                                                                    >
-                                                                        Xác nhận xóa
-                                                                    </AlertDialogAction>
-                                                                </AlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                        </AlertDialog>
+                                                    {v.deleted_by_staff_name && (
+                                                        <span className="text-[11px] text-slate-500">bởi {v.deleted_by_staff_name}</span>
                                                     )}
                                                 </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
-                    {totalPages > 1 && (
-                        <Pagination className="mt-3">
-                            <PaginationContent>
-                                <PaginationItem>
-                                    <PaginationPrevious
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            setPage(Math.max(1, currentPage - 1));
-                                        }}
-                                        aria-disabled={currentPage === 1}
-                                        className={
-                                            currentPage === 1
-                                                ? 'pointer-events-none opacity-30'
-                                                : 'cursor-pointer rounded-lg border shadow-sm'
-                                        }
-                                    />
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <span className="flex items-center px-3 text-sm text-slate-600">
-                                        Trang {currentPage} / {totalPages}
-                                    </span>
-                                </PaginationItem>
-                                <PaginationItem>
-                                    <PaginationNext
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            setPage(Math.min(totalPages, currentPage + 1));
-                                        }}
-                                        aria-disabled={currentPage === totalPages}
-                                        className={
-                                            currentPage === totalPages
-                                                ? 'pointer-events-none opacity-30'
-                                                : 'cursor-pointer rounded-lg border shadow-sm'
-                                        }
-                                    />
-                                </PaginationItem>
-                            </PaginationContent>
-                        </Pagination>
-                    )}
-                </CardContent>
-            </Card>
+                                            ) : isTogglingId === v.id ? (
+                                                <Loader2 className="mx-auto h-4 w-4 animate-spin text-slate-400" />
+                                            ) : hasPermission('vouchers', 'toggle_status') ? (
+                                                <div className="flex items-center justify-center">
+                                                    <Switch
+                                                        checked={!!v.is_active}
+                                                        aria-label={`Đổi trạng thái voucher ${v.code}`}
+                                                        className="cursor-pointer border-2 border-transparent opacity-100 shadow-none transition-all data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-gray-300"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            setVoucherToToggle({ id: v.id, currentStatus: !!v.is_active });
+                                                        }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <StatusBadge status={v.is_active ? 'active' : 'inactive'} />
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="pr-4">
+                                            <RowActions>
+                                                <RowActionButton action="view" label={`Xem chi tiết voucher ${v.code}`} onClick={() => openDetail(v)} />
+                                                {!isDeletedView && hasPermission('vouchers', 'edit') && (
+                                                    <RowActionButton action="edit" label={`Chỉnh sửa voucher ${v.code}`} onClick={() => onEdit(v)} />
+                                                )}
+                                                {isDeletedView && restoreVoucherApi && onRestore && hasPermission('vouchers', 'restore') && (
+                                                    <RowActionButton
+                                                        action="restore"
+                                                        label={`Khôi phục voucher ${v.code}`}
+                                                        disabled={isRestoringId === v.id}
+                                                        onClick={() => setVoucherToRestore(v)}
+                                                    />
+                                                )}
+                                                {!isDeletedView && onDelete && hasPermission('vouchers', 'delete') && (
+                                                    <RowActionButton
+                                                        action="delete"
+                                                        label={`Xóa voucher ${v.code}`}
+                                                        disabled={isDeletingId === v.id}
+                                                        onClick={() => setVoucherToDelete(v)}
+                                                    />
+                                                )}
+                                            </RowActions>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
+                        )}
+                    </TableBody>
+                </Table>
+                <div className="border-t border-slate-200 px-4">
+                    <AdminPagination page={currentPage} totalPages={totalPages} onPageChange={setPage} />
+                </div>
+            </div>
 
-            {/* Create / Edit Modal */}
-            <EditAlert />
-            <Dialog open={isEditOpen} onOpenChange={handleEditOpenChange}>
-                <DialogContent className="max-w-[1050px] max-h-[90vh] flex flex-col p-0 border border-gray-200 shadow-xl rounded-2xl overflow-hidden font-sans bg-white [&>button]:hidden">
-                    <DialogHeader className="px-6 py-4 bg-white border-b border-gray-200">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 rounded-xl border bg-purple-50 border-purple-100 text-purple-600">
-                                    <TicketIcon size={22} />
-                                </div>
-                                <div>
-                                    <DialogTitle className="text-lg font-bold text-gray-900">
-                                        {editData?.id
-                                            ? editData?.scope === 'movie'
-                                                ? 'Chỉnh sửa Voucher Phim'
-                                                : editData?.scope === 'all'
-                                                    ? 'Chỉnh sửa Voucher Tổng hợp'
-                                                    : 'Chỉnh sửa Voucher VR'
-                                            : editData?.scope === 'movie'
-                                                ? 'Thêm voucher phim mới'
-                                                : editData?.scope === 'all'
-                                                    ? 'Thêm voucher mới'
-                                                    : 'Thêm voucher VR mới'}
-                                    </DialogTitle>
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                        {editData?.scope === 'movie'
-                                            ? 'Áp dụng cho Vé xem phim — Loại giảm, giới hạn & chi nhánh'
-                                            : editData?.scope === 'all'
-                                                ? 'Áp dụng cho Tất cả dịch vụ — Loại giảm, giới hạn & chi nhánh'
-                                                : 'Áp dụng cho Dịch vụ Trải nghiệm VR — Loại giảm, giới hạn & chi nhánh'}
-                                    </p>
-                                </div>
+            {/* CREATE / EDIT DIALOG */}
+            <AdminDialog
+                open={isEditOpen}
+                onClose={close_edit_dialog}
+                mode="form"
+                size="xl"
+                dirty={isDirty}
+                busy={isSaving}
+                icon={<TicketIcon className="h-5 w-5" />}
+                title={
+                    editData?.id
+                        ? editData?.scope === 'movie'
+                            ? 'Chỉnh sửa voucher phim'
+                            : editData?.scope === 'all'
+                                ? 'Chỉnh sửa voucher tổng hợp'
+                                : 'Chỉnh sửa voucher VR'
+                        : editData?.scope === 'movie'
+                            ? 'Thêm voucher phim mới'
+                            : editData?.scope === 'all'
+                                ? 'Thêm voucher mới'
+                                : 'Thêm voucher VR mới'
+                }
+                subtitle={
+                    editData?.scope === 'movie'
+                        ? 'Áp dụng cho vé xem phim — loại giảm, giới hạn & chi nhánh'
+                        : editData?.scope === 'all'
+                            ? 'Áp dụng cho tất cả dịch vụ — loại giảm, giới hạn & chi nhánh'
+                            : 'Áp dụng cho dịch vụ trải nghiệm VR — loại giảm, giới hạn & chi nhánh'
+                }
+                footer={
+                    <AdminDialogFooter
+                        onCancel={request_close_edit}
+                        onSubmit={handleSave}
+                        submitText={editData?.id ? ADMIN_TEXT.save : ADMIN_TEXT.create}
+                        busy={isSaving}
+                        submitDisabled={isEditLocked}
+                        leading={
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                {editData?.scope === 'movie' ? (
+                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[11px] font-semibold text-blue-700">
+                                        <Film className="mr-1 inline h-3 w-3" /> Phạm vi: Phim
+                                    </Badge>
+                                ) : editData?.scope === 'all' ? (
+                                    <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-[11px] font-semibold text-indigo-700">
+                                        <TicketIcon className="mr-1 inline h-3 w-3" /> Phạm vi: Tất cả
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[11px] font-semibold text-purple-700">
+                                        <Gamepad2 className="mr-1 inline h-3 w-3" /> Phạm vi: VR
+                                    </Badge>
+                                )}
+                                <span className="hidden md:inline">
+                                    {editData?.id
+                                        ? `Cập nhật lần cuối: ${formatVnDateTime(editData.updated_at)}`
+                                        : 'Voucher mới: mã sẽ được viết hoa tự động'}
+                                </span>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleEditOpenChange(false)}
-                                aria-label="Đóng"
-                                className="h-8 w-8 text-gray-500 hover:text-gray-700"
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </DialogHeader>
-
-                    <div className="overflow-y-auto px-6 py-4 flex-1 bg-slate-50/30">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        }
+                    />
+                }
+            >
+                <div>
+                    <div>
+                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                             {/* Cột trái: Thông tin cơ bản & Giảm giá */}
                             <div className="space-y-4">
                                 {/* Basic Info Card */}
-                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                                    <h3 className="text-xs font-bold text-gray-700 border-b pb-2 flex items-center gap-2">
-                                        <Sparkles size={14} className="text-purple-500" />
-                                        Thông tin voucher
-                                    </h3>
-                                    <div>
-                                        <Label htmlFor="fmi_voucher_code" className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Mã voucher <span className="text-red-500">*</span>
-                                        </Label>
+                                <FormSection
+                                    title="Thông tin voucher"
+                                    icon={<Sparkles size={14} className="text-purple-500" />}
+                                    className="space-y-4"
+                                >
+                                    <FormField label="Mã voucher" htmlFor="fmi_voucher_code" required error={fieldErrors.code}>
                                         <div className="flex gap-2 items-center">
                                             <Input
                                                 id="fmi_voucher_code"
@@ -1530,7 +1306,7 @@ export default function VouchersContent(props: Props) {
                                                 value={editData?.code || ''}
                                                 onChange={(e) => update_fields({ code: e.target.value.replace(/[^a-zA-Z0-9_\-]/g, '') })}
                                                 disabled={!isCodeEditable}
-                                                className={`h-9.5 text-sm flex-1 font-mono uppercase tracking-wider font-semibold ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
+                                                className={`${ADMIN_INPUT} flex-1 font-mono uppercase tracking-wider font-semibold ${!isCodeEditable ? 'bg-gray-100 text-gray-600' : ''}`}
                                                 maxLength={30}
                                             />
                                             {editData?.code && (
@@ -1539,7 +1315,7 @@ export default function VouchersContent(props: Props) {
                                                     variant="outline"
                                                     size="icon"
                                                     onClick={() => handleCopyCode(editData.code)}
-                                                    className="h-9.5 w-9.5 shrink-0 text-gray-500 hover:text-gray-800"
+                                                    className="h-10 rounded-xl w-10 shrink-0 text-gray-500 hover:text-gray-800"
                                                     title="Sao chép mã"
                                                 >
                                                     <Copy className="w-3.5 h-3.5" />
@@ -1553,7 +1329,7 @@ export default function VouchersContent(props: Props) {
                                                         variant="outline"
                                                         size="icon"
                                                         onClick={() => setIsCodeEditable(!isCodeEditable)}
-                                                        className="h-9.5 w-9.5 shrink-0"
+                                                        className="h-10 rounded-xl w-10 shrink-0"
                                                         title={isCodeEditable ? 'Khóa mã' : 'Nhập mã thủ công'}
                                                     >
                                                         <Pencil className="w-3.5 h-3.5" />
@@ -1563,7 +1339,7 @@ export default function VouchersContent(props: Props) {
                                                             type="button"
                                                             variant="outline"
                                                             onClick={() => update_fields({ code: generateRandomCode() })}
-                                                            className="h-9.5 px-3 gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50 shrink-0"
+                                                            className="h-10 rounded-xl px-3 gap-1.5 border-purple-200 text-purple-700 hover:bg-purple-50 shrink-0"
                                                         >
                                                             <Sparkles className="w-3.5 h-3.5" />
                                                             Tự tạo
@@ -1572,30 +1348,21 @@ export default function VouchersContent(props: Props) {
                                                 </>
                                             )}
                                         </div>
-                                        <FieldError message={fieldErrors.code} />
-                                    </div>
+                                    </FormField>
 
-                                    <div>
-                                        <Label htmlFor="fmi_voucher_name" className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Tên chương trình <span className="text-red-500">*</span>
-                                        </Label>
+                                    <FormField label="Tên chương trình" htmlFor="fmi_voucher_name" required error={fieldErrors.name}>
                                         <Input
                                             id="fmi_voucher_name"
                                             aria-invalid={!!fieldErrors.name}
                                             placeholder="VD: Khai trương VR Giảm 20%"
                                             value={editData?.name || ''}
                                             onChange={(e) => update_fields({ name: e.target.value })}
-                                            className="h-9.5 text-sm"
+                                            className={ADMIN_INPUT}
                                             maxLength={150}
                                         />
-                                        <FieldError message={fieldErrors.name} />
-                                    </div>
+                                    </FormField>
 
-                                    <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 flex items-center justify-between">
-                                            <span>Nhân viên Sale phụ trách</span>
-                                            <span className="text-[11px] text-slate-400 font-normal">Ghi nhận hoa hồng / doanh số</span>
-                                        </Label>
+                                    <FormField label="Nhân viên Sale phụ trách" helper="Ghi nhận hoa hồng / doanh số">
                                         <Select
                                             value={editData?.sale_staff_id ? String(editData.sale_staff_id) : 'none'}
                                             onValueChange={(val) => {
@@ -1612,24 +1379,21 @@ export default function VouchersContent(props: Props) {
                                                 }
                                             }}
                                         >
-                                            <SelectTrigger className="h-9.5 text-sm bg-white">
+                                            <SelectTrigger className={`${ADMIN_INPUT} bg-white`}>
                                                 <SelectValue placeholder="-- Chọn nhân viên Sale phụ trách --" />
                                             </SelectTrigger>
                                             <SelectContent className="rounded-xl">
-                                                <SelectItem value="none">-- Không gán Sale (Voucher chung) --</SelectItem>
+                                                <SelectItem value="none">-- Không gán Sale (voucher chung) --</SelectItem>
                                                 {staffList.map((st) => (
                                                     <SelectItem key={st.id} value={String(st.id)}>
-                                                        👤 {st.fullname} ({st.email})
+                                                        {st.fullname} ({st.email})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    </div>
+                                    </FormField>
 
-                                    <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Ghi chú / Mô tả (tùy chọn)
-                                        </Label>
+                                    <FormField label="Ghi chú / Mô tả (tùy chọn)">
                                         <Textarea
                                             placeholder="Mô tả ngắn gọn về voucher hoặc ghi chú nội bộ..."
                                             value={editData?.note !== undefined ? editData.note : editData?.description || ''}
@@ -1637,36 +1401,33 @@ export default function VouchersContent(props: Props) {
                                             rows={2}
                                             className="w-full text-xs resize-none"
                                         />
-                                    </div>
+                                    </FormField>
 
-                                    <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Phạm vi áp dụng (Scope) <span className="text-red-500">*</span>
-                                        </Label>
+                                    <FormField label="Phạm vi áp dụng" required>
                                         <Select
                                             value={editData?.scope || 'all'}
                                             onValueChange={(val) => {
                                                 update_fields({ scope: val, applicable_ticket_package_ids: null });
                                             }}
                                         >
-                                            <SelectTrigger className="h-9.5 text-sm">
+                                            <SelectTrigger className={ADMIN_INPUT}>
                                                 <SelectValue placeholder="Chọn phạm vi áp dụng" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="all">🎟️ Toàn bộ hóa đơn (Tất cả dịch vụ)</SelectItem>
-                                                <SelectItem value="vr">🎮 Trải nghiệm VR</SelectItem>
-                                                <SelectItem value="movie">🎬 Vé xem phim</SelectItem>
+                                                <SelectItem value="all">Toàn bộ hóa đơn (tất cả dịch vụ)</SelectItem>
+                                                <SelectItem value="vr">Trải nghiệm VR</SelectItem>
+                                                <SelectItem value="movie">Vé xem phim</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    </div>
-                                </div>
+                                    </FormField>
+                                </FormSection>
 
                                 {/* Discount Card */}
-                                <div className="bg-white p-4 rounded-2xl border border-purple-100 bg-purple-50/20 shadow-xs space-y-4">
-                                    <h3 className="text-xs font-bold text-purple-800 border-b border-purple-100 pb-2 flex items-center gap-2">
-                                        <Percent size={15} className="text-purple-600" />
-                                        Cấu hình giảm giá
-                                    </h3>
+                                <FormSection
+                                    title="Cấu hình giảm giá"
+                                    icon={<Percent size={15} className="text-purple-600" />}
+                                    className="space-y-4 border-purple-100 bg-purple-50/20"
+                                >
 
                                     {/* Discount Type Tabs */}
                                     <div className="flex gap-2 p-1 bg-purple-100/60 rounded-xl">
@@ -1692,14 +1453,12 @@ export default function VouchersContent(props: Props) {
                                         </button>
                                     </div>
 
-                                    <div>
-                                        <Label htmlFor="fmi_voucher_discount_value" className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Giá trị giảm
-                                            <span className="text-red-500 ml-1">*</span>
-                                            <span className="ml-2 text-[11px] font-normal text-slate-400">
-                                                {editData?.discount_type === 'fixed' ? 'VNĐ' : '1-100 %'}
-                                            </span>
-                                        </Label>
+                                    <FormField
+                                        label={`Giá trị giảm (${editData?.discount_type === 'fixed' ? 'VNĐ' : '1-100 %'})`}
+                                        htmlFor="fmi_voucher_discount_value"
+                                        required
+                                        error={fieldErrors.discount_value}
+                                    >
                                         <Input
                                             id="fmi_voucher_discount_value"
                                             aria-invalid={!!fieldErrors.discount_value}
@@ -1714,16 +1473,12 @@ export default function VouchersContent(props: Props) {
                                                 const v = Number(e.target.value.replace(/[^\d]/g, ''));
                                                 update_fields({ discount_value: isNaN(v) ? 0 : v });
                                             }}
-                                            className="h-9.5 text-sm font-bold text-slate-800"
+                                            className={`${ADMIN_INPUT} font-bold text-slate-800`}
                                         />
-                                        <FieldError message={fieldErrors.discount_value} />
-                                    </div>
+                                    </FormField>
 
                                     {editData?.discount_type === 'percent' ? (
-                                        <div>
-                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                                Giảm tối đa / đơn (để trống = không giới hạn)
-                                            </Label>
+                                        <FormField label="Giảm tối đa / đơn (để trống = không giới hạn)">
                                             <Input
                                                 type="text"
                                                 placeholder="VD: 50000"
@@ -1735,13 +1490,12 @@ export default function VouchersContent(props: Props) {
                                                         max_discount: isNaN(v) || v <= 0 ? null : v
                                                     });
                                                 }}
-                                                className="h-9.5 text-sm text-slate-800"
+                                                className={`${ADMIN_INPUT} text-slate-800`}
                                             />
-                                        </div>
+                                        </FormField>
                                     ) : null}
 
-                                    <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Đơn hàng tối thiểu (VNĐ)</Label>
+                                    <FormField label="Đơn hàng tối thiểu (VNĐ)">
                                         <Input
                                             type="text"
                                             placeholder="Để trống hoặc 0 = không yêu cầu"
@@ -1753,21 +1507,20 @@ export default function VouchersContent(props: Props) {
                                                     min_order_value: isNaN(v) || v <= 0 ? 0 : v
                                                 });
                                             }}
-                                            className="h-9.5 text-sm text-slate-800"
+                                            className={`${ADMIN_INPUT} text-slate-800`}
                                         />
-                                    </div>
-                                </div>
+                                    </FormField>
+                                </FormSection>
 
                                 {/* Limits */}
-                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                                    <h3 className="text-xs font-bold text-gray-700 border-b pb-2 flex items-center gap-2">
-                                        <Tag size={14} className="text-blue-500" />
-                                        Giới hạn lượt dùng
-                                    </h3>
+                                <FormSection
+                                    title="Giới hạn lượt dùng"
+                                    icon={<Tag size={14} className="text-blue-500" />}
+                                    className="space-y-4"
+                                >
 
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Tổng lượt / hệ thống</Label>
+                                        <FormField label="Tổng lượt / hệ thống">
                                             <Input
                                                 placeholder="Để trống = không giới hạn"
                                                 value={editData?.usage_limit ?? ''}
@@ -1780,11 +1533,10 @@ export default function VouchersContent(props: Props) {
                                                 }}
                                                 type="number"
                                                 min="0"
-                                                className="h-9.5 text-sm"
+                                                className={ADMIN_INPUT}
                                             />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">Lượt / 1 người dùng</Label>
+                                        </FormField>
+                                        <FormField label="Lượt / 1 người dùng">
                                             <Input
                                                 placeholder="Mặc định 1"
                                                 value={editData?.per_user_limit ?? 1}
@@ -1797,22 +1549,22 @@ export default function VouchersContent(props: Props) {
                                                 }}
                                                 type="number"
                                                 min="1"
-                                                className="h-9.5 text-sm"
+                                                className={ADMIN_INPUT}
                                             />
-                                        </div>
+                                        </FormField>
                                     </div>
-                                </div>
+                                </FormSection>
                             </div>
 
                             {/* Cột phải: Hiệu lực / Áp dụng gói / Chi nhánh */}
                             <div className="space-y-4">
                                 {/* Validity Period */}
-                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                                    <div className="flex items-center justify-between border-b pb-2">
-                                        <h3 className="text-xs font-bold text-gray-700 flex items-center gap-2">
-                                            <CalendarDays size={14} className="text-indigo-500" />
-                                            Thời gian hiệu lực
-                                        </h3>
+                                <FormSection
+                                    title="Thời gian hiệu lực"
+                                    icon={<CalendarDays size={14} className="text-indigo-500" />}
+                                    className="space-y-3"
+                                >
+                                    <div className="flex items-center justify-end">
                                         <div className="flex items-center space-x-2 bg-indigo-50/70 hover:bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 transition-colors">
                                             <Checkbox
                                                 id="voucher-is-permanent"
@@ -1847,8 +1599,7 @@ export default function VouchersContent(props: Props) {
                                     <div
                                         className={`grid grid-cols-2 gap-3 transition-opacity ${isPermanent ? 'opacity-40 pointer-events-none' : ''}`}
                                     >
-                                        <div>
-                                            <Label htmlFor="fmi_voucher_valid_from" className="text-xs font-semibold text-gray-700 mb-1.5 block">Bắt đầu từ</Label>
+                                        <FormField label="Bắt đầu từ" htmlFor="fmi_voucher_valid_from">
                                             <Input
                                                 id="fmi_voucher_valid_from"
                                                 type="datetime-local"
@@ -1858,11 +1609,10 @@ export default function VouchersContent(props: Props) {
                                                     const dt = e.target.value;
                                                     update_fields({ valid_from: dt ? fromLocalDatetimeString(dt) : null });
                                                 }}
-                                                className="h-9.5 text-sm"
+                                                className={ADMIN_INPUT}
                                             />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="fmi_voucher_valid_until" className="text-xs font-semibold text-gray-700 mb-1.5 block">Hết hạn</Label>
+                                        </FormField>
+                                        <FormField label="Hết hạn" htmlFor="fmi_voucher_valid_until" error={fieldErrors.valid_until}>
                                             <Input
                                                 id="fmi_voucher_valid_until"
                                                 aria-invalid={!!fieldErrors.valid_until}
@@ -1873,17 +1623,16 @@ export default function VouchersContent(props: Props) {
                                                     const dt = e.target.value;
                                                     update_fields({ valid_until: dt ? fromLocalDatetimeString(dt) : null });
                                                 }}
-                                                className="h-9.5 text-sm"
+                                                className={ADMIN_INPUT}
                                             />
-                                            <FieldError message={fieldErrors.valid_until} />
-                                        </div>
+                                        </FormField>
                                     </div>
                                     <p className="text-[11px] text-slate-400">
                                         {isPermanent
-                                            ? '✨ Voucher có hiệu lực vĩnh viễn (áp dụng ngay lập tức và không bao giờ hết hạn).'
+                                            ? 'Voucher có hiệu lực vĩnh viễn (áp dụng ngay lập tức và không bao giờ hết hạn).'
                                             : 'Voucher bắt đầu và kết thúc theo ngày giờ đã chọn ở trên.'}
                                     </p>
-                                </div>
+                                </FormSection>
 
                                 {/* Applied Ticket Packages based on Scope (only for vr / movie, hidden for 'all') */}
                                 {editData?.scope && editData.scope !== 'all'
@@ -1894,31 +1643,19 @@ export default function VouchersContent(props: Props) {
                                                 title: 'Áp dụng cho gói VR cụ thể',
                                                 hint: 'Để trống = tất cả VR',
                                                 empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
-                                                icon: <Gamepad2 size={14} className="text-purple-600" />,
-                                                themeClass: 'border-purple-100 bg-purple-50/10 text-purple-800',
-                                                borderClass: 'border-purple-100',
-                                                textTheme: 'text-purple-800',
-                                                hoverClass: 'hover:bg-purple-50 hover:border-purple-100'
+                                                icon: <Gamepad2 size={14} className="text-purple-500" />
                                             },
                                             movie: {
                                                 title: 'Áp dụng cho gói phim cụ thể',
                                                 hint: 'Để trống = tất cả gói phim',
                                                 empty: 'Không có gói phim — vui lòng tạo ít nhất 1 gói phim trước',
-                                                icon: <Film size={14} className="text-blue-600" />,
-                                                themeClass: 'border-blue-100 bg-blue-50/10 text-blue-800',
-                                                borderClass: 'border-blue-100',
-                                                textTheme: 'text-blue-800',
-                                                hoverClass: 'hover:bg-blue-50 hover:border-blue-100'
+                                                icon: <Film size={14} className="text-blue-500" />
                                             }
                                         }[scopeType as 'vr' | 'movie'] || {
                                             title: 'Áp dụng cho gói VR cụ thể',
                                             hint: 'Để trống = tất cả VR',
                                             empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
-                                            icon: <Gamepad2 size={14} className="text-purple-600" />,
-                                            themeClass: 'border-purple-100 bg-purple-50/10 text-purple-800',
-                                            borderClass: 'border-purple-100',
-                                            textTheme: 'text-purple-800',
-                                            hoverClass: 'hover:bg-purple-50 hover:border-purple-100'
+                                            icon: <Gamepad2 size={14} className="text-purple-500" />
                                         };
 
                                         const appliedList: number[] = Array.isArray(editData?.applicable_ticket_package_ids)
@@ -1930,22 +1667,15 @@ export default function VouchersContent(props: Props) {
                                         const mode: 'all' | 'whitelist' = isAllChecked ? 'all' : 'whitelist';
 
                                         return (
-                                            <div
-                                                className={`bg-white p-4 rounded-2xl border ${scopeConfig.borderClass} ${scopeConfig.themeClass.split(' ')[1] || ''} shadow-xs space-y-3`}
-                                            >
-                                                <div
-                                                    className={`text-xs font-bold ${scopeConfig.textTheme} border-b ${scopeConfig.borderClass} pb-2 flex flex-wrap items-center gap-2`}
-                                                >
-                                                    <div className="flex items-center gap-2 mr-2">
-                                                        {scopeConfig.icon}
-                                                        {scopeConfig.title}
-                                                    </div>
+                                            <FormSection title={scopeConfig.title} icon={scopeConfig.icon} className="space-y-3">
+                                                <div className="flex flex-wrap items-center gap-2 text-xs">
                                                     {mode === 'whitelist' && (
                                                         <Badge
                                                             variant="outline"
                                                             className="text-[11px] border-green-300 bg-green-50 text-green-700 px-2 py-0 rounded-full"
                                                         >
-                                                            ✓ Chỉ áp {appliedList.length} gói
+                                                            <Check className="mr-1 inline h-3 w-3" />
+                                                            Chỉ áp {appliedList.length} gói
                                                         </Badge>
                                                     )}
                                                     {mode === 'all' && (
@@ -1953,27 +1683,23 @@ export default function VouchersContent(props: Props) {
                                                             variant="outline"
                                                             className="text-[11px] border-slate-300 bg-slate-50 text-slate-600 px-2 py-0 rounded-full"
                                                         >
-                                                            ○ Áp tất cả
+                                                            Áp tất cả
                                                         </Badge>
                                                     )}
-                                                    <span
-                                                        className={`ml-auto text-[11px] font-normal ${scopeConfig.textTheme.replace('800', '500')}`}
-                                                    >
-                                                        {scopeConfig.hint}
-                                                    </span>
+                                                    <span className="ml-auto text-[11px] font-normal text-slate-500">{scopeConfig.hint}</span>
                                                 </div>
 
                                                 <div
                                                     id="div_voucher_packages"
                                                     tabIndex={-1}
-                                                    className={`border ${scopeConfig.borderClass} rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white mt-2`}
+                                                    className="border border-slate-200 rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white"
                                                 >
                                                     {vrPackages.length === 0 ? (
                                                         <p className="text-xs text-gray-400 text-center py-6">{scopeConfig.empty}</p>
                                                     ) : (
                                                         <>
                                                             <div
-                                                                className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors mb-2 bg-slate-50 ${scopeConfig.hoverClass}`}
+                                                                className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors mb-2 bg-slate-50 hover:bg-slate-100`}
                                                             >
                                                                 <div>
                                                                     <Checkbox
@@ -1998,7 +1724,7 @@ export default function VouchersContent(props: Props) {
                                                                 return (
                                                                     <div
                                                                         key={pkg.id}
-                                                                        className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors ${scopeConfig.hoverClass}`}
+                                                                        className={`flex items-center space-x-2 p-1.5 rounded-lg border border-transparent transition-colors hover:bg-slate-50`}
                                                                     >
                                                                         <div>
                                                                             <Checkbox
@@ -2031,21 +1757,30 @@ export default function VouchersContent(props: Props) {
                                                     )}
                                                 </div>
                                                 <FieldError message={fieldErrors.packages} />
-                                            </div>
+                                            </FormSection>
                                         );
                                     })()
                                     : null}
 
                                 {/* Branches */}
-                                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-                                    <h3 className="text-xs font-bold text-gray-700 border-b pb-2 flex items-center gap-2">
-                                        <Film size={14} className="text-blue-500" />
-                                        Chi nhánh &amp; Cài đặt
-                                    </h3>
-                                    <div>
-                                        <Label className="text-xs font-semibold text-gray-700 mb-1.5 block">
-                                            Chi nhánh áp dụng <span className="text-red-500">*</span>
-                                        </Label>
+                                <FormSection
+                                    title="Chi nhánh & cài đặt"
+                                    icon={<Film size={14} className="text-blue-500" />}
+                                    className="space-y-3"
+                                >
+                                    <FormField
+                                        label="Chi nhánh áp dụng"
+                                        required
+                                        error={
+                                            fieldErrors.branch_ids ||
+                                            (isEditLocked ? 'Voucher thuộc nhiều chi nhánh, chỉ Super Admin được sửa' : undefined)
+                                        }
+                                        helper={
+                                            isSuperAdmin
+                                                ? 'Chọn "Tất cả chi nhánh" hoặc ít nhất một chi nhánh'
+                                                : 'Chọn ít nhất một chi nhánh bạn quản lý'
+                                        }
+                                    >
                                         <div id="div_voucher_branch_ids" tabIndex={-1} className="outline-none">
                                         {isEditLocked ? (
                                             // Read-only summary: the staff member cannot change branches they do not manage
@@ -2060,19 +1795,7 @@ export default function VouchersContent(props: Props) {
                                             />
                                         )}
                                         </div>
-                                        <FieldError message={fieldErrors.branch_ids} />
-                                        {isEditLocked ? (
-                                            <p className="text-[11px] text-red-600 mt-1">
-                                                Voucher thuộc nhiều chi nhánh, chỉ Super Admin được sửa
-                                            </p>
-                                        ) : (
-                                            <p className="text-[11px] text-slate-400 mt-1">
-                                                {isSuperAdmin
-                                                    ? 'Chọn "Tất cả chi nhánh" hoặc ít nhất một chi nhánh'
-                                                    : 'Chọn ít nhất một chi nhánh bạn quản lý'}
-                                            </p>
-                                        )}
-                                    </div>
+                                    </FormField>
 
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                                         <div>
@@ -2086,109 +1809,83 @@ export default function VouchersContent(props: Props) {
                                             className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300"
                                         />
                                     </div>
-                                </div>
+                                </FormSection>
                             </div>
                         </div>
                     </div>
+                </div>
+            </AdminDialog>
 
-                    {/* Footer action bar */}
-                    <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                            {editData?.scope === 'movie' ? (
-                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[11px] font-semibold">
-                                    <Film className="w-3 h-3 inline mr-1" /> Scope: Phim
-                                </Badge>
-                            ) : editData?.scope === 'all' ? (
-                                <Badge
-                                    variant="outline"
-                                    className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] font-semibold"
-                                >
-                                    <TicketIcon className="w-3 h-3 inline mr-1" /> Scope: Tất cả
-                                </Badge>
-                            ) : (
-                                <Badge
-                                    variant="outline"
-                                    className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold"
-                                >
-                                    <Gamepad2 className="w-3 h-3 inline mr-1" /> Scope: VR
-                                </Badge>
-                            )}
-                            {editData?.id ? (
-                                <span>
-                                    Cập nhật lần cuối:{' '}
-                                    {formatVnDateTime(editData.updated_at)}
-                                </span>
-                            ) : (
-                                <span>Voucher mới — mặc định code sẽ được uppercased</span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving} className="rounded-lg">
-                                Hủy
-                            </Button>
-                            <Button
-                                onClick={handleSave}
-                                disabled={isSaving || isEditLocked}
-                                className={`${editData?.scope === 'movie'
-                                        ? 'bg-blue-600 hover:bg-blue-700'
-                                        : editData?.scope === 'all'
-                                            ? 'bg-indigo-600 hover:bg-indigo-700'
-                                            : 'bg-purple-600 hover:bg-purple-700'
-                                    } text-white rounded-lg px-6 gap-2`}
-                            >
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                {editData?.id ? 'Cập nhật' : 'Tạo voucher'}
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            {/* UNSAVED CHANGES (footer Hủy button) */}
+            <ConfirmDialog
+                open={askDiscardEdit}
+                onOpenChange={setAskDiscardEdit}
+                variant="warning"
+                title="Thay đổi chưa được lưu"
+                description="Bạn đang có thay đổi chưa lưu. Nếu thoát bây giờ, nội dung vừa nhập sẽ bị mất."
+                confirmText="Thoát, bỏ thay đổi"
+                cancelText="Tiếp tục chỉnh sửa"
+                onConfirm={close_edit_dialog}
+            />
 
-            {/* Detail Dialog */}
-            <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-                <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 border border-slate-200 shadow-2xl rounded-2xl overflow-hidden font-sans bg-slate-100 [&>button]:hidden">
-                    {selectedVoucher && (
+            {/* DETAIL DIALOG */}
+            <AdminDialog
+                open={isDetailDialogOpen}
+                onClose={() => setIsDetailDialogOpen(false)}
+                mode="view"
+                size="lg"
+                icon={<Eye className="h-5 w-5" />}
+                title="Hồ sơ voucher"
+                titleExtra={
+                    selectedVoucher ? (
                         <>
-                            <DialogHeader className="px-6 py-4 bg-white border-b border-slate-200/80">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2.5 rounded-xl border bg-purple-50 border-purple-100 text-purple-600 shadow-xs">
-                                            <Eye size={20} />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <DialogTitle className="text-lg font-bold text-slate-900">
-                                                    Hồ sơ Voucher —{' '}
-                                                </DialogTitle>
-                                                <span className="font-mono text-purple-700 font-bold bg-purple-100/70 px-2.5 py-0.5 rounded-md border border-purple-200 text-sm">
-                                                    {selectedVoucher.code}
-                                                </span>
-                                                {selectedVoucher.scope === 'vr' && (
-                                                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] uppercase font-bold">
-                                                        🎮 CHỈ VR
-                                                    </Badge>
-                                                )}
-                                                {selectedVoucher.scope === 'movie' && (
-                                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[11px] uppercase font-bold">
-                                                        🎬 CHỈ PHIM
-                                                    </Badge>
-                                                )}
-                                                {(!selectedVoucher.scope || selectedVoucher.scope === 'all') && (
-                                                    <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700 text-[11px] uppercase font-bold">
-                                                        🎟️ MỌI DỊCH VỤ
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-slate-500 mt-0.5 font-medium truncate max-w-[420px]" title={selectedVoucher.name}>{selectedVoucher.name}</p>
-                                        </div>
-                                    </div>
-                                    <Button variant="ghost" size="icon" aria-label="Đóng" onClick={() => setIsDetailDialogOpen(false)} className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100">
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </DialogHeader>
-
-                            <div className="overflow-y-auto px-6 py-5 space-y-5 flex-1 text-slate-800">
+                            <span className="rounded-md border border-purple-200 bg-purple-100/70 px-2.5 py-0.5 font-mono text-sm font-bold text-purple-700">
+                                {selectedVoucher.code}
+                            </span>
+                            {selectedVoucher.scope === 'vr' && (
+                                <Badge variant="outline" className="gap-1 border-purple-200 bg-purple-50 text-[11px] font-bold uppercase text-purple-700">
+                                    <Gamepad2 className="h-3 w-3" /> Chỉ VR
+                                </Badge>
+                            )}
+                            {selectedVoucher.scope === 'movie' && (
+                                <Badge variant="outline" className="gap-1 border-blue-200 bg-blue-50 text-[11px] font-bold uppercase text-blue-700">
+                                    <Film className="h-3 w-3" /> Chỉ phim
+                                </Badge>
+                            )}
+                            {(!selectedVoucher.scope || selectedVoucher.scope === 'all') && (
+                                <Badge variant="outline" className="gap-1 border-indigo-200 bg-indigo-50 text-[11px] font-bold uppercase text-indigo-700">
+                                    <TicketIcon className="h-3 w-3" /> Mọi dịch vụ
+                                </Badge>
+                            )}
+                        </>
+                    ) : undefined
+                }
+                subtitle={selectedVoucher?.name}
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)} className={ADMIN_BTN_OUTLINE}>
+                            {ADMIN_TEXT.close}
+                        </Button>
+                        {selectedVoucher && !isDeletedView && hasPermission('vouchers', 'edit') && (
+                            <Button
+                                onClick={() => {
+                                    // Edit the list row: the detail copy carries extra read-only fields
+                                    const listRow = data.find((row) => row.id === selectedVoucher.id) ?? selectedVoucher;
+                                    setIsDetailDialogOpen(false);
+                                    onEdit(listRow);
+                                }}
+                                className={`${ADMIN_BTN_PRIMARY} gap-2`}
+                            >
+                                <Pencil className="h-4 w-4" /> {ADMIN_TEXT.edit}
+                            </Button>
+                        )}
+                    </>
+                }
+            >
+                {selectedVoucher && (
+                    <>
+                        <>
+                            <div className="space-y-5 text-slate-800">
                                 {(() => {
                                     const toArr = (v: any): number[] => (Array.isArray(v) ? (v as number[]) : []);
                                     const applied = toArr(selectedVoucher.applicable_ticket_package_ids);
@@ -2240,7 +1937,7 @@ export default function VouchersContent(props: Props) {
                                     return (
                                         <>
                                             {/* KHỐI 1: THÔNG TIN CHUNG */}
-                                            <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-4 space-y-3">
+                                            <div className={`${ADMIN_CARD} p-4 space-y-3`}>
                                                 <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                                                     <FileText size={15} className="text-blue-500" />
                                                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">THÔNG TIN CHUNG</h3>
@@ -2278,21 +1975,13 @@ export default function VouchersContent(props: Props) {
                                             </div>
 
                                             {/* KHỐI 2: THIẾT LẬP TÀI CHÍNH */}
-                                            <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-4 space-y-3">
+                                            <div className={`${ADMIN_CARD} p-4 space-y-3`}>
                                                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                                                     <div className="flex items-center gap-2">
                                                         <Percent size={15} className="text-emerald-500" />
                                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">THIẾT LẬP TÀI CHÍNH</h3>
                                                     </div>
-                                                    {selectedVoucher.is_active ? (
-                                                        <Badge variant="outline" className="text-[11px] border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
-                                                            ĐANG BẬT
-                                                        </Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="text-[11px] border-slate-200 bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full">
-                                                            ĐÃ VÔ HIỆU
-                                                        </Badge>
-                                                    )}
+                                                    <StatusBadge status={selectedVoucher.is_active ? 'active' : 'inactive'} />
                                                 </div>
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                                                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -2318,7 +2007,7 @@ export default function VouchersContent(props: Props) {
                                                         <p className="font-bold text-slate-800">{formatMoney(selectedVoucher.min_order_value || 0)}</p>
                                                     </div>
                                                     <div className="bg-emerald-50/60 rounded-xl p-3 border border-emerald-100">
-                                                        <p className="text-[11px] uppercase font-bold text-emerald-700 mb-1">TỔNG DOANH THU ĐEM VỀ</p>
+                                                        <p className="text-[11px] uppercase font-bold text-emerald-700 mb-1">TỔNG DOANH THU</p>
                                                         <p className="font-black text-emerald-700 text-base">
                                                             {formatMoney(selectedVoucher.total_revenue || 0)}
                                                         </p>
@@ -2329,7 +2018,7 @@ export default function VouchersContent(props: Props) {
                                             {/* KHỐI 3: GIỚI HẠN & ĐỐI TƯỢNG */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {/* Left card */}
-                                                <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-4 space-y-3">
+                                                <div className={`${ADMIN_CARD} p-4 space-y-3`}>
                                                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                                                         <CalendarDays size={15} className="text-amber-500" />
                                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">GIỚI HẠN THỜI GIAN & LƯỢT DÙNG</h3>
@@ -2367,15 +2056,15 @@ export default function VouchersContent(props: Props) {
                                                                 ) : null}
                                                             </div>
                                                             <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                                                <p className="text-[11px] uppercase font-bold text-slate-400 mb-0.5">GIỚI HẠN / 1 USER</p>
-                                                                <p className="font-bold text-slate-800">{selectedVoucher.per_user_limit ?? 1} Khách</p>
+                                                                <p className="text-[11px] uppercase font-bold text-slate-400 mb-0.5">GIỚI HẠN / 1 NGƯỜI DÙNG</p>
+                                                                <p className="font-bold text-slate-800">{selectedVoucher.per_user_limit ?? 1} lượt</p>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Right card: ĐỐI TƯỢNG ÁP DỤNG */}
-                                                <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-4 space-y-3">
+                                                <div className={`${ADMIN_CARD} p-4 space-y-3`}>
                                                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                                                         <Tag size={15} className="text-purple-500" />
                                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">ĐỐI TƯỢNG ÁP DỤNG</h3>
@@ -2400,11 +2089,11 @@ export default function VouchersContent(props: Props) {
                                                                         </span>
                                                                         {isAllPackages ? (
                                                                             <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                                                                                ✓ Áp dụng tất cả ({detailPackages.length > 0 ? detailPackages.length : 'Tất cả'} gói)
+                                                                                Áp dụng tất cả ({detailPackages.length > 0 ? detailPackages.length : 'Tất cả'} gói)
                                                                             </Badge>
                                                                         ) : (
                                                                             <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
-                                                                                ✓ Chỉ áp dụng {applied.length} gói chỉ định
+                                                                                Chỉ áp dụng {applied.length} gói chỉ định
                                                                             </Badge>
                                                                         )}
                                                                     </div>
@@ -2423,15 +2112,15 @@ export default function VouchersContent(props: Props) {
                                                                                 {hasSpecificApplied ? (
                                                                                     applied.map((id) => {
                                                                                         const pkg = detailPackages.find((p) => Number(p.id) === Number(id));
-                                                                                        const pkgName = pkg ? pkg.name : `Gói ID #${id}`;
+                                                                                        const pkgName = pkg ? pkg.name : 'Gói không còn khả dụng';
                                                                                         const pkgPrice = pkg?.price ? formatMoney(pkg.price) : null;
                                                                                         return (
                                                                                             <div
                                                                                                 key={`app-${id}`}
-                                                                                                className="bg-white border border-emerald-200/80 text-emerald-900 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center justify-between shadow-2xs"
+                                                                                                className="bg-white border border-emerald-200/80 text-emerald-900 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center justify-between shadow-sm"
                                                                                             >
                                                                                                 <div className="flex items-center gap-2">
-                                                                                                    <span className="text-emerald-600 font-black text-xs">✓</span>
+                                                                                                    <Check className="h-3.5 w-3.5 text-emerald-600" />
                                                                                                     <span>{pkgName}</span>
                                                                                                 </div>
                                                                                                 {pkgPrice && (
@@ -2446,10 +2135,10 @@ export default function VouchersContent(props: Props) {
                                                                                     detailPackages.map((pkg) => (
                                                                                         <div
                                                                                             key={`app-all-${pkg.id}`}
-                                                                                            className="bg-white border border-emerald-200/80 text-emerald-900 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center justify-between shadow-2xs"
+                                                                                            className="bg-white border border-emerald-200/80 text-emerald-900 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center justify-between shadow-sm"
                                                                                         >
                                                                                             <div className="flex items-center gap-2">
-                                                                                                <span className="text-emerald-600 font-black text-xs">✓</span>
+                                                                                                <Check className="h-3.5 w-3.5 text-emerald-600" />
                                                                                                 <span>{pkg.name}</span>
                                                                                             </div>
                                                                                             {pkg.price && (
@@ -2473,7 +2162,7 @@ export default function VouchersContent(props: Props) {
 
                                             {/* KHỐI 4: LỊCH SỬ REDEEM */}
                                             {recent.length > 0 && (
-                                                <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-4 space-y-3">
+                                                <div className={`${ADMIN_CARD} p-4 space-y-3`}>
                                                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                                                         <History size={15} className="text-slate-500" />
                                                         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
@@ -2539,7 +2228,7 @@ export default function VouchersContent(props: Props) {
                                             )}
 
                                             {/* KHỐI 5: FOOTER AUDIT */}
-                                            <div className="bg-white border border-slate-200/80 rounded-xl p-3 text-[11px] text-slate-500 flex items-center justify-between shadow-xs">
+                                            <div className={`${ADMIN_CARD} flex flex-wrap items-center justify-between gap-2 p-3 text-[11px] text-slate-500`}>
                                                 <span>
                                                     Tạo lúc: <b className="text-slate-800">{formatVnDateTime(selectedVoucher.created_at)}</b> bởi{' '}
                                                     <b className="text-slate-800">{selectedVoucher.created_by_staff_name || 'Hệ thống'}</b>
@@ -2557,49 +2246,110 @@ export default function VouchersContent(props: Props) {
                                 })()}
                             </div>
                         </>
-                    )}
-                </DialogContent>
-            </Dialog>
-            {/* DIALOG XÁC NHẬN SỬA TRƯỜNG QUAN TRỌNG */}
-            <AlertDialog open={!!confirmSaveData} onOpenChange={(open) => !open && setConfirmSaveData(null)}>
-                <AlertDialogContent className="rounded-2xl font-sans bg-white max-w-md">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-slate-900 flex items-center gap-2">
-                            <ShieldAlert className="w-5 h-5 text-amber-500" />
-                            Xác nhận thay đổi Voucher
-                        </AlertDialogTitle>
-                        <AlertDialogDescription asChild className="text-slate-600 text-sm mt-2">
-                            <div>
-                                <p className="mb-3">
-                                    Bạn đang thay đổi các thông số quan trọng của voucher <strong>{editData?.code}</strong>:
-                                </p>
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-xs text-amber-900 font-medium mb-3">
-                                    {confirmSaveData?.changes.map((c, i) => (
-                                        <div key={i} className="flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                                            <span>{c}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-xs text-slate-500 italic">
-                                    Thay đổi này sẽ tác động trực tiếp đến mức ưu đãi khi khách hàng áp dụng voucher cho các đơn hàng mới.
-                                </p>
-                            </div>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
+                    </>
+                )}
+            </AdminDialog>
 
-                    <AlertDialogFooter className="mt-4">
-                        <AlertDialogCancel className="rounded-xl border-slate-200">Hủy bỏ</AlertDialogCancel>
-                        <AlertDialogAction
-                            disabled={isSaving}
-                            onClick={() => confirmSaveData && executeSave(confirmSaveData.payload)}
-                            className="rounded-xl text-white bg-amber-600 hover:bg-amber-700 font-medium"
-                        >
-                            {isSaving ? 'Đang lưu...' : 'Xác nhận lưu'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            {/* DIALOG XÁC NHẬN SỬA TRƯỜNG QUAN TRỌNG */}
+            <ConfirmDialog
+                open={!!confirmSaveData}
+                onOpenChange={(open) => !open && setConfirmSaveData(null)}
+                variant="warning"
+                title="Xác nhận thay đổi voucher"
+                description={
+                    <span className="block space-y-3">
+                        <span className="block">
+                            Bạn đang thay đổi các thông số quan trọng của voucher <strong>{editData?.code}</strong>:
+                        </span>
+                        <span className="block space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900">
+                            {confirmSaveData?.changes.map((change) => (
+                                <span key={change} className="flex items-center gap-1.5">
+                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                                    <span>{change}</span>
+                                </span>
+                            ))}
+                        </span>
+                        <span className="block text-xs italic text-slate-500">
+                            Thay đổi này sẽ tác động trực tiếp đến mức ưu đãi khi khách hàng áp dụng voucher cho các đơn hàng mới.
+                        </span>
+                    </span>
+                }
+                confirmText="Xác nhận lưu"
+                busy={isSaving}
+                onConfirm={() => confirmSaveData && executeSave(confirmSaveData.payload)}
+            />
+
+            {/* TOGGLE STATUS CONFIRM */}
+            <ConfirmDialog
+                open={!!voucherToToggle}
+                onOpenChange={(open) => !open && setVoucherToToggle(null)}
+                variant={voucherToToggle?.currentStatus ? 'warning' : 'info'}
+                title={voucherToToggle?.currentStatus ? 'Xác nhận ẩn voucher' : 'Xác nhận kích hoạt voucher'}
+                description={(() => {
+                    const toggled = data.find((row) => row.id === voucherToToggle?.id);
+                    return (
+                        <span className="block space-y-1">
+                            <span className="block">
+                                Voucher <b className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">{toggled?.code}</b>
+                                {toggled?.name ? ` — ${toggled.name}` : ''}
+                            </span>
+                            <span className="block">
+                                {voucherToToggle?.currentStatus ? (
+                                    <>
+                                        Voucher sẽ <strong>không còn áp dụng được</strong> cho khách hàng.
+                                    </>
+                                ) : (
+                                    <>
+                                        Voucher sẽ <strong>hiển thị công khai</strong> và sẵn sàng cho khách hàng áp dụng.
+                                    </>
+                                )}
+                            </span>
+                        </span>
+                    );
+                })()}
+                confirmText={voucherToToggle?.currentStatus ? 'Đồng ý ẩn' : 'Đồng ý kích hoạt'}
+                busy={isTogglingId !== null}
+                onConfirm={() => {
+                    if (voucherToToggle) handleToggleStatus(voucherToToggle.id, voucherToToggle.currentStatus);
+                }}
+            />
+
+            {/* DELETE CONFIRM */}
+            <ConfirmDialog
+                open={!!voucherToDelete}
+                onOpenChange={(open) => !open && setVoucherToDelete(null)}
+                variant="danger"
+                title="Xác nhận xóa voucher?"
+                description={
+                    <span className="block space-y-1">
+                        <span className="block">
+                            Voucher <b className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">{voucherToDelete?.code}</b> ({voucherToDelete?.name}) sẽ
+                            được chuyển vào danh sách đã xóa.
+                        </span>
+                        <span className="block">Bạn có thể khôi phục lại từ mục "Xem đã xóa".</span>
+                    </span>
+                }
+                confirmText="Xác nhận xóa"
+                busy={isDeletingId !== null}
+                onConfirm={() => voucherToDelete && handleDeleteConfirm(voucherToDelete)}
+            />
+
+            {/* RESTORE CONFIRM */}
+            <ConfirmDialog
+                open={!!voucherToRestore}
+                onOpenChange={(open) => !open && setVoucherToRestore(null)}
+                variant="restore"
+                title="Khôi phục voucher?"
+                description={
+                    <span className="block">
+                        Voucher <b className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">{voucherToRestore?.code}</b> ({voucherToRestore?.name}) sẽ được đưa
+                        trở lại danh sách đang dùng.
+                    </span>
+                }
+                confirmText={ADMIN_TEXT.restore}
+                busy={isRestoringId !== null}
+                onConfirm={() => voucherToRestore && handleRestore(voucherToRestore)}
+            />
         </div>
     );
 }

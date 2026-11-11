@@ -1,34 +1,43 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { request } from '@/lib/api/http';
-import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { FormField, FormSection } from '@/components/admin/common/FormField';
+import { notify } from '@/components/admin/common/notify';
+import {
+  ADMIN_BTN_PRIMARY,
+  ADMIN_BTN_OUTLINE,
+  ADMIN_CARD,
+  ADMIN_TABLE_HEAD,
+  ADMIN_TH,
+  ADMIN_INPUT,
+  ADMIN_TEXT
+} from '@/components/admin/common/adminTokens';
 import { getAdminBranchOptions } from '@/lib/api';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermission, useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { useConfirmUnsaved } from '@/hooks/useConfirmUnsaved';
-import { formatVnDate, formatVnDateTime, activeStatusLabel } from '@/lib/format';
+import { formatVnDate, formatVnDateTime } from '@/lib/format';
 import {
   Info,
-  X,
   Search,
   RefreshCw,
   Plus,
-  Eye,
-  FileText,
-  Edit,
   Trash2,
   Key,
   User,
@@ -186,7 +195,7 @@ export default function StaffPage() {
       });
     },
     onSuccess: (data: any, variables: any) => {
-      toast.success('Tạo nhân viên thành công');
+      notify.created('nhân viên');
       if (data?.generated_password) {
         setCredentialNotice({
           title: 'Tài khoản nhân viên đã được tạo',
@@ -201,7 +210,7 @@ export default function StaffPage() {
       queryClient.invalidateQueries({ queryKey: ['staff', page, pageSize, search, filterRole, filterBranch] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Tạo nhân viên thất bại');
+      notify.error(err, 'Tạo nhân viên thất bại');
     }
   });
 
@@ -215,14 +224,14 @@ export default function StaffPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Cập nhật nhân viên thành công');
+      notify.saved('nhân viên');
       setIsEditDialogOpen(false);
       setSelectedStaff(null);
       resetForm();
       queryClient.invalidateQueries({ queryKey: ['staff'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Cập nhật nhân viên thất bại');
+      notify.error(err, 'Cập nhật nhân viên thất bại');
     }
   });
 
@@ -234,13 +243,13 @@ export default function StaffPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Xóa nhân viên thành công');
+      notify.deleted('nhân viên');
       setIsDeleteDialogOpen(false);
       setSelectedStaff(null);
       queryClient.invalidateQueries({ queryKey: ['staff'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Xóa nhân viên thất bại');
+      notify.error(err, 'Xóa nhân viên thất bại');
     }
   });
 
@@ -252,7 +261,7 @@ export default function StaffPage() {
       });
     },
     onSuccess: (data: any, target: { id: number; fullname: string; email: string }) => {
-      toast.success('Đặt lại mật khẩu thành công.');
+      notify.success('Đã đặt lại mật khẩu');
       if (data?.generated_password) {
         setCredentialNotice({
           title: 'Mật khẩu mới của nhân viên',
@@ -265,19 +274,16 @@ export default function StaffPage() {
       setSelectedStaff(null);
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Đặt lại mật khẩu thất bại');
+      notify.error(err, 'Đặt lại mật khẩu thất bại');
     }
   });
 
-  const isCreateDirty = formData.email !== '' || formData.fullname !== '' || formData.phone !== '' || formData.roleIds.length > 0 || formData.branchIds.length > 0;
-  const { handleOpenChange: handleCreateOpenChange, UnsavedAlert: CreateAlert } = useConfirmUnsaved({
-    isDirty: isCreateDirty,
-    isSubmitting: createMutation.isPending,
-    onConfirmClose: () => {
-      setIsCreateDialogOpen(false);
-      resetForm();
-    }
-  });
+  const isCreateDirty =
+    formData.email !== '' ||
+    formData.fullname !== '' ||
+    formData.phone !== '' ||
+    formData.roleIds.length > 0 ||
+    formData.branchIds.length > 0;
 
   const isEditDirty = selectedStaff
     ? formData.fullname !== selectedStaff.fullname ||
@@ -286,14 +292,17 @@ export default function StaffPage() {
       JSON.stringify(formData.roleIds.slice().sort()) !== JSON.stringify((selectedStaff.roleIds || []).slice().sort()) ||
       JSON.stringify(formData.branchIds.slice().sort()) !== JSON.stringify((selectedStaff.branchIds || []).slice().sort())
     : false;
-  const { handleOpenChange: handleEditOpenChange, UnsavedAlert: EditAlert } = useConfirmUnsaved({
-    isDirty: isEditDirty,
-    isSubmitting: updateMutation.isPending,
-    onConfirmClose: () => {
-      setIsEditDialogOpen(false);
-      resetForm();
-    }
-  });
+
+  // Called once the dialog is really allowed to close (AdminDialog asks about unsaved changes itself)
+  const closeCreateDialog = () => {
+    setIsCreateDialogOpen(false);
+    resetForm();
+  };
+
+  const closeEditDialog = () => {
+    setIsEditDialogOpen(false);
+    resetForm();
+  };
 
   const resetForm = () => {
     setFormData({
@@ -367,9 +376,9 @@ export default function StaffPage() {
     if (!credentialNotice) return;
     try {
       await navigator.clipboard.writeText(credentialNotice.password);
-      toast.success('Đã sao chép mật khẩu');
+      notify.copied('mật khẩu');
     } catch {
-      toast.error('Không sao chép được, hãy bôi đen và sao chép thủ công');
+      notify.error('Không sao chép được, hãy bôi đen và sao chép thủ công');
     }
   };
 
@@ -385,6 +394,11 @@ export default function StaffPage() {
       fullname: selectedStaff.fullname,
       email: selectedStaff.email
     });
+  };
+
+  const openDetailDialog = (target: Staff) => {
+    setSelectedStaff(target);
+    setIsDetailDialogOpen(true);
   };
 
   const openEditDialog = (staff: Staff) => {
@@ -483,44 +497,31 @@ export default function StaffPage() {
       handleLogout={handleLogout}
     >
       <div className="space-y-6">
-        {/* PAGE HEADER */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">Quản lý nhân viên</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {staffData?.total || 0} nhân viên trong hệ thống</p>
-          </div>
-        </div>
+        <PageHeader title="Quản lý nhân viên" description={`Tổng cộng ${staffData?.total || 0} nhân viên trong hệ thống`} />
 
         {/* TOOLBAR */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-          {/* L E F T - G R O U P */}
-          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-            <form onSubmit={handleSearchStaff} className="flex gap-2">
-              <div className="relative w-[320px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo email hoặc tên..."
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-              >
-                <Search className="w-3.5 h-3.5" /> Tìm kiếm
-              </Button>
-            </form>
-          </div>
+        <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
+          <form onSubmit={handleSearchStaff} className="flex w-full gap-2 xl:w-auto">
+            <div className="relative w-[320px] max-w-full">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Tìm theo email hoặc tên..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                className={`${ADMIN_INPUT} pl-10`}
+              />
+            </div>
+            <Button type="submit" className={`${ADMIN_BTN_PRIMARY} shrink-0 gap-1.5`}>
+              <Search className="h-4 w-4" /> Tìm kiếm
+            </Button>
+          </form>
 
-          {/* R I G H T - G R O U P */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
-            <select 
-              value={filterRole} 
+          <div className="flex w-full flex-wrap items-center justify-start gap-2.5 xl:w-auto xl:justify-end">
+            <select
+              value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
-              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
+              className="h-10 min-w-[140px] cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20"
             >
               <option value="all">Tất cả vai trò</option>
               {roles.map((role: Role) => (
@@ -529,11 +530,11 @@ export default function StaffPage() {
                 </option>
               ))}
             </select>
-            
-            <select 
-              value={filterBranch} 
+
+            <select
+              value={filterBranch}
               onChange={(e) => setFilterBranch(e.target.value)}
-              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
+              className="h-10 min-w-[140px] cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20"
             >
               <option value="all">Tất cả chi nhánh</option>
               {branches.map((branch: Branch) => (
@@ -544,32 +545,15 @@ export default function StaffPage() {
             </select>
 
             {hasPermission('staff', 'view_deleted') && (
-              <Button
-                variant="outline"
-                onClick={() => navigate('/deleted/staff')}
-                className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline text-xs font-semibold text-slate-600">Xem đã xóa</span>
-              </Button>
-            )}
-            
-            {hasPermission('staff', 'create') && (
-              <Button
-                onClick={() => {
-                  resetForm();
-                  setIsCreateDialogOpen(true);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs"
-              >
-                <Plus className="w-4 h-4" /> Tạo nhân viên
+              <Button variant="outline" onClick={() => navigate('/deleted/staff')} className={`${ADMIN_BTN_OUTLINE} gap-2`}>
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Xem đã xóa</span>
               </Button>
             )}
 
             <Button
               type="button"
               variant="outline"
-              size="icon"
               onClick={() => {
                 setLocalSearch('');
                 setSearch('');
@@ -577,710 +561,544 @@ export default function StaffPage() {
                 setFilterBranch(staff?.isSuperAdmin ? 'all' : '');
                 queryClient.invalidateQueries({ queryKey: ['staff'] });
               }}
-              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
-              title="Làm mới"
+              className={`${ADMIN_BTN_OUTLINE} gap-2`}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" /> Làm mới
             </Button>
+
+            {hasPermission('staff', 'create') && (
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsCreateDialogOpen(true);
+                }}
+                className={`${ADMIN_BTN_PRIMARY} gap-2`}
+              >
+                <Plus className="h-4 w-4" /> Tạo nhân viên
+              </Button>
+            )}
           </div>
         </div>
 
-        <Card className="border border-gray-200 rounded-xl shadow-sm bg-white mt-4">
-          <CardContent>
-            {staffLoading ? (
-              <div className="space-y-4 py-4">
-                <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
-                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span>Đang tải danh sách nhân viên từ máy chủ...</span>
-                </div>
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
+        <div className={`${ADMIN_CARD} overflow-hidden`}>
+          {staffLoading ? (
+            <TableSkeleton />
+          ) : (
+            <Table>
+              <TableHeader className={ADMIN_TABLE_HEAD}>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className={ADMIN_TH}>Nhân viên</TableHead>
+                  <TableHead className={ADMIN_TH}>SĐT</TableHead>
+                  <TableHead className={ADMIN_TH}>Vai trò</TableHead>
+                  <TableHead className={ADMIN_TH}>Chi nhánh</TableHead>
+                  <TableHead className={ADMIN_TH}>Trạng thái</TableHead>
+                  <TableHead className={`hidden xl:table-cell ${ADMIN_TH}`}>Đăng nhập cuối</TableHead>
+                  <TableHead className={`hidden 2xl:table-cell ${ADMIN_TH}`}>Ngày tạo</TableHead>
+                  <TableHead className={`text-right ${ADMIN_TH}`}>Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {staffList.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={8} className="p-0">
+                      <EmptyState title={search || filterRole || filterBranch ? 'Không tìm thấy nhân viên' : 'Chưa có nhân viên nào'} />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {staffList.map((staff: Staff) => (
+                  <TableRow key={staff.id}>
+                    <TableCell className="max-w-[240px]">
+                      <div className="truncate text-[13px] font-medium text-slate-900" title={staff.fullname}>
+                        {staff.fullname}
+                      </div>
+                      <div className="truncate text-xs text-slate-500" title={staff.email}>
+                        {staff.email}
+                      </div>
+                    </TableCell>
+                    <TableCell>{staff.phone || '-'}</TableCell>
+                    <TableCell className="max-w-[180px]">
+                      {staff.isSuperAdmin ? (
+                        <span className="whitespace-nowrap font-semibold text-purple-700">Siêu quản trị</span>
+                      ) : (
+                        <span className="block truncate" title={staff.roles?.join(', ') || ''}>
+                          {staff.roles?.join(', ') || '-'}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      {staff.isSuperAdmin ? (
+                        <span className="whitespace-nowrap italic text-slate-500">Tất cả chi nhánh</span>
+                      ) : !staff.branchNames?.length ? (
+                        '-'
+                      ) : (
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="truncate">{staff.branchNames.slice(0, MAX_BRANCHES_SHOWN).join(', ')}</span>
+                          {staff.branchNames.length > MAX_BRANCHES_SHOWN && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="shrink-0 cursor-default rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                                  +{staff.branchNames.length - MAX_BRANCHES_SHOWN}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {staff.branchNames.map((branch_name: string) => (
+                                  <div key={branch_name}>{branch_name}</div>
+                                ))}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={staff.isActive === false ? 'inactive' : 'active'} />
+                      {staff.forcePasswordChange && (
+                        <span
+                          className="mt-0.5 block text-[11px] text-amber-700"
+                          title="Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu"
+                        >
+                          Chờ đổi mật khẩu
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell">
+                      {staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : 'Chưa đăng nhập'}
+                    </TableCell>
+                    <TableCell className="hidden 2xl:table-cell">{formatVnDate(staff.createdAt)}</TableCell>
+                    <TableCell>
+                      <RowActions>
+                        <RowActionButton action="view" onClick={() => openDetailDialog(staff)} />
+                        {hasPermission('staff', 'edit') && <RowActionButton action="edit" onClick={() => openEditDialog(staff)} />}
+                        {isSuperAdmin && hasPermission('staff', 'reset_password') && staff.id !== currentStaffId && (
+                          <RowActionButton
+                            action="resetPassword"
+                            onClick={() => {
+                              setSelectedStaff(staff);
+                              setIsResetPasswordDialogOpen(true);
+                            }}
+                          />
+                        )}
+                        {!staff.isSuperAdmin && hasPermission('staff', 'delete') && (
+                          <RowActionButton
+                            action="delete"
+                            onClick={() => {
+                              setSelectedStaff(staff);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          />
+                        )}
+                      </RowActions>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        <AdminPagination page={page} totalPages={totalPages || 1} onPageChange={setPage} totalLabel={`${total} nhân viên`} />
+
+        {/* CREATE DIALOG */}
+        <AdminDialog
+          open={isCreateDialogOpen}
+          onClose={closeCreateDialog}
+          title="Tạo nhân viên mới"
+          size="md"
+          mode="form"
+          dirty={isCreateDirty}
+          busy={createMutation.isPending}
+          footer={
+            <AdminDialogFooter
+              onCancel={() => closeCreateDialog()}
+              onSubmit={handleCreate}
+              submitText={ADMIN_TEXT.create}
+              busy={createMutation.isPending}
+            />
+          }
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleCreate();
+            }}
+            className="space-y-4"
+          >
+            <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+            <FormField label="Email" required error={errors.email}>
+              <Input
+                value={formData.email}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+                }}
+                className={errors.email ? `${ADMIN_INPUT} border-destructive` : ADMIN_INPUT}
+              />
+            </FormField>
+            <FormField label="Họ tên" required error={errors.fullname}>
+              <Input
+                value={formData.fullname}
+                onChange={(e) => {
+                  setFormData({ ...formData, fullname: e.target.value });
+                  if (errors.fullname) setErrors((prev) => ({ ...prev, fullname: '' }));
+                }}
+                className={errors.fullname ? `${ADMIN_INPUT} border-destructive` : ADMIN_INPUT}
+              />
+            </FormField>
+            <FormField label="Số điện thoại" error={errors.phone}>
+              <Input
+                value={formData.phone}
+                onChange={(e) => {
+                  setFormData({ ...formData, phone: e.target.value });
+                  if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                }}
+                className={errors.phone ? `${ADMIN_INPUT} border-destructive` : ADMIN_INPUT}
+              />
+            </FormField>
+            {renderRoleField('create')}
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Chi nhánh</Label>
+                {renderSelectAllBranches('create')}
+              </div>
+              <div className="mt-2 grid max-h-40 grid-cols-2 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                {branches.map((branch: Branch) => (
+                  <div key={branch.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`branch-${branch.id}`}
+                      checked={formData.branchIds.includes(branch.id)}
+                      onCheckedChange={() => toggleBranch(branch.id)}
+                    />
+                    <Label htmlFor={`branch-${branch.id}`} className="text-sm">
+                      {branch.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-start gap-2 px-1 text-xs text-gray-500">
+              <Info className="mt-0.5 h-3.5 w-3.5 text-blue-400/70" />
+              <span>Mật khẩu được tạo tự động và chỉ hiển thị một lần sau khi tạo. Hãy ghi lại và chuyển cho nhân viên.</span>
+            </div>
+          </form>
+        </AdminDialog>
+
+        {/* EDIT DIALOG */}
+        <AdminDialog
+          open={isEditDialogOpen}
+          onClose={closeEditDialog}
+          title="Chỉnh sửa nhân viên"
+          size="md"
+          mode="form"
+          dirty={isEditDirty}
+          busy={updateMutation.isPending}
+          footer={
+            <AdminDialogFooter
+              onCancel={() => closeEditDialog()}
+              onSubmit={handleUpdate}
+              submitText={ADMIN_TEXT.save}
+              busy={updateMutation.isPending}
+            />
+          }
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleUpdate();
+            }}
+            className="space-y-4"
+          >
+            <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+            <FormField label="Email" helper="Email dùng để đăng nhập nên không thể thay đổi.">
+              <Input value={formData.email} readOnly className={`${ADMIN_INPUT} cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500`} />
+            </FormField>
+            <FormField label="Họ tên" required error={errors.fullname}>
+              <Input
+                value={formData.fullname}
+                onChange={(e) => {
+                  setFormData({ ...formData, fullname: e.target.value });
+                  if (errors.fullname) setErrors((prev) => ({ ...prev, fullname: '' }));
+                }}
+                className={errors.fullname ? `${ADMIN_INPUT} border-destructive` : ADMIN_INPUT}
+              />
+            </FormField>
+            <FormField label="Số điện thoại" error={errors.phone}>
+              <Input
+                value={formData.phone}
+                onChange={(e) => {
+                  setFormData({ ...formData, phone: e.target.value });
+                  if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                }}
+                className={errors.phone ? `${ADMIN_INPUT} border-destructive` : ADMIN_INPUT}
+              />
+            </FormField>
+            {selectedStaff?.isSuperAdmin ? (
+              <div>
+                <Label>Vai trò</Label>
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-purple-100 bg-purple-50 p-2 text-sm font-bold text-purple-700">
+                  <Shield className="h-4 w-4" />
+                  SUPER ADMIN (Tất cả quyền)
                 </div>
               </div>
             ) : (
-              <>
-                {/* Table */}
-                <div className="border rounded-lg overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Nhân viên</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">SĐT</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Vai trò</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Chi nhánh</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Đăng nhập cuối</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày tạo</th>
-                        <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {staffList.length === 0 && (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">
-                            Không có nhân viên nào phù hợp
-                          </td>
-                        </tr>
-                      )}
-                      {staffList.map((staff: Staff) => (
-                        <tr key={staff.id} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-2.5 align-middle max-w-[260px]">
-                            <div className="text-[13px] font-medium text-slate-900 truncate" title={staff.fullname}>{staff.fullname}</div>
-                            <div className="text-xs text-slate-500 truncate" title={staff.email}>{staff.email}</div>
-                          </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{staff.phone || '-'}</td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] max-w-[200px]">
-                            {staff.isSuperAdmin ? (
-                              <span className="font-semibold text-purple-700 whitespace-nowrap">Siêu quản trị</span>
-                            ) : (
-                              <span className="block truncate" title={staff.roles?.join(', ') || ''}>
-                                {staff.roles?.join(', ') || '-'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] max-w-[200px]">
-                            {staff.isSuperAdmin ? (
-                              <span className="text-slate-500 italic whitespace-nowrap">Tất cả chi nhánh</span>
-                            ) : !staff.branchNames?.length ? (
-                              '-'
-                            ) : (
-                              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                                <span className="truncate">{staff.branchNames.slice(0, MAX_BRANCHES_SHOWN).join(', ')}</span>
-                                {staff.branchNames.length > MAX_BRANCHES_SHOWN && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="shrink-0 cursor-default rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
-                                        +{staff.branchNames.length - MAX_BRANCHES_SHOWN}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {staff.branchNames.map((branch_name: string) => (
-                                        <div key={branch_name}>{branch_name}</div>
-                                      ))}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
-                            <span
-                              className={`inline-block px-2 py-1 rounded text-xs ${staff.isActive === false ? 'bg-slate-200 text-slate-600' : 'bg-green-100 text-green-700'}`}
-                            >
-                              {activeStatusLabel(staff.isActive)}
-                            </span>
-                            {staff.forcePasswordChange && (
-                              <span
-                                className="block mt-0.5 text-[11px] text-amber-700"
-                                title="Nhân viên phải đổi mật khẩu ở lần đăng nhập đầu"
-                              >
-                                Chờ đổi mật khẩu
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
-                            {staff.lastLoginAt ? formatVnDateTime(staff.lastLoginAt) : 'Chưa đăng nhập'}
-                          </td>
-                          <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{formatVnDate(staff.createdAt)}</td>
-                          <td className="px-4 py-2.5 align-middle text-[13px]">
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => {
-                                  setSelectedStaff(staff);
-                                  setIsDetailDialogOpen(true);
-                                }}
-                                title="Chi tiết"
-                                aria-label={`Xem chi tiết nhân viên ${staff.fullname}`}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              {hasPermission('staff', 'edit') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                                  onClick={() => openEditDialog(staff)}
-                                  title="Sửa"
-                                  aria-label={`Sửa nhân viên ${staff.fullname}`}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {isSuperAdmin && hasPermission('staff', 'reset_password') && staff.id !== currentStaffId && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-                                  onClick={() => {
-                                    setSelectedStaff(staff);
-                                    setIsResetPasswordDialogOpen(true);
-                                  }}
-                                  title="Đặt lại mật khẩu"
-                                  aria-label={`Đặt lại mật khẩu của ${staff.fullname}`}
-                                >
-                                  <Key className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {!staff.isSuperAdmin && hasPermission('staff', 'delete') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => {
-                                    setSelectedStaff(staff);
-                                    setIsDeleteDialogOpen(true);
-                                  }}
-                                  title="Xóa"
-                                  aria-label={`Xóa nhân viên ${staff.fullname}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                <div className="flex justify-between items-center mt-4">
-                  <span className="text-sm text-gray-600">Tổng {total} nhân viên</span>
-                  <div className="flex gap-2">
-                    <Button variant="outline" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                      Trước
-                    </Button>
-                    <span className="flex items-center px-3">
-                      Trang {page} / {totalPages || 1}
-                    </span>
-                    <Button variant="outline" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                      Sau
-                    </Button>
-                  </div>
-                </div>
-              </>
+              renderRoleField('edit')
             )}
-          </CardContent>
-        </Card>
-
-        {/* Create Dialog */}
-        <CreateAlert />
-        <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateOpenChange}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Tạo nhân viên mới</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleCreateOpenChange(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleCreate();
-              }}
-            >
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label>Email *</Label>
-                  <Input 
-                    value={formData.email} 
-                    onChange={(e) => {
-                      setFormData({ ...formData, email: e.target.value });
-                      if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
-                    }} 
-                    className={errors.email ? 'border-destructive' : ''}
-                  />
-                  {errors.email && <p className="text-destructive text-xs mt-1">{errors.email}</p>}
-                </div>
-                <div>
-                  <Label>Họ tên *</Label>
-                  <Input
-                    value={formData.fullname}
-                    onChange={(e) => {
-                      setFormData({ ...formData, fullname: e.target.value });
-                      if (errors.fullname) setErrors((prev) => ({ ...prev, fullname: '' }));
-                    }}
-                    className={errors.fullname ? 'border-destructive' : ''}
-                  />
-                  {errors.fullname && <p className="text-destructive text-xs mt-1">{errors.fullname}</p>}
-                </div>
-                <div>
-                  <Label>Số điện thoại</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => {
-                      setFormData({ ...formData, phone: e.target.value });
-                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
-                    }}
-                    className={errors.phone ? 'border-destructive' : ''}
-                  />
-                  {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone}</p>}
-                </div>
-                {renderRoleField('create')}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label>Chi nhánh</Label>
-                    {renderSelectAllBranches('create')}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded p-2">
-                    {branches.map((branch: Branch) => (
-                      <div key={branch.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`branch-${branch.id}`}
-                          checked={formData.branchIds.includes(branch.id)}
-                          onCheckedChange={() => toggleBranch(branch.id)}
-                        />
-                        <Label htmlFor={`branch-${branch.id}`} className="text-sm">
-                          {branch.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 text-xs text-gray-500 px-1">
-                  <Info className="w-3.5 h-3.5 mt-0.5 text-blue-400/70" />
-                  <span>Mật khẩu được tạo tự động và chỉ hiển thị một lần sau khi tạo. Hãy ghi lại và chuyển cho nhân viên.</span>
-                </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <Label>Chi nhánh</Label>
+                {!selectedStaff?.isSuperAdmin && renderSelectAllBranches('edit')}
               </div>
-              <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 px-6 pb-6 pt-4 bg-white border-t">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleCreateOpenChange(false)}
-                  className="text-slate-500 hover:bg-slate-100"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-                >
-                  {createMutation.isPending ? 'Đang tạo...' : 'Tạo'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Dialog */}
-        <EditAlert />
-        <Dialog open={isEditDialogOpen} onOpenChange={handleEditOpenChange}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Chỉnh sửa nhân viên</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleEditOpenChange(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleUpdate();
-              }}
-            >
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label>Email</Label>
-                  <Input value={formData.email} readOnly className="bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" />
-                  <p className="text-xs text-slate-500 mt-1">Email dùng để đăng nhập nên không thể thay đổi.</p>
+              {selectedStaff?.isSuperAdmin ? (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 p-2 text-sm font-bold text-blue-700">
+                  <Building2 className="h-4 w-4" />
+                  TẤT CẢ CHI NHÁNH
                 </div>
-                <div>
-                  <Label>Họ tên *</Label>
-                  <Input
-                    value={formData.fullname}
-                    onChange={(e) => {
-                      setFormData({ ...formData, fullname: e.target.value });
-                      if (errors.fullname) setErrors((prev) => ({ ...prev, fullname: '' }));
-                    }}
-                    className={errors.fullname ? 'border-destructive' : ''}
-                  />
-                  {errors.fullname && <p className="text-destructive text-xs mt-1">{errors.fullname}</p>}
-                </div>
-                <div>
-                  <Label>Số điện thoại</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => {
-                      setFormData({ ...formData, phone: e.target.value });
-                      if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
-                    }}
-                    className={errors.phone ? 'border-destructive' : ''}
-                  />
-                  {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone}</p>}
-                </div>
-                {selectedStaff?.isSuperAdmin ? (
-                  <div>
-                    <Label>Vai trò</Label>
-                    <div className="mt-2 p-2 bg-purple-50 border border-purple-100 rounded-lg text-purple-700 text-sm font-bold flex items-center gap-2">
-                      <Shield className="w-4 h-4" />
-                      SUPER ADMIN (Tất cả quyền)
+              ) : (
+                <div className="mt-2 grid max-h-40 grid-cols-2 gap-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                  {branches.map((branch: Branch) => (
+                    <div key={branch.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`edit-branch-${branch.id}`}
+                        checked={formData.branchIds.includes(branch.id)}
+                        onCheckedChange={() => toggleBranch(branch.id)}
+                      />
+                      <Label htmlFor={`edit-branch-${branch.id}`} className="text-sm">
+                        {branch.name}
+                      </Label>
                     </div>
-                  </div>
-                ) : (
-                  renderRoleField('edit')
-                )}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label>Chi nhánh</Label>
-                    {!selectedStaff?.isSuperAdmin && renderSelectAllBranches('edit')}
-                  </div>
-                  {selectedStaff?.isSuperAdmin ? (
-                    <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-sm font-bold flex items-center gap-2">
-                      <Building2 className="w-4 h-4" />
-                      TẤT CẢ CHI NHÁNH
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2 mt-2 max-h-40 overflow-y-auto border rounded p-2">
-                      {branches.map((branch: Branch) => (
-                        <div key={branch.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-branch-${branch.id}`}
-                            checked={formData.branchIds.includes(branch.id)}
-                            onCheckedChange={() => toggleBranch(branch.id)}
-                          />
-                          <Label htmlFor={`edit-branch-${branch.id}`} className="text-sm">
-                            {branch.name}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {!selectedStaff?.isSuperAdmin && (
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div>
-                    <Label htmlFor="fmi_staff_is_active" className="text-sm font-semibold text-slate-700">
-                      Tài khoản hoạt động
-                    </Label>
-                    <p className="text-xs text-slate-500 mt-0.5">Tắt để khóa đăng nhập mà không xóa nhân viên.</p>
-                  </div>
-                  <Switch
-                    id="fmi_staff_is_active"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isActive: checked }))}
-                  />
+                  ))}
                 </div>
               )}
-              <div className="flex items-start gap-2 text-xs text-gray-500 px-1">
-                <Info className="w-3.5 h-3.5 mt-0.5 text-blue-400/70" />
-                <span>
-                  {selectedStaff?.forcePasswordChange
-                    ? 'Người dùng chưa đổi mật khẩu lần đầu.'
-                    : 'Người dùng đã đổi mật khẩu lần đầu.'}
-                </span>
-              </div>
-              <DialogFooter className="sticky bottom-0 -mx-6 -mb-6 px-6 pb-6 pt-4 bg-white border-t">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleEditOpenChange(false)}
-                  className="text-slate-500 hover:bg-slate-100"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-                >
-                  {updateMutation.isPending ? 'Đang cập nhật...' : 'Lưu thay đổi'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Dialog */}
-        <ConfirmDeleteDialog
-          isOpen={isDeleteDialogOpen}
-          onOpenChange={setIsDeleteDialogOpen}
-          description={
-            <>
-              Bạn có chắc chắn muốn xóa nhân viên "{selectedStaff?.fullname}"? Hành động này không thể hoàn tác.
-            </>
-          }
-          onConfirm={handleDelete}
-          isDeleting={deleteMutation.isPending}
-        />
-
-        {/* Reset Password Dialog */}
-        <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-md rounded-2xl">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Đặt lại mật khẩu</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsResetPasswordDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <p className="py-4">
-              Bạn có chắc chắn muốn đặt lại mật khẩu cho nhân viên "{selectedStaff?.fullname}"? Mật khẩu mới chỉ hiển thị
-              một lần ngay sau khi xác nhận, và nhân viên sẽ bị đăng xuất khỏi mọi thiết bị.
-            </p>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>
-                Hủy
-              </Button>
-              <Button onClick={handleResetPassword} disabled={resetPasswordMutation.isPending}>
-                {resetPasswordMutation.isPending ? 'Đang xử lý...' : 'Xác nhận'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Generated password: shown once */}
-        <Dialog open={!!credentialNotice} onOpenChange={(open) => !open && setCredentialNotice(null)}>
-          <DialogContent className="bg-white sm:max-w-md rounded-2xl">
-            <DialogHeader className="pb-3 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">{credentialNotice?.title}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 py-2 text-sm text-slate-600">
-              <p>
-                Nhân viên: <b>{credentialNotice?.staffName}</b>
-                {credentialNotice?.email ? <> ({credentialNotice.email})</> : null}
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 select-all rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-base tracking-wide text-slate-900">
-                  {credentialNotice?.password}
-                </code>
-                <Button type="button" variant="outline" onClick={copyGeneratedPassword}>
-                  Sao chép
-                </Button>
-              </div>
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Mật khẩu này chỉ hiển thị một lần. Hệ thống không lưu bản đọc được và không gửi qua email. Nhân viên sẽ phải
-                đổi mật khẩu ở lần đăng nhập đầu tiên.
-              </p>
             </div>
-            <DialogFooter>
-              <Button onClick={() => setCredentialNotice(null)}>Đã ghi lại, đóng</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Detail Dialog */}
-        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[85vh] overflow-y-auto pr-2 custom-scrollbar rounded-2xl">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Chi tiết nhân viên</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsDetailDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-
-            {selectedStaff && (
-              <div className="py-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Account Info */}
-                  <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                        <User className="w-4 h-4 text-blue-500" />
-                        <h3 className="text-sm font-semibold text-slate-800">Thông tin tài khoản</h3>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <Mail className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
-                          <div className="space-y-0.5">
-                            <Label className="text-[11px] font-medium text-slate-500 uppercase">Email</Label>
-                            <div className="text-sm font-semibold text-slate-900 break-all">{selectedStaff.email}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Info className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
-                          <div className="space-y-0.5">
-                            <Label className="text-[11px] font-medium text-slate-500 uppercase">Họ tên</Label>
-                            <div className="text-sm font-medium text-slate-700">{selectedStaff.fullname}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Phone className="w-3.5 h-3.5 text-slate-400 mt-1 shrink-0" />
-                          <div className="space-y-0.5">
-                            <Label className="text-[11px] font-medium text-slate-500 uppercase">Số điện thoại</Label>
-                            <div className="text-sm text-slate-700">{selectedStaff.phone || 'Chưa cập nhật'}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 pt-1">
-                          {selectedStaff.isSuperAdmin && (
-                            <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none rounded-full px-2 py-0 text-[11px] h-5">
-                              Siêu quản trị
-                            </Badge>
-                          )}
-                          {selectedStaff.forcePasswordChange && (
-                            <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-full px-2 py-0 text-[11px] h-5">
-                              Yêu cầu đổi mật khẩu
-                            </Badge>
-                          )}
-                          {selectedStaff.isActive === false ? (
-                            <Badge className="bg-slate-200 text-slate-600 hover:bg-slate-200 border-none rounded-full px-2 py-0 text-[11px] h-5">
-                              Ngừng hoạt động
-                            </Badge>
-                          ) : (
-                            !selectedStaff.isSuperAdmin &&
-                            !selectedStaff.forcePasswordChange && (
-                              <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none rounded-full px-2 py-0 text-[11px] h-5">
-                                Hoạt động bình thường
-                              </Badge>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Assignments */}
-                  <Card className="border-slate-200 shadow-none bg-slate-50/50 h-fit">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                        <Shield className="w-4 h-4 text-purple-500" />
-                        <h3 className="text-sm font-semibold text-slate-800">Phân quyền & chi nhánh</h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Key className="w-3.5 h-3.5 text-slate-400" />
-                            <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                              Vai trò (Roles)
-                            </Label>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {selectedStaff.isSuperAdmin ? (
-                              <Badge
-                                variant="outline"
-                                className="bg-purple-50 text-purple-700 border-purple-200 font-bold px-2 py-0 text-[11px]"
-                              >
-                                SUPER ADMIN
-                              </Badge>
-                            ) : selectedStaff.roles && selectedStaff.roles.length > 0 ? (
-                              selectedStaff.roles.map((role, idx) => (
-                                <Badge
-                                  key={idx}
-                                  variant="outline"
-                                  className="bg-white text-slate-700 border-slate-200 font-medium px-2 py-0 text-[11px]"
-                                >
-                                  {role}
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">Chưa phân vai trò</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="space-y-2 pt-2">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                            <Label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                              Chi nhánh quản lý
-                            </Label>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {selectedStaff.isSuperAdmin ? (
-                              <Badge
-                                variant="outline"
-                                className="bg-blue-50 text-blue-700 border-blue-200 font-bold px-2 py-0 text-[11px]"
-                              >
-                                TẤT CẢ CHI NHÁNH
-                              </Badge>
-                            ) : selectedStaff.branchNames && selectedStaff.branchNames.length > 0 ? (
-                              selectedStaff.branchNames.map((branch, idx) => (
-                                <Badge
-                                  key={idx}
-                                  variant="outline"
-                                  className="bg-white text-blue-600 border-blue-100 font-medium px-2 py-0 text-[11px]"
-                                >
-                                  {branch}
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400 italic">Chưa phân chi nhánh</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* System Info */}
-                  <Card className="border-slate-200 shadow-none bg-slate-50/50 md:col-span-2 h-fit">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                        <History className="w-4 h-4 text-slate-500" />
-                        <h3 className="text-sm font-semibold text-slate-800">Thông tin hệ thống</h3>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Ngày tạo</Label>
-                          <div className="text-xs text-slate-700 font-medium">
-                            {formatVnDateTime(selectedStaff.createdAt)}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-medium italic">
-                            Bởi: {selectedStaff.created_by_staff_name || 'Hệ thống'}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Cập nhật cuối</Label>
-                          <div className="text-xs text-slate-700 font-medium">
-                            {selectedStaff.updatedAt
-                              ? formatVnDateTime(selectedStaff.updatedAt)
-                              : 'Chưa cập nhật'}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-medium italic">
-                            Bởi: {selectedStaff.updated_by_staff_name || 'Hệ thống'}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-slate-500 uppercase">Đăng nhập cuối</Label>
-                          <div className="text-xs text-slate-700 font-medium">
-                            {selectedStaff.lastLoginAt
-                              ? formatVnDateTime(selectedStaff.lastLoginAt)
-                              : 'Chưa đăng nhập'}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+            {!selectedStaff?.isSuperAdmin && (
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <div>
+                  <Label htmlFor="fmi_staff_is_active" className="text-sm font-semibold text-slate-700">
+                    Tài khoản hoạt động
+                  </Label>
+                  <p className="mt-0.5 text-xs text-slate-500">Tắt để khóa đăng nhập mà không xóa nhân viên.</p>
                 </div>
+                <Switch
+                  id="fmi_staff_is_active"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isActive: checked }))}
+                />
               </div>
             )}
-          </DialogContent>
-        </Dialog>
+            <div className="flex items-start gap-2 px-1 text-xs text-gray-500">
+              <Info className="mt-0.5 h-3.5 w-3.5 text-blue-400/70" />
+              <span>
+                {selectedStaff?.forcePasswordChange
+                  ? 'Người dùng chưa đổi mật khẩu lần đầu.'
+                  : 'Người dùng đã đổi mật khẩu lần đầu.'}
+              </span>
+            </div>
+          </form>
+        </AdminDialog>
+
+        {/* DELETE DIALOG */}
+        <ConfirmDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={setIsDeleteDialogOpen}
+          variant="danger"
+          title="Xóa nhân viên"
+          description={<>Bạn có chắc chắn muốn xóa nhân viên "{selectedStaff?.fullname}"? Hành động này không thể hoàn tác.</>}
+          onConfirm={handleDelete}
+          busy={deleteMutation.isPending}
+        />
+
+        {/* RESET PASSWORD DIALOG */}
+        <ConfirmDialog
+          open={isResetPasswordDialogOpen}
+          onOpenChange={setIsResetPasswordDialogOpen}
+          variant="warning"
+          title="Đặt lại mật khẩu"
+          confirmText="Đặt lại mật khẩu"
+          description={
+            <>
+              Bạn có chắc chắn muốn đặt lại mật khẩu cho nhân viên "{selectedStaff?.fullname}"? Mật khẩu mới chỉ hiển thị một
+              lần ngay sau khi xác nhận, và nhân viên sẽ bị đăng xuất khỏi mọi thiết bị.
+            </>
+          }
+          onConfirm={handleResetPassword}
+          busy={resetPasswordMutation.isPending}
+        />
+
+        {/* GENERATED PASSWORD: SHOWN ONCE */}
+        <AdminDialog
+          open={!!credentialNotice}
+          onClose={() => setCredentialNotice(null)}
+          title={credentialNotice?.title ?? ''}
+          size="sm"
+          mode="form"
+          footer={<Button className={ADMIN_BTN_PRIMARY} onClick={() => setCredentialNotice(null)}>Đã ghi lại, đóng</Button>}
+        >
+          <div className="space-y-3 text-sm text-slate-600">
+            <p>
+              Nhân viên: <b>{credentialNotice?.staffName}</b>
+              {credentialNotice?.email ? <> ({credentialNotice.email})</> : null}
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 select-all rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-base tracking-wide text-slate-900">
+                {credentialNotice?.password}
+              </code>
+              <Button type="button" variant="outline" className={ADMIN_BTN_OUTLINE} onClick={copyGeneratedPassword}>
+                Sao chép
+              </Button>
+            </div>
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Mật khẩu này chỉ hiển thị một lần. Hệ thống không lưu bản đọc được và không gửi qua email. Nhân viên sẽ phải đổi
+              mật khẩu ở lần đăng nhập đầu tiên.
+            </p>
+          </div>
+        </AdminDialog>
+
+        {/* DETAIL DIALOG */}
+        <AdminDialog
+          open={isDetailDialogOpen}
+          onClose={() => setIsDetailDialogOpen(false)}
+          title="Chi tiết nhân viên"
+          size="lg"
+          mode="view"
+          footer={
+            <AdminDialogFooter
+              onCancel={() => setIsDetailDialogOpen(false)}
+              cancelText={ADMIN_TEXT.close}
+              onSubmit={
+                selectedStaff && hasPermission('staff', 'edit')
+                  ? () => {
+                      setIsDetailDialogOpen(false);
+                      openEditDialog(selectedStaff);
+                    }
+                  : undefined
+              }
+              submitText={ADMIN_TEXT.edit}
+            />
+          }
+        >
+          {selectedStaff && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* Account Info */}
+              <FormSection title="Thông tin tài khoản" icon={<User className="h-4 w-4 text-blue-500" />} className="h-fit">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Mail className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px] font-medium uppercase text-slate-500">Email</Label>
+                      <div className="break-all text-sm font-semibold text-slate-900">{selectedStaff.email}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Info className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px] font-medium uppercase text-slate-500">Họ tên</Label>
+                      <div className="text-sm font-medium text-slate-700">{selectedStaff.fullname}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Phone className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px] font-medium uppercase text-slate-500">Số điện thoại</Label>
+                      <div className="text-sm text-slate-700">{selectedStaff.phone || 'Chưa cập nhật'}</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {selectedStaff.isSuperAdmin && <StatusBadge tone="info">Siêu quản trị</StatusBadge>}
+                    {selectedStaff.forcePasswordChange && <StatusBadge tone="warning">Yêu cầu đổi mật khẩu</StatusBadge>}
+                    {selectedStaff.isActive === false ? (
+                      <StatusBadge status="inactive" />
+                    ) : (
+                      !selectedStaff.isSuperAdmin && !selectedStaff.forcePasswordChange && <StatusBadge status="active" />
+                    )}
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* Assignments */}
+              <FormSection title="Phân quyền & chi nhánh" icon={<Shield className="h-4 w-4 text-blue-500" />} className="h-fit">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Key className="h-3.5 w-3.5 text-slate-400" />
+                      <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Vai trò</Label>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedStaff.isSuperAdmin ? (
+                        <Badge variant="outline" className="border-purple-200 bg-purple-50 px-2 py-0 text-[11px] font-bold text-purple-700">
+                          SUPER ADMIN
+                        </Badge>
+                      ) : selectedStaff.roles && selectedStaff.roles.length > 0 ? (
+                        selectedStaff.roles.map((role, role_no) => (
+                          <Badge
+                            key={role_no}
+                            variant="outline"
+                            className="border-slate-200 bg-white px-2 py-0 text-[11px] font-medium text-slate-700"
+                          >
+                            {role}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs italic text-slate-400">Chưa phân vai trò</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                      <Label className="text-[11px] font-medium uppercase tracking-wider text-slate-500">Chi nhánh quản lý</Label>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedStaff.isSuperAdmin ? (
+                        <Badge variant="outline" className="border-blue-200 bg-blue-50 px-2 py-0 text-[11px] font-bold text-blue-700">
+                          TẤT CẢ CHI NHÁNH
+                        </Badge>
+                      ) : selectedStaff.branchNames && selectedStaff.branchNames.length > 0 ? (
+                        selectedStaff.branchNames.map((branch, branch_no) => (
+                          <Badge
+                            key={branch_no}
+                            variant="outline"
+                            className="border-blue-100 bg-white px-2 py-0 text-[11px] font-medium text-blue-600"
+                          >
+                            {branch}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs italic text-slate-400">Chưa phân chi nhánh</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* System Info */}
+              <FormSection title="Thông tin hệ thống" icon={<History className="h-4 w-4 text-slate-500" />} className="h-fit md:col-span-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium uppercase text-slate-500">Ngày tạo</Label>
+                    <div className="text-xs font-medium text-slate-700">{formatVnDateTime(selectedStaff.createdAt)}</div>
+                    <div className="text-[11px] font-medium italic text-slate-400">
+                      Bởi: {selectedStaff.created_by_staff_name || 'Hệ thống'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium uppercase text-slate-500">Cập nhật cuối</Label>
+                    <div className="text-xs font-medium text-slate-700">
+                      {selectedStaff.updatedAt ? formatVnDateTime(selectedStaff.updatedAt) : 'Chưa cập nhật'}
+                    </div>
+                    <div className="text-[11px] font-medium italic text-slate-400">
+                      Bởi: {selectedStaff.updated_by_staff_name || 'Hệ thống'}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] font-medium uppercase text-slate-500">Đăng nhập cuối</Label>
+                    <div className="text-xs font-medium text-slate-700">
+                      {selectedStaff.lastLoginAt ? formatVnDateTime(selectedStaff.lastLoginAt) : 'Chưa đăng nhập'}
+                    </div>
+                  </div>
+                </div>
+              </FormSection>
+            </div>
+          )}
+        </AdminDialog>
       </div>
     </AdminLayout>
   );

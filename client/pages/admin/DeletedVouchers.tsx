@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import VouchersContent from '@/components/admin/content/VouchersContent';
 import {
@@ -11,7 +11,7 @@ import {
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '@/components/admin/common/notify';
 
 interface VoucherItem {
   id: number;
@@ -98,7 +98,7 @@ export default function DeletedVouchersPage() {
       setVouchers(items || []);
       setTotal(total ?? 0);
     } catch (err: any) {
-      toast.error(err.message || 'Không thể tải thùng rác voucher');
+      notify.error(err, 'Không thể tải danh sách voucher đã xóa');
     } finally {
       setIsLoading(false);
     }
@@ -113,14 +113,13 @@ export default function DeletedVouchersPage() {
     setIsEditOpen(true);
   };
 
-  const handleDelete = () => {}; // Không cho xóa cứng trong view deleted
   const handleRestore = (voucher: VoucherItem) => {
     restoreVoucherApi(voucher.id)
       .then(() => {
-        toast.success('Phục hồi voucher thành công');
+        notify.restored('voucher');
         handleRefresh();
       })
-      .catch((err) => toast.error(err.message || 'Phục hồi thất bại'));
+      .catch((err) => notify.error(err, 'Không thể khôi phục voucher'));
   };
 
   const handleLogout = () => {
@@ -144,7 +143,6 @@ export default function DeletedVouchersPage() {
         onCreate={() => navigate('/admin/vouchers')}
         onEdit={(data) => openEdit(data)}
         onRefresh={handleRefresh}
-        setVouchers={setVouchers}
         isEditOpen={isEditOpen}
         setIsEditOpen={setIsEditOpen}
         editData={editData}
@@ -165,7 +163,6 @@ export default function DeletedVouchersPage() {
           setPage(1);
         }}
         isDeletedView={true}
-        onDelete={handleDelete}
         onRestore={handleRestore}
       />
     </AdminLayout>

@@ -1,23 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
-import { toast } from 'sonner';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_PRIMARY, ADMIN_BTN_OUTLINE, ADMIN_CARD, ADMIN_TABLE_HEAD, ADMIN_TH, ADMIN_INPUT } from '@/components/admin/common/adminTokens';
 import { useNavigate } from 'react-router-dom';
 import { useStaffStore } from '@/store/staffStore';
-import { RefreshCw, RotateCcw, Building2, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Building2, ArrowLeft } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
 import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 import { formatVnDateTime } from '@/lib/format';
@@ -54,6 +50,7 @@ export default function DeletedBranchesPage() {
     setPage(1);
   };
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [branchToRestore, setBranchToRestore] = useState<number | null>(null);
   const [sortField, setSortField] = useState<'name' | 'deleted_at'>('deleted_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -81,9 +78,7 @@ export default function DeletedBranchesPage() {
       setBranches(sortedItems);
       setTotal(data.total || 0);
     } catch (error) {
-      toast.error('Lỗi', {
-        description: 'Không thể tải danh sách chi nhánh đã xóa'
-      });
+      notify.error('Không thể tải danh sách chi nhánh đã xóa');
     } finally {
       setIsLoading(false);
     }
@@ -100,6 +95,7 @@ export default function DeletedBranchesPage() {
 
   const handleConfirmRestore = async () => {
     if (!branchToRestore) return;
+    setIsRestoring(true);
     try {
       const token = localStorage.getItem('staffToken');
       const response = await fetch(buildUrl(`/api/admin/branches/${branchToRestore}/restore`), {
@@ -110,20 +106,16 @@ export default function DeletedBranchesPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        toast.success('Thành công', {
-          description: 'Đã khôi phục chi nhánh'
-        });
+        notify.restored('chi nhánh');
         setRestoreDialogOpen(false);
         fetchDeletedBranches();
       } else {
-        toast.error('Lỗi', {
-          description: data.message || 'Không thể khôi phục chi nhánh'
-        });
+        notify.error(data.message || 'Không thể khôi phục chi nhánh');
       }
     } catch (error) {
-      toast.error('Lỗi', {
-        description: 'Có lỗi xảy ra'
-      });
+      notify.error(error);
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -139,45 +131,42 @@ export default function DeletedBranchesPage() {
       }}
     >
       <div className="space-y-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/branches')}
-            className="rounded-full"
-            title="Quay lại"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Chi nhánh đã xóa</h1>
-          <div className="flex-1" />
-          <Button onClick={fetchDeletedBranches} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Làm mới
-          </Button>
-        </div>
+        <PageHeader
+          title="Chi nhánh đã xóa"
+          leading={
+            <Button variant="ghost" size="icon" onClick={() => navigate('/branches')} className="rounded-full" title="Quay lại">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          }
+          actions={
+            <Button onClick={fetchDeletedBranches} variant="outline" className={ADMIN_BTN_OUTLINE}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Làm mới
+            </Button>
+          }
+        />
 
-        <form onSubmit={handleSearch} className="mb-4 flex gap-2 max-w-sm">
+        <form onSubmit={handleSearch} className="mb-4 flex max-w-md gap-2">
           <Input
             placeholder="Tìm kiếm theo tên, mã, địa chỉ..."
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
-            className="flex-1"
+            className={`flex-1 ${ADMIN_INPUT}`}
           />
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white gap-1 text-xs">
+          <Button type="submit" className={ADMIN_BTN_PRIMARY}>
             Tìm kiếm
           </Button>
         </form>
 
-        {isLoading ? (
-          <div className="text-center py-8">Đang tải...</div>
-        ) : (
-          <div className="overflow-x-auto">
+        <div className={`${ADMIN_CARD} overflow-hidden`}>
+          {isLoading ? (
+            <TableSkeleton />
+          ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className={ADMIN_TABLE_HEAD}>
                 <TableRow>
                   <TableHead
-                    className="cursor-pointer hover:bg-gray-100"
+                    className={`cursor-pointer hover:bg-slate-100 ${ADMIN_TH}`}
                     onClick={() => {
                       setSortField('name');
                       setSortDir(sortField === 'name' && sortDir === 'asc' ? 'desc' : 'asc');
@@ -185,14 +174,14 @@ export default function DeletedBranchesPage() {
                   >
                     Tên {sortField === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
-                  <TableHead>Mã</TableHead>
-                  <TableHead>Địa chỉ</TableHead>
-                  <TableHead>SĐT</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Mặc định</TableHead>
-                  <TableHead>Xóa bởi</TableHead>
+                  <TableHead className={ADMIN_TH}>Mã</TableHead>
+                  <TableHead className={ADMIN_TH}>Địa chỉ</TableHead>
+                  <TableHead className={ADMIN_TH}>SĐT</TableHead>
+                  <TableHead className={ADMIN_TH}>Email</TableHead>
+                  <TableHead className={ADMIN_TH}>Mặc định</TableHead>
+                  <TableHead className={ADMIN_TH}>Xóa bởi</TableHead>
                   <TableHead
-                    className="cursor-pointer hover:bg-gray-100"
+                    className={`cursor-pointer hover:bg-slate-100 ${ADMIN_TH}`}
                     onClick={() => {
                       setSortField('deleted_at');
                       setSortDir(sortField === 'deleted_at' && sortDir === 'asc' ? 'desc' : 'asc');
@@ -200,7 +189,7 @@ export default function DeletedBranchesPage() {
                   >
                     Ngày xóa {sortField === 'deleted_at' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
-                  <TableHead className="text-right">Hành động</TableHead>
+                  <TableHead className={`text-right ${ADMIN_TH}`}>Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -215,9 +204,9 @@ export default function DeletedBranchesPage() {
                     <TableCell>
                       <Badge variant="outline">{b.code}</Badge>
                     </TableCell>
-                    <TableCell>{b.address || '-'}</TableCell>
+                    <TableCell className="max-w-[220px] truncate" title={b.address}>{b.address || '-'}</TableCell>
                     <TableCell>{b.phone || '-'}</TableCell>
-                    <TableCell>{b.email || '-'}</TableCell>
+                    <TableCell className="max-w-[180px] truncate" title={b.email}>{b.email || '-'}</TableCell>
                     <TableCell>
                       {b.is_default ? (
                         <Badge variant="default">Mặc định</Badge>
@@ -229,58 +218,37 @@ export default function DeletedBranchesPage() {
                     <TableCell>{formatVnDateTime(b.deleted_at)}</TableCell>
                     <TableCell className="text-right">
                       {hasPermission('branches', 'restore') && (
-                        <Button onClick={() => handleRestore(b.id)} variant="outline" size="sm">
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Khôi phục
-                        </Button>
+                        <RowActions>
+                          <RowActionButton action="restore" onClick={() => handleRestore(b.id)} />
+                        </RowActions>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
                 {branches.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                      Không có chi nhánh nào đã xóa
+                    <TableCell colSpan={9} className="p-0">
+                      <EmptyState title={searchQuery ? 'Không tìm thấy chi nhánh đã xóa' : 'Chưa có chi nhánh nào bị xóa'} />
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-sm text-gray-600">
-            Trang {page} / {totalPages} (Tổng {total} chi nhánh)
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} variant="outline" size="sm">
-              Trước
-            </Button>
-            <Button
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-              variant="outline"
-              size="sm"
-            >
-              Sau
-            </Button>
-          </div>
+          )}
         </div>
+
+        <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} totalLabel={`${total} chi nhánh`} />
       </div>
 
-      <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận khôi phục</AlertDialogTitle>
-            <AlertDialogDescription>Bạn có chắc chắn muốn khôi phục chi nhánh này?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmRestore}>Khôi phục</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={restoreDialogOpen}
+        onOpenChange={setRestoreDialogOpen}
+        variant="restore"
+        title="Khôi phục chi nhánh"
+        description="Bạn có chắc chắn muốn khôi phục chi nhánh này?"
+        busy={isRestoring}
+        onConfirm={handleConfirmRestore}
+      />
     </AdminLayout>
   );
 }

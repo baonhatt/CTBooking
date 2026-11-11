@@ -1,24 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
-import { toast } from 'sonner';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { notify } from '@/components/admin/common/notify';
+import { ADMIN_BTN_PRIMARY, ADMIN_BTN_OUTLINE, ADMIN_CARD, ADMIN_TABLE_HEAD, ADMIN_TH, ADMIN_INPUT } from '@/components/admin/common/adminTokens';
 import { useNavigate } from 'react-router-dom';
 import { formatVnDate, formatVnDateTime } from '@/lib/format';
 import { useStaffStore } from '@/store/staffStore';
-import { RefreshCw, RotateCcw, Image as ImageIcon, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Image as ImageIcon, ArrowLeft, Star } from 'lucide-react';
 import { buildUrl } from '@/lib/api/http';
 import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 
@@ -56,6 +52,7 @@ export default function DeletedMoviesPage() {
     setPage(1);
   };
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [movieToRestore, setMovieToRestore] = useState<number | null>(null);
   const [sortField, setSortField] = useState<'title' | 'deleted_at'>('deleted_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -83,9 +80,7 @@ export default function DeletedMoviesPage() {
       setMovies(sortedItems);
       setTotal(data.total || 0);
     } catch (error) {
-      toast.error('Lỗi', {
-        description: 'Không thể tải danh sách phim đã xóa'
-      });
+      notify.error('Không thể tải danh sách phim đã xóa');
     } finally {
       setIsLoading(false);
     }
@@ -102,6 +97,7 @@ export default function DeletedMoviesPage() {
 
   const handleConfirmRestore = async () => {
     if (!movieToRestore) return;
+    setIsRestoring(true);
     try {
       const token = localStorage.getItem('staffToken');
       const response = await fetch(buildUrl(`/api/admin/movies/${movieToRestore}/restore`), {
@@ -112,20 +108,16 @@ export default function DeletedMoviesPage() {
       });
       const data = await response.json();
       if (response.ok) {
-        toast.success('Thành công', {
-          description: 'Đã khôi phục phim'
-        });
+        notify.restored('phim');
         setRestoreDialogOpen(false);
         fetchDeletedMovies();
       } else {
-        toast.error('Lỗi', {
-          description: data.message || 'Không thể khôi phục phim'
-        });
+        notify.error(data.message || 'Không thể khôi phục phim');
       }
     } catch (error) {
-      toast.error('Lỗi', {
-        description: 'Có lỗi xảy ra'
-      });
+      notify.error(error);
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -141,46 +133,43 @@ export default function DeletedMoviesPage() {
       }}
     >
       <div className="space-y-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/movies')}
-            className="rounded-full"
-            title="Quay lại"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Phim đã xóa</h1>
-          <div className="flex-1" />
-          <Button onClick={fetchDeletedMovies} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Làm mới
-          </Button>
-        </div>
+        <PageHeader
+          title="Phim đã xóa"
+          leading={
+            <Button variant="ghost" size="icon" onClick={() => navigate('/movies')} className="rounded-full" title="Quay lại">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          }
+          actions={
+            <Button onClick={fetchDeletedMovies} variant="outline" className={ADMIN_BTN_OUTLINE}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Làm mới
+            </Button>
+          }
+        />
 
-        <form onSubmit={handleSearch} className="mb-4 flex gap-2 max-w-sm">
+        <form onSubmit={handleSearch} className="mb-4 flex max-w-md gap-2">
           <Input
             placeholder="Tìm kiếm theo tên phim..."
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
-            className="flex-1"
+            className={`flex-1 ${ADMIN_INPUT}`}
           />
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white gap-1 text-xs">
+          <Button type="submit" className={ADMIN_BTN_PRIMARY}>
             Tìm kiếm
           </Button>
         </form>
 
-        {isLoading ? (
-          <div className="text-center py-8">Đang tải...</div>
-        ) : (
-          <div className="overflow-x-auto">
+        <div className={`${ADMIN_CARD} overflow-hidden`}>
+          {isLoading ? (
+            <TableSkeleton />
+          ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className={ADMIN_TABLE_HEAD}>
                 <TableRow>
-                  <TableHead>Poster</TableHead>
+                  <TableHead className={ADMIN_TH}>Poster</TableHead>
                   <TableHead
-                    className="cursor-pointer hover:bg-gray-100"
+                    className={`cursor-pointer hover:bg-slate-100 ${ADMIN_TH}`}
                     onClick={() => {
                       setSortField('title');
                       setSortDir(sortField === 'title' && sortDir === 'asc' ? 'desc' : 'asc');
@@ -188,13 +177,13 @@ export default function DeletedMoviesPage() {
                   >
                     Tên phim {sortField === 'title' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
-                  <TableHead>Thể loại</TableHead>
-                  <TableHead>Thời lượng</TableHead>
-                  <TableHead>Đánh giá</TableHead>
-                  <TableHead>Ngày phát hành</TableHead>
-                  <TableHead>Xóa bởi</TableHead>
+                  <TableHead className={ADMIN_TH}>Thể loại</TableHead>
+                  <TableHead className={ADMIN_TH}>Thời lượng</TableHead>
+                  <TableHead className={ADMIN_TH}>Đánh giá</TableHead>
+                  <TableHead className={ADMIN_TH}>Ngày phát hành</TableHead>
+                  <TableHead className={ADMIN_TH}>Xóa bởi</TableHead>
                   <TableHead
-                    className="cursor-pointer hover:bg-gray-100"
+                    className={`cursor-pointer hover:bg-slate-100 ${ADMIN_TH}`}
                     onClick={() => {
                       setSortField('deleted_at');
                       setSortDir(sortField === 'deleted_at' && sortDir === 'asc' ? 'desc' : 'asc');
@@ -202,7 +191,7 @@ export default function DeletedMoviesPage() {
                   >
                     Ngày xóa {sortField === 'deleted_at' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
-                  <TableHead className="text-right">Hành động</TableHead>
+                  <TableHead className={`text-right ${ADMIN_TH}`}>Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -239,64 +228,43 @@ export default function DeletedMoviesPage() {
                       )}
                     </TableCell>
                     <TableCell>{m.duration_min ? `${m.duration_min} phút` : '-'}</TableCell>
-                    <TableCell>{m.rating !== null && m.rating !== undefined ? <Badge variant="outline">⭐ {m.rating}</Badge> : '-'}</TableCell>
+                    <TableCell>{m.rating !== null && m.rating !== undefined ? <Badge variant="outline" className="gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-500" />{m.rating}</Badge> : '-'}</TableCell>
                     <TableCell>{formatVnDate(m.release_date)}</TableCell>
                     <TableCell className="text-gray-600">{m.deleted_by_staff_name || '-'}</TableCell>
                     <TableCell>{formatVnDateTime(m.deleted_at)}</TableCell>
                     <TableCell className="text-right">
                       {hasPermission('movies', 'restore') && (
-                        <Button onClick={() => handleRestore(m.id)} variant="outline" size="sm">
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          Khôi phục
-                        </Button>
+                        <RowActions>
+                          <RowActionButton action="restore" onClick={() => handleRestore(m.id)} />
+                        </RowActions>
                       )}
                     </TableCell>
                   </TableRow>
                 ))}
                 {movies.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                      Không có phim nào đã xóa
+                    <TableCell colSpan={9} className="p-0">
+                      <EmptyState title={searchQuery ? 'Không tìm thấy phim đã xóa' : 'Chưa có phim nào bị xóa'} />
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-sm text-gray-600">
-            Trang {page} / {totalPages} (Tổng {total} phim)
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} variant="outline" size="sm">
-              Trước
-            </Button>
-            <Button
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages}
-              variant="outline"
-              size="sm"
-            >
-              Sau
-            </Button>
-          </div>
+          )}
         </div>
+
+        <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} totalLabel={`${total} phim`} />
       </div>
 
-      <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận khôi phục</AlertDialogTitle>
-            <AlertDialogDescription>Bạn có chắc chắn muốn khôi phục phim này?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmRestore}>Khôi phục</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={restoreDialogOpen}
+        onOpenChange={setRestoreDialogOpen}
+        variant="restore"
+        title="Khôi phục phim"
+        description="Bạn có chắc chắn muốn khôi phục phim này?"
+        busy={isRestoring}
+        onConfirm={handleConfirmRestore}
+      />
     </AdminLayout>
   );
 }

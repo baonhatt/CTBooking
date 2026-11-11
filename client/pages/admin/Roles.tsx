@@ -1,21 +1,32 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { X, Search, RefreshCw, Eye, Trash2, Plus } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { request } from '@/lib/api/http';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
 import { formatVnDate } from '@/lib/format';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge } from '@/components/admin/common/StatusBadge';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import { FormField } from '@/components/admin/common/FormField';
+import { notify } from '@/components/admin/common/notify';
+import {
+  ADMIN_BTN_PRIMARY,
+  ADMIN_BTN_OUTLINE,
+  ADMIN_CARD,
+  ADMIN_TABLE_HEAD,
+  ADMIN_TH,
+  ADMIN_INPUT
+} from '@/components/admin/common/adminTokens';
 import { roleLevelLabel, countGrantedPermissions, TOTAL_APPLICABLE_PERMISSIONS } from './roleConstants';
 
 interface Role {
@@ -84,13 +95,13 @@ export default function RolesPage() {
       });
     },
     onSuccess: (data: any) => {
-      toast.success('Tạo vai trò thành công');
+      notify.created('vai trò');
       setIsCreateDialogOpen(false);
       resetForm();
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Tạo vai trò thất bại');
+      notify.error(err, 'Tạo vai trò thất bại');
     }
   });
 
@@ -102,13 +113,13 @@ export default function RolesPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Xóa vai trò thành công');
+      notify.deleted('vai trò');
       setIsDeleteDialogOpen(false);
       setRoleToDelete(null);
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Xóa vai trò thất bại');
+      notify.error(err, 'Xóa vai trò thất bại');
     }
   });
 
@@ -120,12 +131,12 @@ export default function RolesPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Khởi tạo vai trò mặc định thành công');
+      notify.success('Đã khởi tạo vai trò mặc định');
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['permissions'] });
     },
     onError: (err: any) => {
-      toast.error(err.message || 'Khởi tạo vai trò thất bại');
+      notify.error(err, 'Khởi tạo vai trò thất bại');
     }
   });
 
@@ -162,8 +173,7 @@ export default function RolesPage() {
   };
 
   const roles = (rolesData as any)?.items || [];
-
-
+  const isCreateDirty = formData.name.trim() !== '' || formData.description.trim() !== '' || formData.level !== '0';
 
   return (
     <AdminLayout
@@ -181,61 +191,53 @@ export default function RolesPage() {
         </div>
       )}
       <div className="space-y-6">
-        {/* PAGE HEADER */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">Quản lý vai trò</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {roles.length} vai trò trong hệ thống</p>
-          </div>
-        </div>
+        <PageHeader title="Quản lý vai trò" description={`Tổng cộng ${roles.length} vai trò trong hệ thống`} />
 
         {/* TOOLBAR */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-          {/* L E F T - G R O U P */}
-          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-            <form onSubmit={handleSearchRole} className="flex gap-2">
-              <div className="relative w-[320px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo tên vai trò..."
-                  value={localSearchQuery}
-                  onChange={(e) => setLocalSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-              >
-                <Search className="w-3.5 h-3.5" /> Tìm kiếm
-              </Button>
-            </form>
-          </div>
+        <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
+          <form onSubmit={handleSearchRole} className="flex w-full gap-2 xl:w-auto">
+            <div className="relative w-[320px] max-w-full">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Tìm theo tên vai trò..."
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
+                className={`${ADMIN_INPUT} pl-10`}
+              />
+            </div>
+            <Button type="submit" className={`${ADMIN_BTN_PRIMARY} shrink-0 gap-1.5`}>
+              <Search className="h-4 w-4" /> Tìm kiếm
+            </Button>
+          </form>
 
-          {/* R I G H T - G R O U P */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
+          <div className="flex w-full flex-wrap items-center justify-start gap-2.5 xl:w-auto xl:justify-end">
             {hasPermission('roles', 'view_deleted') && (
-              <Button
-                variant="outline"
-                onClick={() => navigate('/deleted/roles')}
-                className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline text-xs font-semibold text-slate-600">Xem đã xóa</span>
+              <Button variant="outline" onClick={() => navigate('/deleted/roles')} className={`${ADMIN_BTN_OUTLINE} gap-2`}>
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Xem đã xóa</span>
               </Button>
             )}
-            
+
             {isSuperAdmin && (
-              <Button 
-                variant="outline" 
-                onClick={handleSeed} 
-                disabled={seedMutation.isPending}
-                className="rounded-xl flex items-center gap-2 h-10 px-4 shadow-sm"
-              >
+              <Button variant="outline" onClick={handleSeed} disabled={seedMutation.isPending} className={ADMIN_BTN_OUTLINE}>
                 {seedMutation.isPending ? 'Đang khởi tạo...' : 'Khởi tạo vai trò mặc định'}
               </Button>
             )}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setLocalSearchQuery('');
+                setSearchQuery('');
+                setShowSystemOnly(false);
+                queryClient.invalidateQueries({ queryKey: ['roles'] });
+              }}
+              className={`${ADMIN_BTN_OUTLINE} gap-2`}
+            >
+              <RefreshCw className="h-4 w-4" /> Làm mới
+            </Button>
 
             {isSuperAdmin && hasPermission('roles', 'create') && (
               <Button
@@ -243,220 +245,159 @@ export default function RolesPage() {
                   resetForm();
                   setIsCreateDialogOpen(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm gap-2 text-white h-10 px-5 font-semibold text-xs"
+                className={`${ADMIN_BTN_PRIMARY} gap-2`}
               >
-                <Plus className="w-4 h-4" /> Tạo vai trò mới
+                <Plus className="h-4 w-4" /> Tạo vai trò mới
               </Button>
             )}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setLocalSearchQuery('');
-                setSearchQuery('');
-                setShowSystemOnly(false);
-                queryClient.invalidateQueries({ queryKey: ['roles'] });
-              }}
-              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-2"
-              title="Làm mới"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
-        <Card className="border border-gray-200 rounded-xl shadow-sm bg-white mt-4">
-          <CardContent>
-            {rolesLoading ? (
-              <div className="space-y-4 py-4">
-                <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
-                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span>Đang tải danh sách vai trò từ máy chủ...</span>
-                </div>
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                </div>
-              </div>
-            ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] table-fixed">
-                {/* Fixed widths per column; the description takes whatever is left */}
-                <colgroup>
-                  <col className="w-[190px]" />
-                  <col className="w-[110px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[110px]" />
-                  <col className="w-[130px]" />
-                  <col />
-                  <col className="w-[115px]" />
-                  <col className="w-[115px]" />
-                  <col className="w-[130px]" />
-                </colgroup>
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Tên vai trò</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Loại</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Cấp độ</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Nhân viên</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Quyền</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Mô tả</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Ngày tạo</th>
-                    <th className="h-10 px-4 text-left align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider whitespace-nowrap">Cập nhật</th>
-                    <th className="h-10 px-4 text-right align-middle font-semibold text-xs text-slate-500 uppercase tracking-wider">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roles.map((role: Role) => (
-                    <tr
-                      key={role.id}
-                      className="border-b hover:bg-gray-50 cursor-pointer"
-                      onClick={() => navigate(`/roles/${role.id}`)}
-                    >
-                      <td className="px-4 py-2.5 align-middle text-[13px] font-medium">
-                        <span className="block truncate" title={role.name}>{role.name}</span>
-                      </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
-                        {role.isSystem ? (
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">Hệ thống</span>
-                        ) : (
-                          <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Tùy chỉnh</span>
+        <div className={`${ADMIN_CARD} overflow-hidden`}>
+          {rolesLoading ? (
+            <TableSkeleton />
+          ) : (
+            <Table className="min-w-[1000px] table-fixed">
+              {/* Fixed widths per column; the description takes whatever is left */}
+              <colgroup>
+                <col className="w-[180px]" />
+                <col className="w-[110px]" />
+                <col className="w-[100px]" />
+                <col className="w-[100px]" />
+                <col className="w-[110px]" />
+                <col />
+                <col className="w-[110px]" />
+                <col className="w-[110px]" />
+                <col className="w-[130px]" />
+              </colgroup>
+              <TableHeader className={ADMIN_TABLE_HEAD}>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className={ADMIN_TH}>Tên vai trò</TableHead>
+                  <TableHead className={ADMIN_TH}>Loại</TableHead>
+                  <TableHead className={ADMIN_TH}>Cấp độ</TableHead>
+                  <TableHead className={ADMIN_TH}>Nhân viên</TableHead>
+                  <TableHead className={ADMIN_TH}>Quyền</TableHead>
+                  <TableHead className={ADMIN_TH}>Mô tả</TableHead>
+                  <TableHead className={ADMIN_TH}>Ngày tạo</TableHead>
+                  <TableHead className={ADMIN_TH}>Cập nhật</TableHead>
+                  <TableHead className={`text-right ${ADMIN_TH}`}>Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {roles.map((role: Role) => (
+                  <TableRow key={role.id} className="cursor-pointer" onClick={() => navigate(`/roles/${role.id}`)}>
+                    <TableCell className="font-medium">
+                      <span className="block truncate" title={role.name}>
+                        {role.name}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {role.isSystem ? (
+                        <StatusBadge tone="neutral">Hệ thống</StatusBadge>
+                      ) : (
+                        <StatusBadge tone="info">Tùy chỉnh</StatusBadge>
+                      )}
+                    </TableCell>
+                    <TableCell>{roleLevelLabel(role.level)}</TableCell>
+                    <TableCell>{role.staffCount || 0}</TableCell>
+                    <TableCell>
+                      Quyền: {countGrantedPermissions(role.permissions)}/{TOTAL_APPLICABLE_PERMISSIONS}
+                    </TableCell>
+                    <TableCell className="whitespace-normal text-slate-600">
+                      <span className="line-clamp-2" title={role.description || ''}>
+                        {role.description || '-'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-slate-600">{formatVnDate(role.createdAt)}</TableCell>
+                    <TableCell className="text-slate-600">{formatVnDate(role.updatedAt)}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <RowActions>
+                        <RowActionButton action="view" onClick={() => navigate(`/roles/${role.id}?mode=view`)} />
+                        {!role.isSystem && isSuperAdmin && hasPermission('roles', 'edit') && (
+                          <RowActionButton action="edit" onClick={() => navigate(`/roles/${role.id}?mode=edit`)} />
                         )}
-                      </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
-                        {roleLevelLabel(role.level)}
-                      </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">{role.staffCount || 0}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap">
-                        Quyền: {countGrantedPermissions(role.permissions)}/{TOTAL_APPLICABLE_PERMISSIONS}
-                      </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600">
-                        <span className="line-clamp-2" title={role.description || ''}>{role.description || '-'}</span>
-                      </td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600 whitespace-nowrap">{formatVnDate(role.createdAt)}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px] text-gray-600 whitespace-nowrap">{formatVnDate(role.updatedAt)}</td>
-                      <td className="px-4 py-2.5 align-middle text-[13px]" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 flex-shrink-0"
-                            onClick={() => navigate(`/roles/${role.id}?mode=view`)}
-                            title="Chi tiết"
-                            aria-label={`Xem chi tiết vai trò ${role.name}`}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          {!role.isSystem && isSuperAdmin && hasPermission('roles', 'delete') ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                              onClick={() => {
-                                if ((role.staffCount || 0) > 0) {
-                                  toast.error(
-                                    `Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`
-                                  );
-                                  return;
-                                }
-                                setRoleToDelete(role);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                              title="Xóa"
-                              aria-label={`Xóa vai trò ${role.name}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          ) : (
-                            <span className="h-8 w-8 flex-shrink-0" />
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            )}
-          </CardContent>
-        </Card>
+                        {!role.isSystem && isSuperAdmin && hasPermission('roles', 'delete') && (
+                          <RowActionButton
+                            action="delete"
+                            onClick={() => {
+                              if ((role.staffCount || 0) > 0) {
+                                notify.error(`Không thể xóa vai trò này vì đã được giao cho ${role.staffCount} nhân viên`);
+                                return;
+                              }
+                              setRoleToDelete(role);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          />
+                        )}
+                      </RowActions>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {roles.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={9} className="p-0">
+                      <EmptyState title={searchQuery ? 'Không tìm thấy vai trò' : 'Chưa có vai trò nào'} />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </div>
 
-        {/* Create Dialog */}
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-md rounded-2xl">
-            <DialogHeader className="flex flex-row items-center gap-3 space-y-0 pb-4 border-b">
-              <DialogTitle className="text-lg font-bold text-slate-800">Tạo vai trò mới</DialogTitle>
-              <div className="flex-1" />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCreateDialogOpen(false)}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
-                title="Đóng"
-                aria-label="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Tên vai trò *</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-              </div>
-              <div>
-                <Label>Mô tả</Label>
-                <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Cấp độ</Label>
-                <Select value={formData.level} onValueChange={(v) => setFormData({ ...formData, level: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn cấp độ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">{roleLevelLabel(0)}</SelectItem>
-                    <SelectItem value="1">{roleLevelLabel(1)}</SelectItem>
-                    <SelectItem value="2">{roleLevelLabel(2)}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="ghost"
-                onClick={() => setIsCreateDialogOpen(false)}
-                className="text-slate-500 hover:bg-slate-100"
-              >
-                Hủy
-              </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={createMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-              >
-                {createMutation.isPending ? 'Đang tạo...' : 'Tạo'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* CREATE DIALOG */}
+        <AdminDialog
+          open={isCreateDialogOpen}
+          onClose={() => setIsCreateDialogOpen(false)}
+          title="Tạo vai trò mới"
+          size="sm"
+          mode="form"
+          dirty={isCreateDirty}
+          busy={createMutation.isPending}
+          footer={
+            <AdminDialogFooter
+              onCancel={() => setIsCreateDialogOpen(false)}
+              onSubmit={handleCreate}
+              submitText="Tạo mới"
+              busy={createMutation.isPending}
+            />
+          }
+        >
+          <div className="space-y-4">
+            <FormField label="Tên vai trò" required>
+              <Input
+                className={ADMIN_INPUT}
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Mô tả">
+              <Input
+                className={ADMIN_INPUT}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Cấp độ">
+              <Select value={formData.level} onValueChange={(v) => setFormData({ ...formData, level: v })}>
+                <SelectTrigger className={ADMIN_INPUT}>
+                  <SelectValue placeholder="Chọn cấp độ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">{roleLevelLabel(0)}</SelectItem>
+                  <SelectItem value="1">{roleLevelLabel(1)}</SelectItem>
+                  <SelectItem value="2">{roleLevelLabel(2)}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+        </AdminDialog>
 
-        {/* Delete Dialog */}
+        {/* DELETE DIALOG */}
         <ConfirmDeleteDialog
           isOpen={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
-          description={
-            <>
-              Bạn có chắc chắn muốn xóa vai trò "{roleToDelete?.name}"? Hành động này không thể hoàn tác.
-            </>
-          }
+          description={<>Bạn có chắc chắn muốn xóa vai trò "{roleToDelete?.name}"? Hành động này không thể hoàn tác.</>}
           onConfirm={handleDelete}
           isDeleting={deleteMutation.isPending}
         />

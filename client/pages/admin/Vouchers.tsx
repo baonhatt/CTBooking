@@ -11,7 +11,7 @@ import {
 import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '@/components/admin/common/notify';
 
 interface VoucherItem {
   id: number;
@@ -138,7 +138,7 @@ export default function VouchersPage() {
       setVouchers(items || []);
       setTotal(total ?? 0);
     } catch (err: any) {
-      toast.error(err.message || 'Không thể tải danh sách voucher');
+      notify.error(err, 'Không thể tải danh sách voucher');
     } finally {
       setIsLoading(false);
     }
@@ -226,19 +226,19 @@ export default function VouchersPage() {
   const handleDelete = (voucher: VoucherItem) => {
     deleteVoucherApi(voucher.id)
       .then(() => {
-        toast.success('Xóa voucher thành công');
+        notify.deleted('voucher');
         handleRefresh();
       })
-      .catch((err) => toast.error(err.message || 'Xóa thất bại'));
+      .catch((err) => notify.error(err, 'Xóa thất bại'));
   };
 
   const handleRestore = (voucher: VoucherItem) => {
     restoreVoucherApi(voucher.id)
       .then(() => {
-        toast.success('Phục hồi voucher thành công');
+        notify.restored('voucher');
         handleRefresh();
       })
-      .catch((err) => toast.error(err.message || 'Phục hồi thất bại'));
+      .catch((err) => notify.error(err, 'Khôi phục thất bại'));
   };
 
   const handleLogout = () => {
@@ -262,7 +262,6 @@ export default function VouchersPage() {
         onCreate={openCreate}
         onEdit={(data) => openEdit(data)}
         onRefresh={handleRefresh}
-        setVouchers={setVouchers}
         isEditOpen={isEditOpen}
         setIsEditOpen={setIsEditOpen}
         editData={editData}

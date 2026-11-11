@@ -1,27 +1,26 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination';
 import { request } from '@/lib/api/http';
 import { formatVnDateTime } from '@/lib/format';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
-import { Search, RefreshCw, Eye, FilterX } from 'lucide-react';
+import { Search, RefreshCw, FilterX, History } from 'lucide-react';
+import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
+import { RowActionButton, RowActions } from '@/components/admin/common/RowActionButton';
+import { StatusBadge, type StatusTone } from '@/components/admin/common/StatusBadge';
+import { PageHeader } from '@/components/admin/common/PageHeader';
+import { AdminPagination } from '@/components/admin/common/AdminPagination';
+import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
+import {
+  ADMIN_BTN_PRIMARY,
+  ADMIN_BTN_OUTLINE,
+  ADMIN_CARD,
+  ADMIN_TABLE_HEAD,
+  ADMIN_TH,
+  ADMIN_TEXT
+} from '@/components/admin/common/adminTokens';
 
 interface AuditLog {
   id: number;
@@ -53,17 +52,24 @@ const ACTION_LABELS: Record<string, string> = {
   check_in: 'Cho vào cổng',
   force_checkin: 'Duyệt vé quá hạn',
   reset_password: 'Đặt lại mật khẩu',
-  copy: 'Sao chép'
+  copy: 'Sao chép',
+  lock: 'Khóa tài khoản',
+  unlock: 'Mở khóa tài khoản'
 };
 
-const ACTION_COLORS: Record<string, string> = {
-  login: 'bg-gray-100 text-gray-800 border-gray-200',
-  create: 'bg-green-50 text-green-700 border-green-200',
-  update: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  delete: 'bg-red-50 text-red-600 border-red-200',
-  force_logout: 'bg-orange-100 text-orange-800 border-orange-200',
-  reset_password: 'bg-purple-100 text-purple-800 border-purple-200',
-  copy: 'bg-blue-50 text-blue-700 border-blue-200'
+// Badge colour of each action (same five tones as every other status in the admin)
+const ACTION_TONES: Record<string, StatusTone> = {
+  login: 'neutral',
+  create: 'success',
+  update: 'info',
+  delete: 'danger',
+  force_logout: 'warning',
+  check_in: 'success',
+  force_checkin: 'warning',
+  reset_password: 'warning',
+  copy: 'info',
+  lock: 'danger',
+  unlock: 'success'
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -72,8 +78,15 @@ const ENTITY_LABELS: Record<string, string> = {
   booking: 'Đặt vé',
   role: 'Vai trò',
   ticket_package: 'Gói vé',
-  showtimes: 'Lịch chiếu'
+  showtimes: 'Lịch chiếu',
+  user: 'Khách hàng'
 };
+
+const FILTER_SELECT_CLASS =
+  'h-10 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20';
+
+const DATE_INPUT_CLASS =
+  'h-10 w-[140px] cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20';
 
 // Fields to ignore for each module (auto-generated or system fields)
 const IGNORED_FIELDS: Record<string, string[]> = {
@@ -86,11 +99,10 @@ const IGNORED_FIELDS: Record<string, string[]> = {
   site_media: ['id', 'created_at', 'updated_at', 'deleted_at'],
   post: ['id', 'created_at', 'updated_at', 'deleted_at'],
   toy: ['id', 'created_at', 'updated_at', 'deleted_at'],
-  users: ['id', 'created_at', 'updated_at']
+  user: ['id', 'created_at', 'updated_at']
 };
 
 export default function AuditLogsPage() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
   const clearStaff = useStaffStore((state) => state.clearStaff);
@@ -100,7 +112,7 @@ export default function AuditLogsPage() {
   const [search, setSearch] = useState('');
   const [localSearch, setLocalSearch] = useState('');
 
-  const handleSearchAudit = (e?: React.FormEvent) => {
+  const handleSearchAudit = (e?: FormEvent) => {
     if (e) e.preventDefault();
     setSearch(localSearch);
     setPage(1);
@@ -184,12 +196,8 @@ export default function AuditLogsPage() {
   const formatEntityLabel = (log: AuditLog) => {
     const entityLabel = ENTITY_LABELS[log.entityType] || log.entityType;
     const entityName = getEntityName(log);
-    // Show the name when there is one; the internal id only as a fallback
-    return entityName ? `${entityLabel}: ${entityName}` : `${entityLabel} #${log.entityId}`;
-  };
-
-  const getStaffInfo = (staffId: number) => {
-    return staffList.find((s: Staff) => s.id === staffId);
+    // The internal id is never shown: without a name the label alone is shown
+    return entityName ? `${entityLabel}: ${entityName}` : entityLabel;
   };
 
   const openDetailDialog = (log: AuditLog) => {
@@ -204,49 +212,6 @@ export default function AuditLogsPage() {
     setFilterEntityType('');
     setFilterFromDate('');
     setFilterToDate('');
-  };
-
-  const renderJsonDiff = (oldValues: any, newValues: any) => {
-    const allKeys = new Set([...Object.keys(oldValues || {}), ...Object.keys(newValues || {})]);
-    const keys = Array.from(allKeys);
-
-    return (
-      <div className="space-y-2">
-        {keys.map((key) => {
-          const oldValue = oldValues?.[key];
-          const newValue = newValues?.[key];
-          const isChanged = JSON.stringify(oldValue) !== JSON.stringify(newValue);
-
-          return (
-            <div key={key} className="flex">
-              <div className="w-1/3 p-2 font-medium text-sm">{key}</div>
-              <div className={`w-1/3 p-2 text-sm ${isChanged ? 'bg-red-50' : ''}`}>
-                {oldValue !== undefined ? (
-                  typeof oldValue === 'object' ? (
-                    JSON.stringify(oldValue, null, 2)
-                  ) : (
-                    String(oldValue)
-                  )
-                ) : (
-                  <span className="text-gray-400">-</span>
-                )}
-              </div>
-              <div className={`w-1/3 p-2 text-sm ${isChanged ? 'bg-green-50' : ''}`}>
-                {newValue !== undefined ? (
-                  typeof newValue === 'object' ? (
-                    JSON.stringify(newValue, null, 2)
-                  ) : (
-                    String(newValue)
-                  )
-                ) : (
-                  <span className="text-gray-400">-</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
   };
 
   const parseAuditJson = (value?: string) => {
@@ -287,6 +252,243 @@ export default function AuditLogsPage() {
 
 
 
+  const hasFilter = Boolean(filterStaff || filterAction || filterEntityType || filterFromDate || filterToDate);
+
+  const renderActionBadge = (action: string) => (
+    <StatusBadge tone={ACTION_TONES[action] || 'neutral'}>{ACTION_LABELS[action] || action}</StatusBadge>
+  );
+
+  // TOOLBAR
+  const renderToolbar = () => (
+    <div className={`${ADMIN_CARD} flex flex-col items-start justify-between gap-4 p-4 xl:flex-row xl:items-center`}>
+      <form onSubmit={handleSearchAudit} className="flex w-full gap-2 xl:w-auto">
+        <div className="relative w-[320px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            aria-label="Tìm theo tên nhân viên hoặc hành động"
+            placeholder="Tìm theo tên nhân viên hoặc hành động..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-600/20"
+          />
+        </div>
+        <button type="submit" className={`${ADMIN_BTN_PRIMARY} inline-flex shrink-0 items-center gap-2`}>
+          <Search className="h-4 w-4" />
+          {ADMIN_TEXT.search}
+        </button>
+      </form>
+
+      <div className="flex w-full flex-wrap items-center justify-start gap-2 xl:w-auto xl:justify-end">
+        <select
+          value={filterStaff}
+          aria-label="Lọc theo nhân viên"
+          onChange={(e) => setFilterStaff(e.target.value)}
+          className={`${FILTER_SELECT_CLASS} min-w-[140px]`}
+        >
+          <option value="">Tất cả nhân viên</option>
+          {staffList.map((staffItem: Staff) => (
+            <option key={staffItem.id} value={String(staffItem.id)}>
+              {staffItem.fullname}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterAction}
+          aria-label="Lọc theo hành động"
+          onChange={(e) => setFilterAction(e.target.value)}
+          className={`${FILTER_SELECT_CLASS} min-w-[140px]`}
+        >
+          <option value="">Tất cả hành động</option>
+          {Object.entries(ACTION_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterEntityType}
+          aria-label="Lọc theo đối tượng"
+          onChange={(e) => setFilterEntityType(e.target.value)}
+          className={`${FILTER_SELECT_CLASS} min-w-[140px]`}
+        >
+          <option value="">Tất cả đối tượng</option>
+          {Object.entries(ENTITY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="date"
+          value={filterFromDate}
+          onChange={(e) => setFilterFromDate(e.target.value)}
+          className={DATE_INPUT_CLASS}
+          title="Từ ngày"
+          aria-label="Từ ngày"
+        />
+
+        <input
+          type="date"
+          value={filterToDate}
+          onChange={(e) => setFilterToDate(e.target.value)}
+          className={DATE_INPUT_CLASS}
+          title="Đến ngày"
+          aria-label="Đến ngày"
+        />
+
+        {hasFilter && (
+          <button type="button" onClick={clearFilters} className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}>
+            <FilterX className="h-4 w-4" /> Bỏ lọc
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            setLocalSearch('');
+            setSearch('');
+            setPage(1);
+            clearFilters();
+            refetchLogs();
+          }}
+          className={`${ADMIN_BTN_OUTLINE} inline-flex items-center gap-2`}
+        >
+          <RefreshCw className={`h-4 w-4 ${logsLoading ? 'animate-spin' : ''}`} />
+          {ADMIN_TEXT.refresh}
+        </button>
+      </div>
+    </div>
+  );
+
+  // TABLE
+  const renderLogRow = (log: AuditLog) => (
+    <TableRow key={log.id} className="h-[52px] border-b border-slate-200 transition-colors hover:bg-slate-50">
+      <TableCell className="text-sm text-slate-600">{formatDate(log.createdAt)}</TableCell>
+      <TableCell>
+        <div className="flex flex-col">
+          <span className="font-medium text-slate-900">{log.staffFullname || 'Nhân viên'}</span>
+          <span className="text-xs text-slate-500">{log.staffEmail || '-'}</span>
+        </div>
+      </TableCell>
+      <TableCell>{renderActionBadge(log.action)}</TableCell>
+      <TableCell className="text-sm text-slate-600">{formatEntityLabel(log)}</TableCell>
+      <TableCell className="font-mono text-sm text-slate-600">{log.ipAddress || '-'}</TableCell>
+      <TableCell className="pr-4 text-right">
+        <RowActions>
+          <RowActionButton action="view" onClick={() => openDetailDialog(log)} />
+        </RowActions>
+      </TableCell>
+    </TableRow>
+  );
+
+  const renderTable = () => {
+    if (logsLoading) return <TableSkeleton rows={6} />;
+    if (logs.length === 0) {
+      const isFiltered = hasFilter || Boolean(search);
+      return <EmptyState title={isFiltered ? 'Không tìm thấy bản ghi nào' : 'Chưa có bản ghi nào'} />;
+    }
+    return (
+      <Table>
+        <TableHeader className={ADMIN_TABLE_HEAD}>
+          <TableRow className="border-none hover:bg-transparent">
+            <TableHead className={`${ADMIN_TH} py-3`}>Thời gian</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Nhân viên</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Hành động</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Đối tượng</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3`}>Địa chỉ IP</TableHead>
+            <TableHead className={`${ADMIN_TH} py-3 pr-4 text-right`}>{ADMIN_TEXT.actionColumn}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>{logs.map(renderLogRow)}</TableBody>
+      </Table>
+    );
+  };
+
+  // PAGINATION
+  const renderPaginationLabel = () => (
+    <span className="flex items-center gap-3">
+      <span>{total} bản ghi</span>
+      <select
+        value={pageSize}
+        aria-label="Số bản ghi mỗi trang"
+        onChange={(e) => {
+          setPageSize(Number(e.target.value));
+          setPage(1);
+        }}
+        className="h-8 cursor-pointer rounded-lg border border-slate-200 bg-white px-2 text-xs outline-none"
+      >
+        {[20, 50, 100].map((size) => (
+          <option key={size} value={size}>
+            {size} / trang
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+
+  // DETAIL MODAL
+  const renderInfoItem = (label: string, value: ReactNode, wide = false) => (
+    <div className={wide ? 'col-span-2' : undefined}>
+      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="mt-0.5 break-all text-sm text-slate-900">{value}</div>
+    </div>
+  );
+
+  const renderDiffTable = (log: AuditLog) => {
+    const diffEntries = getDiffEntries(log);
+    return (
+      <div className={`${ADMIN_CARD} overflow-hidden`}>
+        <table className="w-full">
+          <thead className={ADMIN_TABLE_HEAD}>
+            <tr>
+              <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trường</th>
+              {log.oldValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trước</th>}
+              {log.newValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Sau</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {diffEntries.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="p-3 text-center text-sm text-slate-500">
+                  Không có thay đổi
+                </td>
+              </tr>
+            ) : (
+              diffEntries.map(({ key, oldValue, newValue }) => (
+                <tr key={key} className="border-b border-slate-100 last:border-b-0">
+                  <td className="p-3 text-sm font-medium">{key}</td>
+                  {log.oldValues && <td className="bg-red-50 p-3 text-sm">{renderValue(oldValue)}</td>}
+                  {log.newValues && <td className="bg-emerald-50 p-3 text-sm">{renderValue(newValue)}</td>}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderDetailBody = () => {
+    if (!selectedLog) return null;
+    return (
+      <div className="space-y-4">
+        <div className={`${ADMIN_CARD} grid grid-cols-2 gap-4 p-5`}>
+          {renderInfoItem('Thời gian', formatDate(selectedLog.createdAt))}
+          {renderInfoItem('Địa chỉ IP', selectedLog.ipAddress || '-')}
+          {renderInfoItem('Trình duyệt / thiết bị', selectedLog.userAgent || '-', true)}
+          {renderInfoItem('Nhân viên', `${selectedLog.staffFullname || 'Nhân viên'} (${selectedLog.staffEmail || '-'})`)}
+          {renderInfoItem('Hành động', ACTION_LABELS[selectedLog.action] || selectedLog.action)}
+          {renderInfoItem('Đối tượng', formatEntityLabel(selectedLog))}
+        </div>
+        {(selectedLog.oldValues || selectedLog.newValues) && renderDiffTable(selectedLog)}
+      </div>
+    );
+  };
+
   return (
     <AdminLayout
       active={activeTab as any}
@@ -294,133 +496,13 @@ export default function AuditLogsPage() {
       adminEmailState={staff?.email || 'admin@email.com'}
       handleLogout={handleLogout}
     >
-      <div className="space-y-6">
-        {/* PAGE HEADER */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">Nhật ký hoạt động</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Tổng cộng {total} bản ghi</p>
-          </div>
-        </div>
+      <div className="space-y-4">
+        <PageHeader title="Nhật ký hoạt động" description={`Tổng cộng ${total} bản ghi`} />
 
-        {/* TOOLBAR */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-          {/* L E F T - G R O U P */}
-          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-            <form onSubmit={handleSearchAudit} className="flex gap-2">
-              <div className="relative w-[320px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="text"
-                  aria-label="Tìm theo tên nhân viên hoặc hành động"
-                  placeholder="Tìm theo tên nhân viên hoặc hành động..."
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded-xl transition-all outline-none text-sm"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold px-4 flex items-center gap-1.5 shrink-0"
-              >
-                <Search className="w-3.5 h-3.5" /> Tìm kiếm
-              </Button>
-            </form>
-          </div>
-
-          {/* R I G H T - G R O U P */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto font-sans justify-start xl:justify-end">
-            <select
-              value={filterStaff}
-              aria-label="Lọc theo nhân viên"
-              onChange={(e) => setFilterStaff(e.target.value)}
-              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
-            >
-              <option value="all">Tất cả nhân viên</option>
-              {staffList.map((staff: Staff) => (
-                <option key={staff.id} value={String(staff.id)}>
-                  {staff.fullname}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterAction}
-              aria-label="Lọc theo hành động"
-              onChange={(e) => setFilterAction(e.target.value)}
-              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
-            >
-              <option value="all">Tất cả hành động</option>
-              {Object.entries(ACTION_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filterEntityType}
-              aria-label="Lọc theo đối tượng"
-              onChange={(e) => setFilterEntityType(e.target.value)}
-              className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer min-w-[140px]"
-            >
-              <option value="all">Tất cả đối tượng</option>
-              {Object.entries(ENTITY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="date"
-              value={filterFromDate}
-              onChange={(e) => setFilterFromDate(e.target.value)}
-              className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer w-[130px]"
-              title="Từ ngày"
-              aria-label="Từ ngày"
-            />
-            
-            <input
-              type="date"
-              value={filterToDate}
-              onChange={(e) => setFilterToDate(e.target.value)}
-              className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer w-[130px]"
-              title="Đến ngày"
-              aria-label="Đến ngày"
-            />
-
-            {(filterStaff || filterAction || filterEntityType || filterFromDate || filterToDate) && (
-              <Button 
-                variant="outline" 
-                onClick={clearFilters} 
-                className="h-10 rounded-xl border-dashed border-slate-300 text-slate-500 hover:text-slate-700 px-3 flex items-center gap-2"
-              >
-                <FilterX className="w-3.5 h-3.5" /> Bỏ lọc
-              </Button>
-            )}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setLocalSearch('');
-                setSearch('');
-                setPage(1);
-                clearFilters();
-                queryClient.invalidateQueries(['audit-logs'] as any);
-              }}
-              className="rounded-xl shadow-sm hover:rotate-180 transition-transform duration-500 shrink-0 h-10 w-10 ml-1"
-              title="Làm mới"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+        {renderToolbar()}
 
         {logsFailed && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <span>Không tải được nhật ký hoạt động. Dữ liệu bên dưới có thể đã cũ hoặc trống.</span>
             <button onClick={() => refetchLogs()} className="font-semibold underline">
               Tải lại
@@ -428,234 +510,22 @@ export default function AuditLogsPage() {
           </div>
         )}
 
-        {/* TABLE */}
-        <Card className="border border-gray-200 rounded-xl shadow-sm bg-white">
-          <CardContent className="p-0 overflow-x-auto">
-            {logsLoading ? (
-              <div className="space-y-4 py-4 px-6">
-                <div className="flex items-center justify-center gap-3 py-4 text-slate-600 font-medium">
-                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span>Đang tải nhật ký hoạt động từ máy chủ...</span>
-                </div>
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                  <Skeleton className="h-12 w-full rounded-lg bg-slate-100" />
-                </div>
-              </div>
-            ) : (
-            <Table>
-              <TableHeader className="bg-gray-50">
-                <TableRow className="hover:bg-transparent border-none">
-                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Thời gian</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Nhân viên</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Hành động</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Đối tượng</TableHead>
-                  <TableHead className="text-xs font-semibold text-gray-600 uppercase py-3">Địa chỉ IP</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-gray-600 uppercase py-3 pr-6">
-                    Thao tác
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log: AuditLog) => (
-                  <TableRow
-                    key={log.id}
-                    className="group hover:bg-gray-50 transition-colors border-b border-gray-200 h-[52px]"
-                  >
-                    <TableCell className="text-sm text-slate-600">{formatDate(log.createdAt)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-slate-900">
-                          {log.staffFullname || `Nhân viên #${log.staffId}`}
-                        </span>
-                        <span className="text-xs text-slate-500">{log.staffEmail || '-'}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                          ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-800 border-gray-200'
-                        }`}
-                      >
-                        {ACTION_LABELS[log.action] || log.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600">
-                      {formatEntityLabel(log)}
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-600 font-mono">{log.ipAddress || '-'}</TableCell>
-                    <TableCell className="text-right pr-6">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 rounded-lg hover:bg-blue-50 text-blue-600"
-                        onClick={() => openDetailDialog(log)}
-                        title="Xem chi tiết"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
-          </CardContent>
-        </Card>
+        <div className={`${ADMIN_CARD} overflow-hidden`}>{renderTable()}</div>
 
-        {/* FOOTER / PAGINATION */}
-        <div className="bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              {total} bản ghi trong hệ thống
-            </span>
-            <select
-              value={pageSize}
-              aria-label="Số bản ghi mỗi trang"
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-              className="h-8 px-2 bg-white border border-slate-200 rounded-lg text-xs outline-none cursor-pointer"
-            >
-              {[20, 50, 100].map((size) => (
-                <option key={size} value={size}>
-                  {size} / trang
-                </option>
-              ))}
-            </select>
-          </div>
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(Math.max(1, page - 1));
-                  }}
-                  aria-disabled={page === 1}
-                  className={
-                    page === 1 ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'
-                  }
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <span className="flex items-center px-3 text-sm text-slate-600">
-                  Trang {page} / {totalPages || 1}
-                </span>
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setPage(Math.min(totalPages, page + 1));
-                  }}
-                  aria-disabled={page >= totalPages}
-                  className={
-                    page >= totalPages ? 'pointer-events-none opacity-30' : 'cursor-pointer rounded-lg border shadow-sm'
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        <AdminPagination page={page} totalPages={totalPages || 1} onPageChange={setPage} totalLabel={renderPaginationLabel()} />
 
-        {/* Detail Dialog */}
-        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-          <DialogContent className="[&>button]:hidden bg-white sm:max-w-4xl max-h-[80vh] overflow-y-auto rounded-2xl flex flex-col">
-            <DialogHeader className="sticky top-0 z-10 bg-white pb-3 border-b">
-              <DialogTitle>Chi tiết hoạt động</DialogTitle>
-            </DialogHeader>
-            {selectedLog && (
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Thời gian</Label>
-                    <div className="text-sm">{formatDate(selectedLog.createdAt)}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Địa chỉ IP</Label>
-                    <div className="text-sm">{selectedLog.ipAddress || '-'}</div>
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-sm font-medium">Trình duyệt / thiết bị</Label>
-                    <div className="text-sm break-all">{selectedLog.userAgent || '-'}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Nhân viên</Label>
-                    <div className="text-sm">
-                      {selectedLog.staffFullname || `Nhân viên #${selectedLog.staffId}`} ({selectedLog.staffEmail || '-'})
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Hành động</Label>
-                    <div className="text-sm">{ACTION_LABELS[selectedLog.action] || selectedLog.action}</div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Đối tượng</Label>
-                    <div className="text-sm">{formatEntityLabel(selectedLog)}</div>
-                  </div>
-                </div>
-
-                {/* Diff View */}
-                {(selectedLog.oldValues || selectedLog.newValues) && (
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left p-3 border-b w-1/3">Field</th>
-                          {selectedLog.oldValues && <th className="text-left p-3 border-b w-1/3">Trước</th>}
-                          {selectedLog.newValues && <th className="text-left p-3 border-b w-1/3">Sau</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const diffEntries = getDiffEntries(selectedLog);
-
-                          if (diffEntries.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={3} className="p-3 text-center text-gray-500">
-                                  Không có thay đổi
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return diffEntries.map(({ key, oldValue, newValue }) => (
-                            <tr key={key} className="border-b">
-                              <td className="p-3 font-medium text-sm">{key}</td>
-                              {selectedLog.oldValues && (
-                                <td className="p-3 text-sm bg-red-50">
-                                  {renderValue(oldValue)}
-                                </td>
-                              )}
-                              {selectedLog.newValues && (
-                                <td className="p-3 text-sm bg-green-50">
-                                  {renderValue(newValue)}
-                                </td>
-                              )}
-                            </tr>
-                          ));
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-            <DialogFooter className="sticky bottom-0 bg-white border-t p-4 mt-auto">
-              <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
-                Đóng
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <AdminDialog
+          open={isDetailDialogOpen}
+          onClose={() => setIsDetailDialogOpen(false)}
+          mode="view"
+          size="lg"
+          icon={<History className="h-5 w-5" />}
+          title="Chi tiết hoạt động"
+          titleExtra={selectedLog ? renderActionBadge(selectedLog.action) : undefined}
+          footer={<AdminDialogFooter onCancel={() => setIsDetailDialogOpen(false)} cancelText={ADMIN_TEXT.close} />}
+        >
+          {renderDetailBody()}
+        </AdminDialog>
       </div>
     </AdminLayout>
   );

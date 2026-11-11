@@ -1,11 +1,24 @@
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import UsersContent from '@/components/admin/content/UsersContent';
-// Modal sửa tài khoản khách bị tắt (20261110): nút Lưu của nó chỉ đổi dữ liệu trên màn hình và báo thành công giả, vì server không có API sửa khách hàng, và danh sách không có nút gọi nó. Làm API thật rồi mới bật lại.
-// import { UserEditModal } from '@/components/admin/dialogs/UserEditModal';
-import React, { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { getUsers } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
+
+const PAGE_SIZE = 10;
+
+// One row of the API list, in the shape the table uses
+const mapUserRow = (u: any) => ({
+  id: String(u.id),
+  fullname: u.fullname,
+  email: u.email,
+  phone: u.phone,
+  is_active: u.is_active,
+  total_bookings: u.total_bookings,
+  login_type: u.login_type,
+  last_booking_at: u.last_booking_at,
+  created_at: new Date(u.created_at)
+});
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -18,73 +31,31 @@ export default function UsersPage() {
   const [userQuery, setUserQuery] = useState('');
   // 'all', 'active' or 'inactive'
   const [statusFilter, setStatusFilter] = useState('all');
-  const pageSize = 10;
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editData, setEditData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const loadUsers = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const { items, total } = await getUsers({
+        page: usersPage,
+        pageSize: PAGE_SIZE,
+        q: userQuery,
+        status: statusFilter
+      });
+      setUsers(items.map(mapUserRow));
+      setTotalUsers(total);
+    } catch (err) {
+      console.error('Lỗi load users:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [usersPage, userQuery, statusFilter]);
+
   useEffect(() => {
-    (async () => {
-      try {
-        setIsLoading(true);
-        const { items, total } = await getUsers({
-          page: usersPage,
-          pageSize,
-          q: userQuery,
-          status: statusFilter
-        });
-        setUsers(
-          items.map((u: any) => ({
-            id: String(u.id),
-            fullname: u.fullname,
-            email: u.email,
-            phone: u.phone,
-            is_active: u.is_active,
-            total_bookings: u.total_bookings,
-            login_type: u.login_type,
-            last_booking_at: u.last_booking_at,
-            created_at: new Date(u.created_at)
-          }))
-        );
-        setTotalUsers(total);
-      } catch (err) {
-        console.error('Lỗi load users:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [usersPage, userQuery, statusFilter, pageSize]);
-  const usersTotalPages = useMemo(() => Math.max(1, Math.ceil(totalUsers / pageSize)), [totalUsers]);
+    loadUsers();
+  }, [loadUsers]);
 
-  const handleOpenEdit = (_type: 'user', data: any) => {
-    setEditData(data);
-    setIsEditOpen(true);
-  };
-
-  const handleRefresh = async () => {
-    setIsLoading(true);
-    const { items, total } = await getUsers({
-      page: usersPage,
-      pageSize,
-      q: userQuery,
-      status: statusFilter
-    });
-    setUsers(
-      items.map((u: any) => ({
-        id: String(u.id),
-        fullname: u.fullname,
-        email: u.email,
-        phone: u.phone,
-        is_active: u.is_active,
-        total_bookings: u.total_bookings,
-        login_type: u.login_type,
-        last_booking_at: u.last_booking_at,
-        created_at: new Date(u.created_at)
-      }))
-    );
-    setTotalUsers(total);
-    setIsLoading(false);
-  };
+  const usersTotalPages = useMemo(() => Math.max(1, Math.ceil(totalUsers / PAGE_SIZE)), [totalUsers]);
 
   const handleLogout = () => {
     localStorage.removeItem('staffToken');
@@ -111,21 +82,10 @@ export default function UsersPage() {
           setStatusFilter(value);
           setUsersPage(1);
         }}
-        onEdit={handleOpenEdit}
         usersLength={totalUsers}
-        onRefresh={handleRefresh}
+        onRefresh={loadUsers}
         isLoading={isLoading}
       />
-      {/* Modal sửa tài khoản khách bị tắt (20261110): nút Lưu của nó chỉ đổi dữ liệu trên màn hình và báo thành công giả, vì server không có API sửa khách hàng, và danh sách không có nút gọi nó. Làm API thật rồi mới bật lại. */}
-      {/*
-      <UserEditModal
-        isEditOpen={isEditOpen}
-        setIsEditOpen={setIsEditOpen}
-        editData={editData}
-        setEditData={setEditData}
-        setUsers={setUsers}
-      />
-      */}
     </AdminLayout>
   );
 }
