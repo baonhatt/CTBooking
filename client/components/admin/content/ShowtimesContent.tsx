@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CalendarClock,
+  ChevronDown,
   ChevronRight,
   Clock,
   Copy,
   MapPin,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,6 +115,8 @@ export default function ShowtimesContent({
   const [copyFromBranchId, setCopyFromBranchId] = useState<number | ''>('');
   const [isCopyConfirmOpen, setIsCopyConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ShowtimeItem | null>(null);
+  const [slotSearch, setSlotSearch] = useState('');
+  const [isCopyOpen, setIsCopyOpen] = useState(false);
 
   const items = editorBranch ? schedules[editorBranch.id] || [] : [];
   const lastSlot = items[items.length - 1];
@@ -186,6 +190,8 @@ export default function ShowtimesContent({
     setEditing(null);
     setFormErrors({});
     setCopyFromBranchId('');
+    setSlotSearch('');
+    setIsCopyOpen(false);
     const slots = schedules[branch.id] || [];
     const last = slots[slots.length - 1];
     setForm({ movie_id: 0, start_time: last?.end_time || '10:00', end_time: '' });
@@ -196,6 +202,8 @@ export default function ShowtimesContent({
     setEditing(null);
     setDeleteTarget(null);
     setCopyFromBranchId('');
+    setSlotSearch('');
+    setIsCopyOpen(false);
     setFormErrors({});
   };
 
@@ -361,6 +369,7 @@ export default function ShowtimesContent({
       start_time: slot.start_time,
       end_time: slot.end_time
     });
+    document.getElementById(`showtime_row_${slot.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
 
   const timeline = useMemo(() => {
@@ -376,6 +385,19 @@ export default function ShowtimesContent({
     });
     return rows;
   }, [items]);
+
+  // The list rows: with a search text only the slots whose movie matches (gaps hidden, they would be misleading)
+  const visibleRows = useMemo(() => {
+    const keyword = slotSearch.trim().toLowerCase();
+    if (!keyword) return timeline;
+    return timeline.filter(
+      (row) => row.type === 'slot' && (row.slot.movie_title || '').toLowerCase().includes(keyword)
+    );
+  }, [timeline, slotSearch]);
+
+  const canShowForm = hasPermission('showtimes', 'create') || (!!editing && hasPermission('showtimes', 'edit'));
+  const canCopy = hasPermission('showtimes', 'create') && hasPermission('showtimes', 'delete') && branches.length > 1;
+  const hasRightPanel = canShowForm || canCopy;
 
   // BRANCH LIST
   const renderBranchRow = (branch: any) => {
@@ -506,156 +528,16 @@ export default function ShowtimesContent({
         mode="form"
         dirty={isDirty}
         busy={isSaving}
-        size="lg"
+        size="xl"
         icon={<CalendarClock className="h-5 w-5" />}
         title={`Lịch chiếu · ${editorBranch?.name ?? ''}`}
         subtitle="Thêm lần lượt các suất trong ngày. Suất mới sẽ tự điền giờ bắt đầu bằng giờ kết thúc suất trước."
         footer={<AdminDialogFooter onCancel={closeEditor} cancelText={ADMIN_TEXT.close} busy={isSaving} />}
       >
-        <div className="space-y-4">
-            {/* Staff who can edit but not create still need the form while editing a slot */}
-            {(hasPermission('showtimes', 'create') || (editing && hasPermission('showtimes', 'edit'))) && (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-slate-700">{editing ? 'Sửa suất' : 'Thêm suất'}</p>
-                  {editing && (
-                    <button
-                      type="button"
-                      onClick={() => resetForm(true)}
-                      className="text-xs text-slate-500 hover:text-slate-700"
-                    >
-                      Hủy sửa
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div className="sm:col-span-2 space-y-1.5">
-                    <Label htmlFor={FORM_FIELD_IDS.movie_id}>
-                      Phim <span className="text-red-500">*</span>
-                    </Label>
-                    <select
-                      id={FORM_FIELD_IDS.movie_id}
-                      aria-required="true"
-                      aria-invalid={!!formErrors.movie_id}
-                      value={form.movie_id || ''}
-                      onChange={(e) => handleMovieChange(Number(e.target.value))}
-                      className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
-                    >
-                      <option value="">Chọn phim</option>
-                      {movieOptions.map((movie) => (
-                        <option key={movie.id} value={movie.id}>
-                          {movie.title}
-                          {movie.duration_min ? ` (${movie.duration_min} phút)` : ''}
-                          {movie.label_note ? ` - ${movie.label_note}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <FieldError message={formErrors.movie_id} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={FORM_FIELD_IDS.start_time}>
-                      Giờ bắt đầu <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id={FORM_FIELD_IDS.start_time}
-                      type="time"
-                      aria-required="true"
-                      aria-invalid={!!formErrors.start_time}
-                      value={form.start_time}
-                      onChange={(e) => handleStartChange(e.target.value)}
-                      className={ADMIN_INPUT}
-                    />
-                    <FieldError message={formErrors.start_time} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={FORM_FIELD_IDS.end_time}>
-                      Giờ kết thúc <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id={FORM_FIELD_IDS.end_time}
-                      type="time"
-                      aria-required="true"
-                      aria-invalid={!!formErrors.end_time}
-                      value={form.end_time}
-                      onChange={(e) => {
-                        clearFormError('end_time');
-                        setForm((prev) => ({ ...prev, end_time: e.target.value }));
-                      }}
-                      className={ADMIN_INPUT}
-                    />
-                    <FieldError message={formErrors.end_time} />
-                  </div>
-                </div>
-                {renderMoviesNote()}
-                <p className="text-xs text-slate-400">
-                  Giờ kết thúc tự điền theo thời lượng phim
-                  {selectedMovie?.duration_min ? ` (${selectedMovie.duration_min} phút)` : ''}, vẫn sửa được.
-                </p>
-                {slotProblem && (
-                  <p
-                    role="alert"
-                    className={`flex items-start gap-1.5 text-xs rounded-lg border px-3 py-2 ${
-                      slotProblem.blocking
-                        ? 'text-red-700 bg-red-50 border-red-100'
-                        : 'text-amber-700 bg-amber-50 border-amber-100'
-                    }`}
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    {slotProblem.message}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={handleSave}
-                    disabled={isSaving || !!slotProblem?.blocking}
-                    className={ADMIN_BTN_PRIMARY}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    {isSaving ? 'Đang lưu...' : editing ? 'Cập nhật suất' : 'Thêm suất'}
-                  </Button>
-                  {!editing && items.length > 0 && (
-                    <Button variant="outline" onClick={() => resetForm(true)} className={ADMIN_BTN_OUTLINE}>
-                      Điền giờ suất tiếp
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {hasPermission('showtimes', 'create') && hasPermission('showtimes', 'delete') && branches.length > 1 && (
-              <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="flex-1 min-w-[200px] space-y-1.5">
-                  <Label htmlFor="fmi_showtime_copy_from">Sao chép lịch từ chi nhánh khác</Label>
-                  <select
-                    id="fmi_showtime_copy_from"
-                    value={copyFromBranchId}
-                    onChange={(e) => setCopyFromBranchId(e.target.value ? Number(e.target.value) : '')}
-                    className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
-                  >
-                    <option value="">Chọn chi nhánh nguồn</option>
-                    {branches
-                      .filter((b) => b.id !== editorBranch?.id)
-                      .map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                          {branch.is_active === false ? ' (ngừng hoạt động)' : ''}
-                          {(schedules[branch.id] || []).length ? ` (${schedules[branch.id].length} suất)` : ''}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={askCopyConfirmation}
-                  disabled={isSaving || !copyFromBranchId}
-                  className={ADMIN_BTN_OUTLINE}
-                >
-                  <Copy className="w-4 h-4 mr-1" />
-                  Sao chép vào {editorBranch?.name}
-                </Button>
-              </div>
-            )}
-
+        {/* Below lg: form first, then the list. From lg: list on the left (3/5), sticky form panel on the right (2/5). */}
+        <div className={`grid grid-cols-1 gap-4 ${hasRightPanel ? 'lg:grid-cols-5' : ''}`}>
+          {/* LEFT: THE SLOTS OF THE DAY */}
+          <div className={`order-2 lg:order-1 ${hasRightPanel ? 'lg:col-span-3' : ''}`}>
             <div className={`${ADMIN_CARD} overflow-hidden`}>
               {editorBranch && failedBranchIds.includes(editorBranch.id) ? (
                 <EmptyState
@@ -672,64 +554,273 @@ export default function ShowtimesContent({
               ) : items.length === 0 ? (
                 <EmptyState
                   icon={<CalendarClock className="h-6 w-6" />}
-                  title="Chưa có suất chiếu"
-                  description="Thêm suất phía trên, hoặc sao chép lịch từ chi nhánh khác."
+                  title="Chưa có suất chiếu nào"
+                  description="Thêm suất bằng biểu mẫu, hoặc sao chép lịch từ chi nhánh khác."
                 />
               ) : (
-                <div className="divide-y divide-slate-100">
-                  <div className="px-4 py-2 bg-slate-50 text-xs text-slate-500 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    {items[0].start_time} – {items[items.length - 1].end_time} · {items.length} suất
+                <div>
+                  {/* List header: title, count badge, time range summary, search */}
+                  <div className="space-y-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-700">Các suất trong ngày</p>
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-700">
+                          {items.length} suất
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <Clock className="w-3.5 h-3.5" />
+                        {items[0].start_time} – {items[items.length - 1].end_time}
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="fmi_showtime_search"
+                        type="search"
+                        value={slotSearch}
+                        onChange={(e) => setSlotSearch(e.target.value)}
+                        placeholder="Tìm theo tên phim..."
+                        aria-label="Tìm suất theo tên phim"
+                        className={`${ADMIN_INPUT} h-9 pl-9`}
+                      />
+                    </div>
                   </div>
-                  {timeline.map((row) => {
-                    if (row.type === 'gap') {
+                  {/* Own scroll area so the modal body does not scroll twice */}
+                  <div className="max-h-[54vh] divide-y divide-slate-100 overflow-y-auto">
+                    {visibleRows.length === 0 && (
+                      <EmptyState
+                        icon={<Search className="h-6 w-6" />}
+                        title="Không tìm thấy suất nào"
+                        description="Thử tên phim khác."
+                      />
+                    )}
+                    {visibleRows.map((row) => {
+                      if (row.type === 'gap') {
+                        return (
+                          <div
+                            key={row.key}
+                            className="px-4 py-1.5 text-[11px] font-medium text-amber-600 bg-amber-50/70"
+                          >
+                            Trống {row.minutes} phút
+                          </div>
+                        );
+                      }
+                      const slot = row.slot;
+                      const isEditingRow = editing?.id === slot.id;
+                      const updatedTip = slot.updated_at ? `Cập nhật lần cuối: ${formatVnDateTime(slot.updated_at)}` : undefined;
                       return (
                         <div
-                          key={row.key}
-                          className="px-4 py-1.5 text-[11px] font-medium text-amber-600 bg-amber-50/70"
+                          key={slot.id}
+                          id={`showtime_row_${slot.id}`}
+                          className={`flex items-center gap-3 px-4 py-3 ${
+                            isEditingRow ? 'bg-blue-50 ring-2 ring-inset ring-blue-300' : ''
+                          }`}
+                          title={updatedTip}
                         >
-                          Trống {row.minutes} phút
+                          <div className="w-[118px] shrink-0 font-black tabular-nums text-blue-700">
+                            {slot.start_time} – {slot.end_time}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-slate-800 truncate" title={slot.movie_title || undefined}>
+                              {slot.movie_title || 'Phim không xác định'}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              {minutesBetween(slot.start_time, slot.end_time)} phút
+                              {slot.movie_deleted ? ' · phim đã xóa' : ''}
+                            </div>
+                          </div>
+                          <RowActions>
+                            {hasPermission('showtimes', 'edit') && (
+                              <RowActionButton
+                                action="edit"
+                                label={`Sửa suất ${slot.start_time} – ${slot.end_time}`}
+                                onClick={() => openEdit(slot)}
+                              />
+                            )}
+                            {hasPermission('showtimes', 'delete') && (
+                              <RowActionButton
+                                action="delete"
+                                label={`Xóa suất ${slot.start_time} – ${slot.end_time}`}
+                                onClick={() => setDeleteTarget(slot)}
+                              />
+                            )}
+                          </RowActions>
                         </div>
                       );
-                    }
-                    const slot = row.slot;
-                    const updatedTip = slot.updated_at ? `Cập nhật lần cuối: ${formatVnDateTime(slot.updated_at)}` : undefined;
-                    return (
-                      <div key={slot.id} className="flex items-center gap-3 px-4 py-3" title={updatedTip}>
-                        <div className="w-[118px] shrink-0 font-black tabular-nums text-blue-700">
-                          {slot.start_time} – {slot.end_time}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-slate-800 truncate" title={slot.movie_title || undefined}>
-                            {slot.movie_title || 'Phim không xác định'}
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            {minutesBetween(slot.start_time, slot.end_time)} phút
-                            {slot.movie_deleted ? ' · phim đã xóa' : ''}
-                          </div>
-                        </div>
-                        <RowActions>
-                          {hasPermission('showtimes', 'edit') && (
-                            <RowActionButton
-                              action="edit"
-                              label={`Sửa suất ${slot.start_time} – ${slot.end_time}`}
-                              onClick={() => openEdit(slot)}
-                            />
-                          )}
-                          {hasPermission('showtimes', 'delete') && (
-                            <RowActionButton
-                              action="delete"
-                              label={`Xóa suất ${slot.start_time} – ${slot.end_time}`}
-                              onClick={() => setDeleteTarget(slot)}
-                            />
-                          )}
-                        </RowActions>
-                      </div>
-                    );
-                  })}
+                    })}
+                  </div>
                 </div>
               )}
             </div>
+          </div>
+
+          {/* RIGHT: ADD / EDIT FORM + COPY (sticky on lg+) */}
+          {hasRightPanel && (
+            <div className="order-1 lg:order-2 lg:col-span-2 lg:self-start lg:sticky lg:top-0 space-y-3">
+              {/* Staff who can edit but not create still need the form while editing a slot */}
+              {canShowForm && (
+                <div
+                  className={`space-y-3 rounded-xl border bg-white p-4 ${
+                    editing ? 'border-blue-300 ring-1 ring-blue-200' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-700">{editing ? 'Sửa suất' : 'Thêm suất'}</p>
+                    {editing && (
+                      <button
+                        type="button"
+                        onClick={() => resetForm(true)}
+                        className="text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        Hủy sửa
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2 space-y-1.5">
+                      <Label htmlFor={FORM_FIELD_IDS.movie_id}>
+                        Phim <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        id={FORM_FIELD_IDS.movie_id}
+                        aria-required="true"
+                        aria-invalid={!!formErrors.movie_id}
+                        value={form.movie_id || ''}
+                        onChange={(e) => handleMovieChange(Number(e.target.value))}
+                        className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+                      >
+                        <option value="">Chọn phim</option>
+                        {movieOptions.map((movie) => (
+                          <option key={movie.id} value={movie.id}>
+                            {movie.title}
+                            {movie.duration_min ? ` (${movie.duration_min} phút)` : ''}
+                            {movie.label_note ? ` - ${movie.label_note}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <FieldError message={formErrors.movie_id} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={FORM_FIELD_IDS.start_time}>
+                        Giờ bắt đầu <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id={FORM_FIELD_IDS.start_time}
+                        type="time"
+                        aria-required="true"
+                        aria-invalid={!!formErrors.start_time}
+                        value={form.start_time}
+                        onChange={(e) => handleStartChange(e.target.value)}
+                        className={ADMIN_INPUT}
+                      />
+                      <FieldError message={formErrors.start_time} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={FORM_FIELD_IDS.end_time}>
+                        Giờ kết thúc <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id={FORM_FIELD_IDS.end_time}
+                        type="time"
+                        aria-required="true"
+                        aria-invalid={!!formErrors.end_time}
+                        value={form.end_time}
+                        onChange={(e) => {
+                          clearFormError('end_time');
+                          setForm((prev) => ({ ...prev, end_time: e.target.value }));
+                        }}
+                        className={ADMIN_INPUT}
+                      />
+                      <FieldError message={formErrors.end_time} />
+                    </div>
+                  </div>
+                  {renderMoviesNote()}
+                  <p className="text-xs text-slate-400">
+                    Giờ kết thúc tự điền theo thời lượng phim
+                    {selectedMovie?.duration_min ? ` (${selectedMovie.duration_min} phút)` : ''}, vẫn sửa được.
+                  </p>
+                  {slotProblem && (
+                    <p
+                      role="alert"
+                      className={`flex items-start gap-1.5 text-xs rounded-lg border px-3 py-2 ${
+                        slotProblem.blocking
+                          ? 'text-red-700 bg-red-50 border-red-100'
+                          : 'text-amber-700 bg-amber-50 border-amber-100'
+                      }`}
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      {slotProblem.message}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving || !!slotProblem?.blocking}
+                      className={ADMIN_BTN_PRIMARY}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      {isSaving ? 'Đang lưu...' : editing ? 'Cập nhật suất' : 'Thêm suất'}
+                    </Button>
+                    {!editing && items.length > 0 && (
+                      <Button variant="outline" onClick={() => resetForm(true)} className={ADMIN_BTN_OUTLINE}>
+                        Điền giờ suất tiếp
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {canCopy && (
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCopyOpen((open) => !open)}
+                    aria-expanded={isCopyOpen}
+                    aria-controls="div_showtime_copy"
+                    className={`${ADMIN_BTN_OUTLINE} w-full justify-center`}
+                  >
+                    <Copy className="w-4 h-4 mr-1.5" />
+                    Sao chép lịch từ chi nhánh khác
+                    <ChevronDown className={`ml-1.5 h-4 w-4 transition-transform ${isCopyOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                  {isCopyOpen && (
+                    <div id="div_showtime_copy" className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="fmi_showtime_copy_from">Sao chép lịch từ chi nhánh khác</Label>
+                        <select
+                          id="fmi_showtime_copy_from"
+                          value={copyFromBranchId}
+                          onChange={(e) => setCopyFromBranchId(e.target.value ? Number(e.target.value) : '')}
+                          className="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
+                        >
+                          <option value="">Chọn chi nhánh nguồn</option>
+                          {branches
+                            .filter((b) => b.id !== editorBranch?.id)
+                            .map((branch) => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name}
+                                {branch.is_active === false ? ' (ngừng hoạt động)' : ''}
+                                {(schedules[branch.id] || []).length ? ` (${schedules[branch.id].length} suất)` : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={askCopyConfirmation}
+                        disabled={isSaving || !copyFromBranchId}
+                        className={`${ADMIN_BTN_OUTLINE} w-full justify-center`}
+                      >
+                        <Copy className="w-4 h-4 mr-1" />
+                        Sao chép vào {editorBranch?.name}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </AdminDialog>
 

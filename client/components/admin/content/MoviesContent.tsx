@@ -601,7 +601,7 @@ export default function MoviesContent({
               ))}
             </div>
 
-            {/* Single row: Ticket packages | Metadata */}
+            {/* Single row: Ticket packages | System info */}
             <div className="flex gap-6">
               {/* LEFT: Ticket packages */}
               <div className="flex-1">
@@ -655,7 +655,7 @@ export default function MoviesContent({
               {/* RIGHT: Metadata - fixed width (duration is already in the stat cards above) */}
               <div className="w-[260px]">
                 <div className="h-full space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Metadata</h3>
+                  <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Thông tin hệ thống</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-400">Ngày phát hành:</span>
@@ -665,22 +665,22 @@ export default function MoviesContent({
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="flex items-center gap-1.5 text-slate-400">
-                        <Calendar size={12} /> Ngày tạo:
+                        <Calendar size={12} /> Thêm vào lúc:
                       </span>
                       <span className="font-mono text-slate-600">{formatVnDateTime(movieDetails.created_at)}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">Tạo bởi:</span>
+                      <span className="text-slate-400">Người thêm:</span>
                       <span className="font-medium text-slate-700">{movieDetails.created_by_staff_name || '-'}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="flex items-center gap-1.5 text-slate-400">
-                        <History size={12} /> Cập nhật:
+                        <History size={12} /> Sửa lần cuối:
                       </span>
                       <span className="font-mono text-slate-600">{formatVnDateTime(movieDetails.updated_at)}</span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-400">Cập nhật bởi:</span>
+                      <span className="text-slate-400">Người sửa cuối:</span>
                       <span className="font-medium text-slate-700">{movieDetails.updated_by_staff_name || '-'}</span>
                     </div>
                     <div className="flex items-start justify-between gap-2 text-[11px]">

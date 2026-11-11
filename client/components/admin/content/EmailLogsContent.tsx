@@ -369,7 +369,7 @@ export default function EmailLogsContent() {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-slate-500">
               <FileJson size={16} />
-              <span className="text-sm font-semibold">Dữ liệu đi kèm (Metadata)</span>
+              <span className="text-sm font-semibold">Dữ liệu đi kèm</span>
             </div>
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white p-4 font-mono text-xs text-blue-600">
               <pre className="max-h-40 overflow-x-auto whitespace-pre-wrap leading-relaxed">{formatMetadata(selectedLog.metadata)}</pre>

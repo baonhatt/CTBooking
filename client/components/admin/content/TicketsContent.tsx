@@ -896,29 +896,45 @@ export default function TicketsContent(props: Props) {
           />
         }
       >
-        {/* TYPE SELECTOR TABS */}
-        <div className="mb-4 flex max-w-md gap-2 rounded-xl bg-slate-200/70 p-1">
-          <button
-            type="button"
-            onClick={() => setEditData({ ...editData, type: 'movie' })}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              editData?.type !== 'vr'
-                ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Film className="w-4 h-4" /> Vé xem phim
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditData({ ...editData, type: 'vr' })}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-              editData?.type === 'vr' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Gamepad2 className="w-4 h-4" /> Trải nghiệm VR
-          </button>
-        </div>
+        {/* TYPE SELECTOR TABS (create / clone only) - the package type cannot change after creation */}
+        {editData?.id ? (
+          <div className="mb-4 max-w-md rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+              {editData?.type === 'vr' ? (
+                <Gamepad2 className="h-4 w-4 text-purple-600" />
+              ) : (
+                <Film className="h-4 w-4 text-blue-600" />
+              )}
+              Loại gói: {editData?.type === 'vr' ? 'Trải nghiệm VR' : 'Vé xem phim'}
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Không thể đổi loại gói sau khi tạo. Muốn dùng loại khác, hãy tạo gói mới.
+            </p>
+          </div>
+        ) : (
+          <div className="mb-4 flex max-w-md gap-2 rounded-xl bg-slate-200/70 p-1">
+            <button
+              type="button"
+              onClick={() => setEditData({ ...editData, type: 'movie' })}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                editData?.type !== 'vr'
+                  ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Film className="w-4 h-4" /> Vé xem phim
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditData({ ...editData, type: 'vr' })}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                editData?.type === 'vr' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Gamepad2 className="w-4 h-4" /> Trải nghiệm VR
+            </button>
+          </div>
+        )}
 
         <div>
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

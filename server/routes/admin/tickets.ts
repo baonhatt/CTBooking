@@ -612,6 +612,17 @@ export async function updateTicketPackageImpl(
     max_players
   } = args;
 
+  // Loại gói (vé phim / VR) không được đổi sau khi tạo; gửi lại đúng loại cũ thì chấp nhận
+  if (type !== undefined && type !== null && type !== '') {
+    const existingType = existing.type === 'vr' ? 'vr' : 'movie';
+    const requestedType = type === 'vr' ? 'vr' : 'movie';
+    if (requestedType !== existingType) {
+      const err: any = new Error('Không thể đổi loại gói vé sau khi tạo');
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
   const now = new Date();
   // Khởi tạo object data với ngày cập nhật
   const data: any = { updated_at: formatDateForDb(now) };
@@ -620,7 +631,7 @@ export async function updateTicketPackageImpl(
   if (name !== undefined) data.name = name;
   if (code !== undefined) data.code = code;
   if (description !== undefined) data.description = description;
-  if (type !== undefined) data.type = type;
+  // type is intentionally never written on update (see check above)
   if (price !== undefined) data.price = Number(price).toString();
   if (min_group_size !== undefined) data.min_group_size = Number(min_group_size);
   if (max_group_size !== undefined) data.max_group_size = Number(max_group_size);

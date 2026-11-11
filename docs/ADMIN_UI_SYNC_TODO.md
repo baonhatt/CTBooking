@@ -36,3 +36,11 @@ Quyết định đã chốt:
 - Toys: chưa có nút khôi phục (cần API); module đang ẩn.
 - Một số cột phụ ẩn dưới màn 1536px để bảng vừa 1440px.
 - Chưa có test tự động cho `loginWithSessionImpl`, `validateOTPImpl`, `resendOTPImpl` khi tài khoản bị khóa (code đã chặn).
+
+## Cập nhật sau đợt review lần 2
+- Lý do khóa tài khoản khách: giữ lưu trong nhật ký (`audit_logs.new_values`, trường `reason`); KHÔNG thêm cột vào `accounts` (quyết định: hạn chế tạo cột). Hệ quả: modal khách không hiện lý do, chỉ xem ở trang Nhật ký hoạt động.
+- Gói vé: không đổi được loại gói (Vé xem phim / Trải nghiệm VR) sau khi tạo. Sửa gói: ẩn tab, hiện nhãn "Loại gói: ..."; server trả 400 nếu gửi loại khác (có test). Tạo mới và nhân bản vẫn chọn được loại.
+- Lịch chiếu: modal 2 cột (danh sách suất + tìm kiếm bên trái, form Thêm/Sửa cố định bên phải), "Sao chép lịch từ chi nhánh khác" thu gọn dưới form.
+- Việt hóa: khung "Metadata" ở chi tiết phim -> "Thông tin hệ thống" (Thêm vào lúc / Người thêm / Sửa lần cuối / Người sửa cuối); Email logs: "Dữ liệu đi kèm".
+- Chưa làm (ý tưởng, tùy chọn): nút "Tạo nhanh nhiều suất" ở Lịch chiếu (chọn phim, khung giờ, khoảng nghỉ rồi sinh hàng loạt).
+- Cần rà tiếp: các từ tiếng Anh còn sót trong modal (chỉ mới đổi Metadata); nên grep các nhãn tiếng Anh khác khi review.
