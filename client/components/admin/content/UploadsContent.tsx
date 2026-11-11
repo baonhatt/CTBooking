@@ -53,6 +53,7 @@ import { PageHeader } from '@/components/admin/common/PageHeader';
 import { EmptyState } from '@/components/admin/common/EmptyState';
 import { FormField } from '@/components/admin/common/FormField';
 import { notify } from '@/components/admin/common/notify';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 import {
   ADMIN_BTN_PRIMARY,
   ADMIN_BTN_OUTLINE,
@@ -65,6 +66,10 @@ import {
 } from '@/components/admin/common/adminTokens';
 
 export default function UploadsContent() {
+  const hasPermission = useHasStaffPermission();
+  // The server enforces these rights; hiding the buttons avoids offering actions that would fail
+  const can_upload = hasPermission('uploads', 'upload');
+  const can_delete = hasPermission('uploads', 'delete');
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -710,7 +715,7 @@ export default function UploadsContent() {
 
             <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
               <Button
-                disabled={!files.length || has_active_upload}
+                disabled={!can_upload || !files.length || has_active_upload}
                 onClick={checkAndPrepareUpload}
                 className={`${ADMIN_BTN_PRIMARY} gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
               >
@@ -1436,6 +1441,7 @@ export default function UploadsContent() {
                         Mở tab mới
                       </Button>
 
+                      {can_delete && (
                       <Button
                         disabled={mediaLoadingId === selectedMediaItem.id}
                         onClick={() => setItemToDelete(selectedMediaItem)}
@@ -1444,6 +1450,7 @@ export default function UploadsContent() {
                         <Trash2 className="h-4 w-4" />
                         Xóa media
                       </Button>
+                      )}
                     </div>
                   </div>
                 </div>

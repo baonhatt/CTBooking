@@ -5,6 +5,7 @@ import { mailQueue } from '../../lib/mail-queue';
 import 'dotenv/config';
 import { getResetPasswordEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
+import { ACCOUNT_LOCKED_MESSAGE } from './auth';
 
 function randomToken() {
   const array = new Uint8Array(32);
@@ -105,6 +106,11 @@ export async function resetPasswordImpl(
 
   if (!account) {
     return { status: 400, message: 'Tài khoản không tồn tại!' };
+  }
+
+  // A locked customer cannot complete a reset (the reset email is still sent, so a lock is not revealed by the request step)
+  if (account.is_active === false) {
+    return { status: 403, message: ACCOUNT_LOCKED_MESSAGE };
   }
 
   // Kiểm tra nếu mật khẩu mới trùng với mật khẩu cũ

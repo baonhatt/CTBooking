@@ -71,6 +71,7 @@ export default function ToysContent({
   onEdit,
   onCreate,
   toysLength,
+  deleteToyApi,
   setToys,
   onRefresh,
   searchQuery = '',
@@ -98,13 +99,17 @@ export default function ToysContent({
   const handleDelete = async (id: number) => {
     setIsDeleting(true);
     try {
-      // Soft delete: update status to inactive instead of deleting
-      const response = await fetch(`/api/toys/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'inactive' })
-      });
-      if (!response.ok) throw new Error('Failed to update toy status');
+      if (deleteToyApi) {
+        await deleteToyApi(id);
+      } else {
+        // Fallback when no delete API is provided: set status to inactive
+        const response = await fetch(`/api/toys/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'inactive' })
+        });
+        if (!response.ok) throw new Error('Failed to update toy status');
+      }
 
       // Update local state
       setToys((prev) => prev.map((toy) => (toy.id === id ? { ...toy, status: 'inactive' } : toy)));

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { getEmailLogsApi, resendBookingEmailApi } from '@/lib/api';
+import { useHasStaffPermission } from '@/hooks/useStaffPermission';
 import { formatVnDateTime } from '@/lib/format';
 import { AdminDialog, AdminDialogFooter } from '@/components/admin/common/AdminDialog';
 import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
@@ -89,6 +90,7 @@ function InfoBox({ label, children }: { label: string; children: React.ReactNode
 }
 
 export default function EmailLogsContent() {
+  const hasPermission = useHasStaffPermission();
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -151,8 +153,12 @@ export default function EmailLogsContent() {
   const formatDateTime = (value: string | null) => formatVnDateTime(value);
 
   // Only a failed confirmation of an order can be sent again (the server checks that the order is paid)
+  // The server uses the ticket_check.validate right for this action, so the button needs it too
   const canResend = (log: any) =>
-    log?.email_type === 'booking_confirmation' && log?.status === 'failed' && Boolean(log?.booking_id);
+    hasPermission('ticket_check', 'validate') &&
+    log?.email_type === 'booking_confirmation' &&
+    log?.status === 'failed' &&
+    Boolean(log?.booking_id);
 
   const handleResend = async () => {
     if (!selectedLog?.booking_id) return;

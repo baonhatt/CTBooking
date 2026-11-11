@@ -75,7 +75,13 @@ const EDITOR_FRAME_CLASS = [
   '[&_.ck.ck-toolbar_.ck-button.ck-on]:bg-blue-50 [&_.ck.ck-toolbar_.ck-button.ck-on]:text-blue-700',
   '[&_.ck.ck-toolbar_.ck-button.ck-on:not(.ck-disabled):hover]:bg-blue-100',
   // Separators
-  '[&_.ck.ck-toolbar__separator]:bg-slate-300'
+  '[&_.ck.ck-toolbar__separator]:bg-slate-300',
+  // CKEditor buttons use huge z-indexes and showed through the page's sticky header (z-10): confine the editor to its own stacking context
+  'relative z-0 isolate',
+  // The page header is already sticky: a second sticky toolbar slid under it and overlapped. Keep the toolbar in the flow.
+  '[&_.ck-sticky-panel__content]:!static [&_.ck-sticky-panel__content]:!w-auto [&_.ck-sticky-panel__content]:!m-0 [&_.ck-sticky-panel__placeholder]:!hidden',
+  // Safety net: if a dropdown panel with a toolbar is ever shown, keep it narrow and wrapped inside the editor
+  '[&_.ck.ck-dropdown__panel_.ck-toolbar]:flex-wrap [&_.ck.ck-dropdown__panel_.ck-toolbar]:max-w-[22rem]'
 ].join(' ');
 
 function normalizeInitialContent(value?: string) {
@@ -159,7 +165,10 @@ export function PostRichTextEditor({ value, onChange, disabled }: PostRichTextEd
         TableCellProperties,
         Undo
       ],
-      toolbar: [
+      toolbar: {
+        // Wrap onto several rows instead of hiding buttons behind the "..." menu (that menu overflowed the editor)
+        shouldNotGroupWhenFull: true,
+        items: [
         'undo',
         'redo',
         '|',
@@ -193,7 +202,8 @@ export function PostRichTextEditor({ value, onChange, disabled }: PostRichTextEd
         '|',
         'insertTable',
         'uploadImage'
-      ],
+        ]
+      },
       heading: {
         options: [
           {

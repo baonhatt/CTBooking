@@ -1026,7 +1026,9 @@ export default function TicketCheckContent() {
             ? 'danger'
             : (confirmType as string) === 'force_checkin'
               ? 'warning'
-              : 'info'
+              : confirmType === 'checkin'
+                ? 'restore'
+                : 'info'
         }
         title={
           confirmType === 'checkin'
@@ -1060,7 +1062,7 @@ export default function TicketCheckContent() {
             )}
           </>
         }
-        confirmText="Xác nhận ngay"
+        confirmText={confirmType === 'checkin' ? 'Xác nhận soát vé' : 'Xác nhận ngay'}
         onConfirm={executeAction}
         busy={useLoading}
       />

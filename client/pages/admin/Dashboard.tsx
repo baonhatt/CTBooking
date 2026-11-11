@@ -37,8 +37,10 @@ export default function DashboardPage() {
 
   // Master Year Filter (with localStorage)
   const [selectedYear, setSelectedYear] = useState<number>(() => {
+    const current_year = new Date().getFullYear();
     const stored = localStorage.getItem('dashboard_selected_year');
-    return stored ? parseInt(stored) : new Date().getFullYear();
+    const parsed_year = stored !== null && /^\d{4}$/.test(stored.trim()) ? Number(stored) : NaN;
+    return Number.isInteger(parsed_year) && parsed_year >= 2020 && parsed_year <= current_year + 1 ? parsed_year : current_year;
   });
 
   // Save to localStorage when year changes
@@ -76,7 +78,10 @@ export default function DashboardPage() {
   const [selectedBranchId, setSelectedBranchId] = useState<number | 'all' | null>(() => {
     const stored = localStorage.getItem('dashboard_selected_branch_id');
     if (stored !== null) {
-      return stored === 'all' ? 'all' : Number(stored);
+      if (stored === 'all') return 'all';
+      // Options are not loaded yet: accept only a positive integer here, checked again once options load
+      if (/^\d+$/.test(stored) && Number(stored) > 0) return Number(stored);
+      return staff?.isSuperAdmin ? 'all' : null;
     }
     if (staff?.isSuperAdmin) return 'all';
     return null;
@@ -106,6 +111,14 @@ export default function DashboardPage() {
           if (!isValid && selectedBranchId !== 'all') {
             setSelectedBranchId(branchItems[0].id);
           }
+        } else if (
+          staff?.isSuperAdmin &&
+          typeof selectedBranchId === 'number' &&
+          branchItems.length > 0 &&
+          !branchItems.some((b: any) => b.id === selectedBranchId)
+        ) {
+          // Stored branch no longer exists: fall back to all branches
+          setSelectedBranchId('all');
         }
       } catch (error) {
         console.error('Error loading branches:', error);
