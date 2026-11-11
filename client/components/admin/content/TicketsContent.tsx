@@ -1222,8 +1222,15 @@ export default function TicketsContent(props: Props) {
                     icon={<Film size={14} className="text-blue-500" />}
                     className="space-y-4"
                   >
+                    <Input
+                      placeholder="Tìm phim theo tên..."
+                      value={movieSearch}
+                      onChange={(e) => setMovieSearch(e.target.value)}
+                      aria-label="Tìm phim cho combo"
+                      className="h-9 text-xs"
+                    />
                     {filteredMovies.length > 0 && (
-                      <div className="flex justify-end">
+                      <div className="flex justify-start">
                         <div className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-slate-50">
                           <Checkbox
                             id="check-all-movies"
@@ -1251,13 +1258,6 @@ export default function TicketsContent(props: Props) {
                         </div>
                       </div>
                     )}
-                    <Input
-                      placeholder="Tìm phim theo tên..."
-                      value={movieSearch}
-                      onChange={(e) => setMovieSearch(e.target.value)}
-                      aria-label="Tìm phim cho combo"
-                      className="h-9 text-xs"
-                    />
                     <div className="border border-gray-200 rounded-xl p-2.5 h-44 overflow-y-auto space-y-1.5 bg-gray-50/50">
                       {selectedOutsideResults.map((movieId) => (
                         <div
