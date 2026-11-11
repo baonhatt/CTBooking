@@ -265,6 +265,27 @@ const getTodayEndIso = () => {
     return new Date(`${dateStr}T23:59:59+07:00`).toISOString();
 };
 
+// Does a ticket package belong to one of the selected branches? A package with no branch set is global (all branches).
+// An empty selection matches nothing.
+function package_in_branches(pkg: any, allowed_branch_ids: number[]): boolean {
+    if (allowed_branch_ids.length === 0) return false;
+    const allowed = new Set(allowed_branch_ids.map(Number));
+    let package_branches: number[] = [];
+    if (Array.isArray(pkg.branch_ids)) {
+        package_branches = pkg.branch_ids.map(Number);
+    } else if (typeof pkg.branch_ids === 'string' && pkg.branch_ids.trim().length > 0) {
+        try {
+            const parsed = JSON.parse(pkg.branch_ids);
+            if (Array.isArray(parsed)) package_branches = parsed.map(Number);
+        } catch {
+            package_branches = [];
+        }
+    }
+    if (typeof pkg.branch_id === 'number') package_branches = [...package_branches, pkg.branch_id];
+    if (package_branches.length === 0) return true;
+    return package_branches.some((id) => allowed.has(id));
+}
+
 export default function VouchersContent(props: Props) {
     const navigate = useNavigate();
     const permissions = useStaffPermissions();
@@ -425,54 +446,41 @@ export default function VouchersContent(props: Props) {
         setPage(1);
     };
 
+    // Packages of the chosen scope, narrowed to the chosen branches. Reloads when the scope or the branches change.
+    const packagesScopeRef = React.useRef<string | null>(null);
     useEffect(() => {
-        if (isEditOpen) {
-            const scope = editData?.scope || 'vr';
-            const branchIds = editData?.branch_ids;
-            const isSingleBranch = Array.isArray(branchIds) && branchIds.length === 1;
-            const isMultiBranch = Array.isArray(branchIds) && branchIds.length > 1;
-            const branchFilter = isSingleBranch ? { branch_id: branchIds[0] } : undefined;
-            listVRTicketPackagesForVoucher(scope, branchFilter)
-                .then((res) => {
-                    let packages = res.items || [];
-                    if (isMultiBranch) {
-                        const allowedIds = new Set(branchIds as number[]);
-                        packages = packages.filter((pkg: any) => {
-                            const noBranchConfig =
-                                (pkg.branch_id === undefined || pkg.branch_id === null) &&
-                                (pkg.branch_ids === undefined ||
-                                    pkg.branch_ids === null ||
-                                    (Array.isArray(pkg.branch_ids) && pkg.branch_ids.length === 0) ||
-                                    pkg.branch_ids === '[]');
-                            if (noBranchConfig) return true;
-                            if (typeof pkg.branch_id === 'number' && allowedIds.has(pkg.branch_id)) {
-                                return true;
-                            }
-                            let pkgBranchArr: number[] = [];
-                            if (Array.isArray(pkg.branch_ids)) {
-                                pkgBranchArr = pkg.branch_ids;
-                            } else if (typeof pkg.branch_ids === 'string' && pkg.branch_ids.trim().length > 0) {
-                                try {
-                                    const parsed = JSON.parse(pkg.branch_ids);
-                                    if (Array.isArray(parsed)) pkgBranchArr = parsed;
-                                } catch { }
-                            }
-                            if (pkgBranchArr.length === 0 && (pkg.branch_id === undefined || pkg.branch_id === null)) {
-                                return true;
-                            }
-                            return pkgBranchArr.some((id) => allowedIds.has(Number(id)));
-                        });
-                    }
-                    setVrPackages(packages);
-                })
-                .catch(() => { });
-            getAdminBranchOptions({ includeInactive: true })
-                .then((res) => {
-                    setBranchOptions(res.items || []);
-                })
-                .catch(() => { });
+        if (!isEditOpen) {
+            packagesScopeRef.current = null;
+            return;
         }
+        let cancelled = false;
+        const scope = editData?.scope || 'vr';
+        const branchIds = editData?.branch_ids;
+        // Do not show packages of the previous scope while the new list loads
+        if (packagesScopeRef.current !== scope) {
+            setVrPackages([]);
+            packagesScopeRef.current = scope;
+        }
+        listVRTicketPackagesForVoucher(scope)
+            .then((res) => {
+                if (cancelled) return;
+                const packages = res.items || [];
+                setVrPackages(Array.isArray(branchIds) ? packages.filter((pkg: any) => package_in_branches(pkg, branchIds as number[])) : packages);
+            })
+            .catch(() => { });
+        return () => {
+            cancelled = true;
+        };
     }, [isEditOpen, editData?.scope, JSON.stringify(editData?.branch_ids)]);
+
+    useEffect(() => {
+        if (!isEditOpen) return;
+        getAdminBranchOptions({ includeInactive: true })
+            .then((res) => {
+                setBranchOptions(res.items || []);
+            })
+            .catch(() => { });
+    }, [isEditOpen]);
 
     useEffect(() => {
         if (isDetailDialogOpen && selectedVoucher) {
@@ -1695,7 +1703,11 @@ export default function VouchersContent(props: Props) {
                                                     className="border border-slate-200 rounded-xl p-2.5 h-40 overflow-y-auto space-y-1.5 bg-white"
                                                 >
                                                     {vrPackages.length === 0 ? (
-                                                        <p className="text-xs text-gray-400 text-center py-6">{scopeConfig.empty}</p>
+                                                        <p className="text-xs text-gray-400 text-center py-6">
+                                                            {Array.isArray(editData?.branch_ids) && editData.branch_ids.length === 0
+                                                                ? 'Chọn chi nhánh áp dụng để xem các gói'
+                                                                : scopeConfig.empty}
+                                                        </p>
                                                     ) : (
                                                         <>
                                                             <div
@@ -1789,7 +1801,8 @@ export default function VouchersContent(props: Props) {
                                             <BranchMultiSelect
                                                 branches={branchOptions.length > 0 ? branchOptions : branches}
                                                 value={editData?.branch_ids ?? null}
-                                                onChange={(ids) => update_fields({ branch_ids: ids })}
+                                                // Changing the branches shows that branch's packages with every one ticked (null = all packages)
+                                                onChange={(ids) => update_fields({ branch_ids: ids, applicable_ticket_package_ids: null })}
                                                 allowAll={isSuperAdmin}
                                                 className="rounded-lg text-xs"
                                             />
