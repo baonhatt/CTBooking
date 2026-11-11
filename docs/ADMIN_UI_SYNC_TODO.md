@@ -13,12 +13,12 @@ Quyết định đã chốt:
 - Khóa/mở khóa tài khoản chạy thật trên local (đã mở khóa lại). Có test tự động: endpoint khóa, router, đăng nhập/phiên/middleware khi bị khóa, đặt lại mật khẩu bị chặn cho tài khoản khóa. Toàn bộ 63 file / 814 test đạt; `tsc` sạch; `vite build` thành công.
 - Thanh công cụ soạn thảo bài viết: bỏ menu "ba chấm" (toolbar tự xuống dòng), bỏ toolbar dính chồng với header dính, cô lập lớp z-index của CKEditor.
 - Kiểm tra phân quyền bằng đối chiếu code (không có hồi quy): mọi hasPermission cũ còn nguyên, nút mới đều có điều kiện quyền bằng nút trên hàng.
+- Đã test phân quyền thật (tài khoản test local, đã xóa): vai trò T-VIEW chỉ vào được Dashboard (các URL khác báo "Truy cập bị từ chối"); vai trò manager thấy đúng menu, không có nút khóa/xóa/thêm ngoài quyền, API khóa trả 403.
 - Nút Uploads (tải lên/xóa) và nút gửi lại email (Email logs) giờ ẩn/vô hiệu theo quyền như server.
 
 ## Còn lại – cần người làm / quyết định
 | Việc | Ghi chú |
 |---|---|
-| Test RBAC bằng tài khoản thật ít quyền | Chưa làm: cần tạo hoặc dùng một nhân viên test (xem phần hỏi trong báo cáo). |
 | Quyền mới `users:lock` trên DB đã có | Seed chỉ chạy khi cài; DB đang chạy cần thêm quyền cho vai trò (Roles UI) hoặc chạy lại seed. KHÔNG bấm "Khởi tạo vai trò mặc định" nếu đã tùy chỉnh vai trò mặc định (nó ghi đè quyền). |
 | Popup hết phiên (còn 5 phút / 1 phút) | Chưa xem trực quan (cần chờ đồng hồ). |
 | Kéo thả file ở Uploads | Đã viết, chưa thử với file thật. |
