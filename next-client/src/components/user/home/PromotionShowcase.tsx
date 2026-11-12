@@ -138,14 +138,14 @@ export default function PromotionShowcase({
                 key={combo.id}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: true, margin: "0px 0px 120px 0px" }}
                 transition={{
-                  delay: index * 0.05,
-                  duration: 0.4
+                  delay: Math.min(index, 4) * 0.04,
+                  duration: 0.3
                 }}
                 className="h-auto w-[calc(50%-0.3125rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] xl:w-[calc(25%-1.125rem)]"
               >
-                <div className="h-full relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-6 bg-slate-900/80 border border-white/10 backdrop-blur-xl hover:border-amber-400/40 hover:shadow-[0_0_35px_rgba(245,158,11,0.2)] group transition-all duration-300 flex flex-col justify-between">
+                <div className="h-full relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-6 bg-[#1a2744] border border-white/[0.22] hover:border-amber-400/40 hover:shadow-[0_0_35px_rgba(245,158,11,0.2)] group transition-all duration-300 flex flex-col justify-between">
                   <div className="space-y-2 sm:space-y-4">
                     <div>
                       <span className="inline-block px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-extrabold uppercase tracking-wider">

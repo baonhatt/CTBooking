@@ -539,7 +539,7 @@ export default function QRPaymentPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
                         {/* CỘT TRÁI: SỐ TIỀN + MÃ QR */}
                         <div className="lg:col-span-2 space-y-4">
-                            <Card className="bg-white/10 border-white/15 text-white overflow-hidden shadow-2xl rounded-2xl">
+                            <Card className="bg-[#1a2744] border-white/[0.22] text-white overflow-hidden shadow-2xl rounded-2xl">
                                 <CardHeader className="bg-white/5 border-b border-white/5 py-4">
                                     <CardTitle className="text-base font-bold flex items-center gap-2 uppercase tracking-wide">
                                         <QrCode className="w-4 h-4 text-blue-400" />
@@ -580,7 +580,7 @@ export default function QRPaymentPage() {
                         {/* CỘT PHẢI: CHI TIẾT & HÀNH ĐỘNG */}
                         <div className="lg:col-span-3 space-y-6">
                             {/* THÔNG TIN CHUYỂN KHOẢN: always visible, for paying from a banking app on the same phone */}
-                            <div className="bg-white/10 border border-white/15 rounded-2xl p-4 shadow-xl space-y-3">
+                            <div className="bg-[#1a2744] border border-white/[0.22] rounded-2xl p-4 shadow-xl space-y-3">
                                 <div>
                                     <h2 className="text-sm font-black uppercase tracking-wider text-blue-400">
                                         Thông tin chuyển khoản
@@ -637,7 +637,7 @@ export default function QRPaymentPage() {
                             </div>
 
                             {/* Accordion Container */}
-                            <div className="bg-white/10 border border-white/15 rounded-2xl overflow-hidden shadow-xl">
+                            <div className="bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-xl">
                                 <Accordion type="multiple" defaultValue={[]} className="w-full">
                                     {/* 1. THÔNG TIN VÉ */}
                                     <AccordionItem value="item-1" className="border-white/10 px-4">

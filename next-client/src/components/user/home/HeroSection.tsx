@@ -475,7 +475,7 @@ export default function HeroSection({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 + idx * 0.1, duration: 0.45 }}
                   whileHover={{ scale: 1.03, x: 4 }}
-                  className="rounded-2xl p-4 sm:p-5 border border-white/15 bg-white/5 backdrop-blur-xl hover:border-cyan-400/50 hover:bg-white/10 transition-all duration-300 cursor-default shadow-lg flex items-center gap-4"
+                  className="rounded-2xl p-4 sm:p-5 border border-white/[0.24] bg-[#1a2744] hover:border-cyan-400/50 hover:bg-[#223156] transition-all duration-300 cursor-default shadow-lg flex items-center gap-4"
                   style={{ x: cardX, y: cardY, translateZ: 0 }}
                 >
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md shrink-0`}>

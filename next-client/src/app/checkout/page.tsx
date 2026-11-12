@@ -320,7 +320,7 @@ export default function Checkout() {
                 return (
                         <UserLayout className="bg-[#0f172a] border-none" hideFooter>
                                 <section className="min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-10 px-4">
-                                        <div className="w-full max-w-md text-center space-y-4 bg-white/5 border border-white/10 rounded-3xl p-6">
+                                        <div className="w-full max-w-md text-center space-y-4 bg-[#1a2744] border border-white/[0.22] rounded-3xl p-6">
                                                 <h1 className="text-xl font-bold text-white">Không tìm thấy đơn gần đây</h1>
                                                 <p className="text-sm text-slate-300 leading-relaxed">
                                                         Thiết bị này không còn lưu đơn vừa đặt. Mã đặt vé đã được gửi tới email bạn dùng khi đặt vé, và
@@ -365,7 +365,7 @@ export default function Checkout() {
                                                 <div className="absolute inset-0 bg-blue-500/5 blur-2xl rounded-3xl" />
 
                                                 {/* Main Ticket Box */}
-                                                <div className="relative bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
+                                                <div className="relative bg-[#1a2744] border border-white/[0.22] rounded-3xl overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
                                                         {/* Top Section: Status */}
                                                         <div
                                                                 className={`p-1 pt-1 ${isSuccess ? 'bg-emerald-500/20' : isError ? 'bg-rose-500/20' : 'bg-slate-500/20'}`}

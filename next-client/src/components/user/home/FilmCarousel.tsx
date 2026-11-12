@@ -276,8 +276,8 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                   key={film.id}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.05, duration: 0.45 }}
+                  viewport={{ once: true, margin: "0px 0px 120px 0px" }}
+                  transition={{ delay: Math.min(index, 4) * 0.04, duration: 0.3 }}
                   className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px] pl-6"
                 >
                   <motion.button
@@ -322,7 +322,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
             </div>
           </div>
         ) : (
-          <div className="w-full text-center text-gray-400 py-20 bg-white/5 rounded-xl border border-white/10 backdrop-blur-sm">
+          <div className="w-full text-center text-gray-400 py-20 bg-[#1a2744] rounded-xl border border-white/[0.22]">
             <p className="text-xl font-medium text-cyan-100 mb-2">Không có phim</p>
             <p className="text-sm">Hiện tại chưa có phim nào đang chiếu. Vui lòng quay lại sau.</p>
           </div>

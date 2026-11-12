@@ -350,12 +350,12 @@ export default function MovieScheduleSection() {
 
         {/* Content Body */}
         {isLoadingSchedule ? (
-          <div className="flex items-center justify-center py-16 sm:py-20 text-slate-400 gap-3 text-xs sm:text-sm bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10">
+          <div className="flex items-center justify-center py-16 sm:py-20 text-slate-400 gap-3 text-xs sm:text-sm bg-[#1a2744] rounded-2xl sm:rounded-3xl border border-white/[0.22]">
             <Clock className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-cyan-400" />
             <span>Đang nạp đồng hồ lịch chiếu...</span>
           </div>
         ) : allItems.length === 0 ? (
-          <div className="text-center py-12 sm:py-16 px-4 bg-white/5 rounded-2xl sm:rounded-3xl border border-white/10 backdrop-blur-md">
+          <div className="text-center py-12 sm:py-16 px-4 bg-[#1a2744] rounded-2xl sm:rounded-3xl border border-white/[0.22]">
             <p className="text-base sm:text-lg font-bold text-cyan-200">Chưa có lịch chiếu hôm nay</p>
             <p className="text-xs text-slate-400 mt-1">
               {selectedBranch?.name

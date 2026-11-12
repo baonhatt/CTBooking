@@ -102,7 +102,7 @@ export default async function PostsPage() {
 
           {/* Featured Grid – Server rendered */}
           {posts.length === 0 ? (
-            <div className="text-slate-400 text-center py-20 border border-white/10 rounded-2xl bg-white/5">
+            <div className="text-slate-400 text-center py-20 border border-white/[0.22] rounded-2xl bg-[#1a2744]">
               Chưa có bài viết.
             </div>
           ) : (

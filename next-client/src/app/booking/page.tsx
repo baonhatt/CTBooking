@@ -791,7 +791,7 @@ export default function BookingPage() {
           </div>
 
           {isLoadingPage ? (
-            <Card className="bg-white/5 backdrop-blur-xl border border-white/10 text-white p-8 text-center rounded-2xl">
+            <Card className="bg-[#1a2744] border border-white/[0.22] text-white p-8 text-center rounded-2xl">
               <div className="flex flex-col items-center justify-center gap-3">
                 <div className="w-8 h-8 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm font-semibold text-slate-300">Đang chuẩn bị dữ liệu thanh toán...</p>
@@ -802,8 +802,8 @@ export default function BookingPage() {
               {/* ================= LEFT COLUMN: SELECTED ITEMS & MOVIES (7 cols) ================= */}
               <div className="contents lg:block lg:col-span-7 lg:space-y-6">
                 {/* 1. ORDER ITEMS LIST CARD */}
-                <Card className="order-1 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6">
+                <Card className="order-1 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5 sm:px-6">
                     <div className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
                       <h2 className="flex items-center gap-2.5 text-base sm:text-lg font-bold text-white">
                         <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
@@ -989,9 +989,9 @@ export default function BookingPage() {
 
                 {/* 2. PHIM ĐANG CHIẾU (Info-only – rạp 1 phòng xoay vòng) */}
                 {movieItems.length > 0 && availableMovies.length > 0 && (
-                  <Card className="order-5 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
+                  <Card className="order-5 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
                     <CardHeader 
-                      className="bg-white/[0.03] border-b border-white/10 py-4 px-5 sm:px-6 cursor-pointer select-none group"
+                      className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5 sm:px-6 cursor-pointer select-none group"
                       onClick={() => setIsMoviesOpen(!isMoviesOpen)}
                     >
                       <CardTitle className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
@@ -1063,7 +1063,7 @@ export default function BookingPage() {
                 )}
 
                 {/* 3. SAFETY / CONVENIENCE NOTES */}
-                <div className="order-6 lg:order-none p-4 sm:p-5 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md space-y-2.5">
+                <div className="order-6 lg:order-none p-4 sm:p-5 rounded-2xl border border-white/[0.22] bg-[#1a2744] space-y-2.5">
                   <h4 className="text-slate-300 font-bold text-xs sm:text-sm flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-cyan-400" />
                     Lưu ý vận hành:
@@ -1080,8 +1080,8 @@ export default function BookingPage() {
               {selectedItems.length > 0 && (
               <div className="contents lg:block lg:col-span-5 lg:space-y-6">
                 {/* 1. CUSTOMER INFO CARD */}
-                <Card className="order-2 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5">
+                <Card className="order-2 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
                       <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Thông Tin Nhận Vé</span>
@@ -1118,7 +1118,7 @@ export default function BookingPage() {
                           }
                         }}
                         placeholder="Ví dụ: Nguyễn Văn A"
-                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
+                        className={`h-11 bg-[#0e1730] border-white/[0.2] placeholder:text-slate-400 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
                           formErrors.name ? 'border-orange-500/50' : ''
                         }`}
                       />
@@ -1151,7 +1151,7 @@ export default function BookingPage() {
                           }
                         }}
                         placeholder="VD: 0912345678"
-                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
+                        className={`h-11 bg-[#0e1730] border-white/[0.2] placeholder:text-slate-400 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
                           phoneError || formErrors.phone ? 'border-orange-500/50' : ''
                         }`}
                       />
@@ -1189,7 +1189,7 @@ export default function BookingPage() {
                           }
                         }}
                         placeholder="you@email.com"
-                        className={`h-11 bg-white/5 border-white/10 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
+                        className={`h-11 bg-[#0e1730] border-white/[0.2] placeholder:text-slate-400 focus:border-cyan-400 text-base md:text-sm rounded-xl ${
                           emailError || formErrors.email ? 'border-orange-500/50' : ''
                         }`}
                       />
@@ -1217,8 +1217,8 @@ export default function BookingPage() {
                 </Card>
 
                 {/* 2. VOUCHER & PAYMENT METHOD */}
-                <Card className="order-3 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5">
+                <Card className="order-3 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
                       <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Ưu Đãi &amp; Thanh Toán</span>
@@ -1274,7 +1274,7 @@ export default function BookingPage() {
                             value={voucherCode}
                             onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
                             onKeyDown={(e) => e.key === 'Enter' && applyVoucher()}
-                            className="h-11 bg-white/5 border-white/10 text-white placeholder:text-slate-500 uppercase font-mono font-bold text-base md:text-sm rounded-xl"
+                            className="h-11 bg-[#0e1730] border-white/[0.2] text-white placeholder:text-slate-400 uppercase font-mono font-bold text-base md:text-sm rounded-xl"
                           />
                           <Button
                             type="button"
@@ -1292,8 +1292,8 @@ export default function BookingPage() {
                 </Card>
 
                 {/* 3. ORDER SUMMARY CARD */}
-                <Card className="order-4 lg:order-none bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.03] border-b border-white/10 py-4 px-5">
+                <Card className="order-4 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
                       <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Tóm Tắt Thanh Toán</span>
@@ -1411,7 +1411,7 @@ export default function BookingPage() {
 
         {/* Sticky Bottom Action Bar on Mobile */}
         {selectedItems.length > 0 && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-slate-950/95 backdrop-blur-xl border-t border-white/10 shadow-2xl">
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-[#16223d] border-t border-white/[0.22] shadow-[0_-12px_32px_rgba(0,0,0,0.55)]">
             {missingReason && (
               <p className="text-xs text-amber-300 text-center mb-2">Còn thiếu: {missingReason}</p>
             )}

@@ -31,7 +31,7 @@ export default function ProductSection({ initialProducts = [] }: { initialProduc
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "0px 0px 120px 0px" }}
             transition={{ duration: 0.5 }}
             className="space-y-3"
           >
@@ -51,7 +51,7 @@ export default function ProductSection({ initialProducts = [] }: { initialProduc
           <motion.button
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "0px 0px 120px 0px" }}
             transition={{ duration: 0.5 }}
             className="text-pink-400 hover:text-pink-300 font-bold text-sm uppercase tracking-wider flex items-center gap-2 transition-colors group px-4 py-2 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:border-pink-500/40"
           >
@@ -65,12 +65,12 @@ export default function ProductSection({ initialProducts = [] }: { initialProduc
               key={product.id}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45, delay: index * 0.08 }}
+              viewport={{ once: true, margin: "0px 0px 120px 0px" }}
+              transition={{ duration: 0.3, delay: Math.min(index, 4) * 0.04 }}
               whileHover={{ y: -6 }}
               className="group min-w-[280px] max-w-[300px] md:min-w-0 md:max-w-none snap-start"
             >
-              <Card className="bg-slate-900/70 backdrop-blur-xl border border-white/10 hover:border-pink-400/40 hover:shadow-[0_0_35px_rgba(236,72,153,0.2)] transition-all duration-300 overflow-hidden h-full rounded-2xl flex flex-col justify-between">
+              <Card className="bg-[#1a2744] border border-white/[0.22] hover:border-pink-400/40 hover:shadow-[0_0_35px_rgba(236,72,153,0.2)] transition-all duration-300 overflow-hidden h-full rounded-2xl flex flex-col justify-between">
                 <div>
                   <div className="relative h-60 overflow-hidden">
                     <motion.img
