@@ -22,14 +22,14 @@ type PageStep = 'checking' | 'invalid' | 'form' | 'done';
 // The card all four steps sit in: the brand panel on the left from md up, the step on the right
 function ResetCard({ children }: { children: ReactNode }) {
   return (
-    <UserLayout className="bg-gradient-dark" hideFooter>
+    <UserLayout className="bg-[#050915]" hideFooter>
       <section className="flex min-h-screen items-center justify-center px-4 pb-10 pt-28">
-        <div className="grid w-full max-w-3xl overflow-hidden rounded-2xl border border-cyan-500/30 bg-[#0b1226] shadow-[0_0_60px_rgba(59,130,246,0.25)] md:grid-cols-[5fr_6fr]">
+        <div className="grid w-full max-w-3xl overflow-hidden rounded-2xl border border-white/[0.22] bg-[#1a2744] shadow-[0_0_60px_rgba(59,130,246,0.25)] md:grid-cols-[5fr_6fr]">
           <AuthAside
             asideTitle="Đặt lại mật khẩu"
             asideText="Chọn một mật khẩu mới cho tài khoản Cinesphere của bạn. Liên kết trong email chỉ dùng được một lần."
           />
-          <div className="bg-gradient-to-br from-[#0b1226] via-[#0e1b3d] to-[#080d1f] px-5 py-8 sm:px-8">{children}</div>
+          <div className="bg-[#1a2744] px-5 py-8 sm:px-8">{children}</div>
         </div>
       </section>
     </UserLayout>

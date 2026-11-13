@@ -11,13 +11,13 @@ const HOTLINE = '036 643 1179';
 
 const Maintenance = () => {
   return (
-    <div className="min-h-screen bg-gradient-dark text-white flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#050915] text-white flex items-center justify-center px-4 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-2xl relative z-10">
-        <div className="bg-black/40 border border-white/10 rounded-3xl p-10 text-center shadow-2xl backdrop-blur-md">
+        <div className="bg-[#1a2744] border border-white/[0.22] rounded-3xl p-10 text-center shadow-2xl">
           <div className="flex justify-center mb-8 relative">
             <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-blue-500/20 to-purple-500/20 flex items-center justify-center">
               <Settings className="w-12 h-12 text-blue-400 animate-[spin_4s_linear_infinite]" />

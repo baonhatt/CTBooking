@@ -480,7 +480,7 @@ export default function QRPaymentPage() {
     // The branch has no complete bank account: do not show a QR that could send money to the wrong place
     if (bankConfigMissing) {
         return (
-            <UserLayout className="bg-[#0f172a]" hideFooter>
+            <UserLayout className="bg-[#050915]" hideFooter>
                 <div className="relative min-h-screen">
                     <div className="relative z-10 max-w-md mx-auto px-4 pt-28 text-center text-white space-y-5">
                         <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
@@ -499,7 +499,7 @@ export default function QRPaymentPage() {
     }
 
     return (
-        <UserLayout className="bg-[#0f172a]" hideFooter>
+        <UserLayout className="bg-[#050915]" hideFooter>
             <div className="relative min-h-screen pb-28 sm:pb-20">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(30,58,138,0.2),transparent_70%)] pointer-events-none" />
 

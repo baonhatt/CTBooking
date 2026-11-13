@@ -525,7 +525,7 @@ export default function Account() {
                                                     <div className="space-y-2">
                                                         <Label htmlFor="profile-name" className="text-xs font-semibold text-gray-400 ml-1">Họ và tên</Label>
                                                         <Input
-                                                            id="profile-name" autoComplete="name" className="h-11 bg-[#0f172a] border-white/10 text-white focus:border-blue-500/50 transition-all"
+                                                            id="profile-name" autoComplete="name" className="h-11 bg-[#0e1730] border-white/[0.2] text-white focus:border-blue-500/50 transition-all"
                                                             value={profile.name}
                                                             onChange={(e) =>
                                                                 setProfile((p) => ({
@@ -548,7 +548,7 @@ export default function Account() {
                                                                     dob: e.target.value
                                                                 }))
                                                             }
-                                                            className="h-11 bg-[#0f172a] border-white/10 text-white focus:border-blue-500/50 transition-all cursor-pointer"
+                                                            className="h-11 bg-[#0e1730] border-white/[0.2] text-white focus:border-blue-500/50 transition-all cursor-pointer"
                                                         />
                                                     </div>
 
@@ -561,7 +561,7 @@ export default function Account() {
                                                                     onClick={() => setProfile((p) => ({ ...p, gender }))}
                                                                     className={`flex-1 h-11 rounded-md border transition-all flex items-center justify-center gap-2 text-sm ${profile.gender === gender
                                                                             ? 'bg-blue-600/20 border-blue-500 text-blue-300'
-                                                                            : 'bg-[#0f172a] border-white/10 text-gray-400 hover:border-white/20'
+                                                                            : 'bg-[#0e1730] border-white/[0.2] text-gray-400 hover:border-white/20'
                                                                         }`}
                                                                 >
                                                                     {gender === 'male' ? <Mars size={16} /> : <Venus size={16} />}
@@ -596,7 +596,7 @@ export default function Account() {
                                                     <div className="space-y-2">
                                                         <Label htmlFor="profile-phone" className="text-xs font-semibold text-gray-400 ml-1">Số điện thoại</Label>
                                                         <Input
-                                                            id="profile-phone" type="tel" inputMode="numeric" autoComplete="tel" className="h-11 bg-[#0f172a] border-white/10 text-white"
+                                                            id="profile-phone" type="tel" inputMode="numeric" autoComplete="tel" className="h-11 bg-[#0e1730] border-white/[0.2] text-white"
                                                             value={profile.phone}
                                                             onChange={(e) =>
                                                                 setProfile((p) => ({
@@ -995,7 +995,7 @@ export default function Account() {
                         if (!open && !isCancelling) setCancelTarget(null);
                     }}
                 >
-                    <AlertDialogContent className="bg-[#0f172a] border-white/10 text-white max-w-[400px]">
+                    <AlertDialogContent className="bg-[#0e1730] border-white/[0.2] text-white max-w-[400px]">
                         <AlertDialogHeader>
                             <AlertDialogTitle className="text-xl font-bold text-white text-center">Hủy đơn này?</AlertDialogTitle>
                             <AlertDialogDescription className="text-gray-300 text-center">

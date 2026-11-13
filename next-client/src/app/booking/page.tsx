@@ -733,7 +733,7 @@ export default function BookingPage() {
 
   return (
     <UserLayout>
-      <div className="min-h-screen bg-[#070b14] relative overflow-x-clip text-slate-100 selection:bg-cyan-500/30">
+      <div className="min-h-screen bg-[#050915] relative overflow-x-clip text-slate-100 selection:bg-cyan-500/30">
         {/* Ambient Background Lights */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="hidden sm:block absolute top-10 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[140px]" />

@@ -156,7 +156,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
   };
 
   return (
-    <UserLayout className="bg-gradient-dark">
+    <UserLayout className="bg-[#050915]">
       <PostViewIncrementor postId={post.id} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
       <main className="pb-16">

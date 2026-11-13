@@ -27,7 +27,7 @@ export default function SuccessPayment() {
   }, []);
 
   return (
-    <UserLayout className="bg-[#0f172a] border-none" hideFooter>
+    <UserLayout className="bg-[#050915] border-none" hideFooter>
       <section className="min-h-screen flex items-center justify-center px-4 pt-28 pb-10">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto" />

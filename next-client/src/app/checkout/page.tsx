@@ -318,7 +318,7 @@ export default function Checkout() {
 
         if (noOrder) {
                 return (
-                        <UserLayout className="bg-[#0f172a] border-none" hideFooter>
+                        <UserLayout className="bg-[#050915] border-none" hideFooter>
                                 <section className="min-h-screen flex items-center justify-center pt-28 md:pt-32 pb-10 px-4">
                                         <div className="w-full max-w-md text-center space-y-4 bg-[#1a2744] border border-white/[0.22] rounded-3xl p-6">
                                                 <h1 className="text-xl font-bold text-white">Không tìm thấy đơn gần đây</h1>
@@ -342,7 +342,7 @@ export default function Checkout() {
         }
 
         return (
-                <UserLayout className="bg-[#0f172a] border-none" hideFooter>
+                <UserLayout className="bg-[#050915] border-none" hideFooter>
                         <section className="relative min-h-screen flex items-center justify-center pt-28 md:pt-32 lg:pt-36 pb-10 overflow-hidden">
                                 {/* Animated Background Elements */}
                                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -467,8 +467,8 @@ export default function Checkout() {
 
                                                         {/* Tear-off line of the ticket: two notches and a dashed line between the code and the details */}
                                                         <div className="relative h-0" aria-hidden="true">
-                                                                <div className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#0f172a]" />
-                                                                <div className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-[#0f172a]" />
+                                                                <div className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#050915]" />
+                                                                <div className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-[#050915]" />
                                                                 <div className="mx-5 border-t-2 border-dashed border-white/15" />
                                                         </div>
 

@@ -14,7 +14,7 @@ export default function NotFound() {
   return (
     // The header reads the address, so it sits in a Suspense boundary like the other pages
     <Suspense fallback={null}>
-      <UserLayout className="bg-gradient-dark">
+      <UserLayout className="bg-[#050915]">
         <section className="flex min-h-[80vh] items-center justify-center px-4 pb-16 pt-32">
           <div className="w-full max-w-lg text-center">
             <h1 className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-7xl font-extrabold text-transparent sm:text-8xl">

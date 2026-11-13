@@ -30,7 +30,7 @@ export default function PostsSearchClient({ initialPosts }: { initialPosts: Post
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Tìm tiêu đề bài viết..."
-          className="w-full pl-10 bg-[#0A192F] border border-white/20 text-white placeholder:text-slate-400 h-11 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#00D2FF]"
+          className="w-full pl-10 bg-[#0e1730] border border-white/[0.2] text-white placeholder:text-slate-400 h-11 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#00D2FF]"
         />
 
         {/* Search Results Dropdown */}
