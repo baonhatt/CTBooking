@@ -141,6 +141,17 @@ export default function HeroSection({
 
   const activeBanners = branchBanners;
 
+  // Ảnh nền hero: poster phim mới nhất (theo ngày phát hành, rồi theo id). Chỉ dùng khi chi nhánh chưa có banner.
+  const latestMovieCover = useMemo<string>(() => {
+    const withCover = (initialMovies || []).filter((movie: any) => movie?.cover_image);
+    if (withCover.length === 0) return '';
+    const sorted = [...withCover].sort((a: any, b: any) => {
+      const dateDiff = String(b.release_date || '').localeCompare(String(a.release_date || ''));
+      return dateDiff !== 0 ? dateDiff : Number(b.id || 0) - Number(a.id || 0);
+    });
+    return sorted[0].cover_image as string;
+  }, [initialMovies]);
+
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState(1);
   const [isCarouselHovered, setIsCarouselHovered] = useState(false);
@@ -234,6 +245,21 @@ export default function HeroSection({
           className="absolute -right-32 top-20 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(217,70,239,0.2)_0%,_transparent_70%)] pointer-events-none"
           style={{ x: blobX, y: blobY, translateZ: 0 }}
         />
+
+        {/* Nền ảnh phim mới nhất: ảnh tĩnh, không blur, phủ gradient tối để chữ vẫn dễ đọc */}
+        {branchBanners.length === 0 && latestMovieCover && (
+          <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+            <img
+              src={optimizeCloudinaryUrl(latestMovieCover, isDesktopHero ? 1280 : 640, 'auto:low') || latestMovieCover}
+              alt=""
+              className="w-full h-full object-cover object-[center_30%] opacity-70"
+              loading="eager"
+              decoding="async"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#050915]/50 via-[#050915]/45 to-[#050915]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#050915]/80 via-[#050915]/25 to-transparent hidden lg:block" />
+          </div>
+        )}
 
         {/* ================= TOP SECTION: WIDESCREEN BANNER CAROUSEL (Chỉ hiện khi chi nhánh có banner) ================= */}
         {branchBanners.length > 0 && (

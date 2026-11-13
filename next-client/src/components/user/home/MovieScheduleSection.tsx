@@ -364,7 +364,7 @@ export default function MovieScheduleSection() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-8 items-center bg-slate-950/80 border border-white/15 rounded-2xl sm:rounded-3xl p-3.5 sm:p-8 backdrop-blur-2xl shadow-[0_25px_70px_rgba(0,0,0,0.8)]">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-8 items-center bg-[#0b1226] border border-white/[0.22] rounded-2xl sm:rounded-3xl p-3.5 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.8)]">
             {/* 1. LEFT COLUMN: COMPACT & SHARP ANALOG CLOCK */}
             <div className="lg:col-span-6 flex flex-col items-center justify-center relative select-none py-1 sm:py-2">
               <div className="relative w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] lg:w-[340px] lg:h-[340px] flex items-center justify-center">
@@ -663,15 +663,15 @@ export default function MovieScheduleSection() {
 
               {/* ALL SHOWTIMES QUICK TIMELINE STRIP */}
               <div className="space-y-1.5 sm:space-y-2.5">
-                <div className="flex items-center justify-between text-xs sm:text-xs text-slate-400">
-                  <span className="font-bold text-slate-300">Tất cả các suất chiếu:</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-300">
+                  <span className="font-bold text-slate-100">Tất cả các suất chiếu:</span>
                   <span className="text-xs sm:text-xs text-cyan-400 font-semibold">
                     {allItems.length} suất chiếu
                   </span>
                 </div>
-                <p className="text-xs text-slate-400">Chạm một giờ chiếu để chọn suất và đặt vé.</p>
+                <p className="text-xs sm:text-sm text-slate-300">Chạm một giờ chiếu để chọn suất và đặt vé.</p>
 
-                <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2 sm:max-h-36 sm:overflow-y-auto sm:pr-1 custom-scrollbar">
+                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 lg:grid-cols-6">
                   {allItems.map((slot) => {
                     const isActiveDisplay = activeSlot?.id === slot.id;
                     const isPinned = focusMode === 'selected' && selectedSlotId === slot.id;
@@ -686,16 +686,16 @@ export default function MovieScheduleSection() {
                         onMouseLeave={handleSlotLeave}
                         disabled={isPast}
                         title={isPast ? 'Suất đã kết thúc' : undefined}
-                        className={`w-full min-h-[44px] py-2 rounded-lg text-xs font-bold transition-all duration-200 border text-center sm:w-auto sm:px-3 sm:py-1.5 sm:shrink ${
+                        className={`w-full min-h-[44px] py-2 rounded-lg text-sm font-bold transition-all duration-200 border text-center ${
                           isPast
-                            ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/5 text-slate-500'
+                            ? 'opacity-60 cursor-not-allowed bg-transparent border-white/10 text-slate-500 line-through'
                             : isPinned
                               ? 'bg-gradient-to-r from-fuchsia-500 to-purple-600 text-white font-black border-fuchsia-300 shadow-[0_0_15px_rgba(168,85,247,0.5)] scale-105 cursor-pointer'
                               : isActiveDisplay
                                 ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black border-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.6)] scale-105 cursor-pointer'
                                 : isLive
                                   ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 cursor-pointer hover:bg-emerald-900/60'
-                                  : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300 hover:text-white cursor-pointer'
+                                  : 'bg-[#1a2744] hover:bg-[#223156] border-white/[0.22] text-slate-100 hover:text-white cursor-pointer'
                         }`}
                       >
                         {slot.start_time}

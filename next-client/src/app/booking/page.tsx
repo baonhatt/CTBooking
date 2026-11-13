@@ -124,6 +124,7 @@ export default function BookingPage() {
   const [showEmailConfirmDialog, setShowEmailConfirmDialog] = useState(false);
   const [showPaymentConfirmDialog, setShowPaymentConfirmDialog] = useState(false);
   const [directBookingItem, setDirectBookingItem] = useState<any | null>(null);
+  // Movies of the package: a compact row on mobile (tap to open), always open on desktop
   const [isMoviesOpen, setIsMoviesOpen] = useState(false);
 
   // Prefetch target routes
@@ -732,7 +733,7 @@ export default function BookingPage() {
 
   return (
     <UserLayout>
-      <div className="min-h-screen bg-[#070b14] relative overflow-hidden text-slate-100 selection:bg-cyan-500/30">
+      <div className="min-h-screen bg-[#070b14] relative overflow-x-clip text-slate-100 selection:bg-cyan-500/30">
         {/* Ambient Background Lights */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="hidden sm:block absolute top-10 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[140px]" />
@@ -803,19 +804,16 @@ export default function BookingPage() {
               <div className="contents lg:block lg:col-span-7 lg:space-y-6">
                 {/* 1. ORDER ITEMS LIST CARD */}
                 <Card className="order-1 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5 sm:px-6">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-3 px-4 sm:py-4 sm:px-6">
                     <div className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
                       <h2 className="flex items-center gap-2.5 text-base sm:text-lg font-bold text-white">
                         <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                         <span>Chi Tiết Dịch Vụ Đã Chọn</span>
                       </h2>
-                      <span className="text-xs text-slate-400 font-normal">
-                        Tổng {selectedItems.reduce((s, i) => s + i.quantity, 0)} vé/gói
-                      </span>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="p-5 sm:p-6 space-y-4">
+                  <CardContent className="p-4 sm:p-6 space-y-4">
                     {selectedItems.length === 0 ? (
                       <div className="py-12 px-4 text-center space-y-4 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl">
                         <div className="p-4 w-16 h-16 mx-auto rounded-2xl bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center">
@@ -852,11 +850,11 @@ export default function BookingPage() {
                           return (
                             <div
                               key={item.id}
-                              className="pt-4 first:pt-0 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
+                              className="pt-4 first:pt-0 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between"
                             >
                               {/* Item Left: Image & Details */}
                               <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                                <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 relative bg-slate-950 border border-white/10 flex items-center justify-center shadow-md">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 relative bg-slate-950 border border-white/10 flex items-center justify-center shadow-md">
                                   {item.cover_image ? (
                                     <img
                                       src={optimizeCloudinaryUrl(item.cover_image, 160)}
@@ -984,111 +982,84 @@ export default function BookingPage() {
                         })}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
 
-                {/* 2. PHIM ĐANG CHIẾU (Info-only – rạp 1 phòng xoay vòng) */}
-                {movieItems.length > 0 && availableMovies.length > 0 && (
-                  <Card className="order-5 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-300">
-                    <CardHeader 
-                      className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5 sm:px-6 cursor-pointer select-none group"
-                      onClick={() => setIsMoviesOpen(!isMoviesOpen)}
-                    >
-                      <CardTitle className="text-base sm:text-lg font-bold text-white flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
-                          <span>Phim Đang Chiếu</span>
-                        </div>
-                        <div className="flex items-center gap-3">
+                    {/* Movies of the selected package(s): compact row on mobile (tap to open), full row of posters on desktop */}
+                    {movieItems.length > 0 && availableMovies.length > 0 && (
+                      <div className="pt-3 lg:pt-4 border-t border-white/10 space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => setIsMoviesOpen(!isMoviesOpen)}
+                          aria-expanded={isMoviesOpen}
+                          className="lg:hidden w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+                        >
+                          <span className="flex items-center gap-3 min-w-0">
+                            <span className="flex -space-x-3 shrink-0">
+                              {availableMovies.slice(0, 4).map((m: any) => (
+                                <img
+                                  key={m.id}
+                                  src={optimizeCloudinaryUrl(m.cover_image, 80)}
+                                  alt=""
+                                  loading="lazy"
+                                  className="w-8 h-11 rounded-md object-cover border-2 border-[#1a2744] bg-slate-950"
+                                />
+                              ))}
+                            </span>
+                            <span className="text-sm font-bold text-white truncate">
+                              Phim trong gói <span className="text-cyan-300 font-semibold">· {availableMovies.length} phim</span>
+                            </span>
+                          </span>
+                          <ChevronDown
+                            className={`w-5 h-5 text-cyan-300 shrink-0 transition-transform duration-300 ${isMoviesOpen ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+                        <div className="hidden lg:flex items-center justify-between gap-3">
+                          <p className="text-sm font-bold text-white">
+                            Phim trong gói <span className="text-cyan-300 font-semibold">· {availableMovies.length} phim</span>
+                          </p>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.dispatchEvent(new CustomEvent('open-movie-schedule'));
-                            }}
-                            className="hidden lg:inline text-xs text-slate-400 hover:text-cyan-400 transition-colors font-medium outline-none"
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-movie-schedule'))}
+                            className="text-xs text-slate-300 hover:text-cyan-300 transition-colors font-medium"
                           >
                             Xem lịch chiếu đầy đủ &rarr;
                           </button>
-                          <div className="flex items-center gap-1.5 px-2 py-1 bg-cyan-500/10 rounded-lg border border-cyan-500/20 group-hover:bg-cyan-500/15 transition-colors">
-                            <span className="text-xs sm:text-xs text-cyan-400 font-semibold">{availableMovies.length} phim</span>
-                            <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 transition-transform duration-300 ${isMoviesOpen ? 'rotate-180' : ''}`} />
-                          </div>
                         </div>
-                      </CardTitle>
-                    </CardHeader>
-
-                    <CardContent className={`p-5 sm:p-6 ${isMoviesOpen ? 'block' : 'hidden'}`}>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
-                        {availableMovies.map((m: any) => (
-                          <div
-                            key={m.id}
-                            className="group relative rounded-xl overflow-hidden border border-white/10 bg-white/5 shadow-md"
-                          >
-                            <div className="aspect-[2/3] relative overflow-hidden bg-slate-950">
-                              <img
-                                src={optimizeCloudinaryUrl(m.cover_image, 300)}
-                                alt={m.title}
-                                loading="lazy"
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent opacity-90" />
-                              <div className="absolute bottom-0 p-2.5 w-full space-y-1">
-                                <p className="text-xs font-black text-white leading-tight line-clamp-1">
-                                  {m.title}
-                                </p>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-xs text-cyan-300 font-bold border border-cyan-500/30">
-                                    {m.duration_min ? `${m.duration_min} Phút` : '8K'}
-                                  </span>
-                                  {m.genres && (
-                                    <span className="text-xs text-slate-400 truncate">
-                                      {Array.isArray(m.genres)
-                                        ? m.genres.map((g: any) => (typeof g === 'object' && g ? g.name : String(g))).join(', ')
-                                        : String(m.genres)}
-                                    </span>
-                                  )}
-                                </div>
+                        <div className={`${isMoviesOpen ? 'flex' : 'hidden'} lg:flex gap-3 overflow-x-auto pb-2 snap-x`}>
+                          {availableMovies.map((m: any) => (
+                            <div key={m.id} className="w-[84px] sm:w-24 shrink-0 snap-start space-y-1.5">
+                              <div className="aspect-[2/3] rounded-lg overflow-hidden border border-white/[0.22] bg-slate-950">
+                                <img
+                                  src={optimizeCloudinaryUrl(m.cover_image, 200)}
+                                  alt={m.title}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src =
+                                      'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80';
+                                  }}
+                                />
                               </div>
+                              <p className="text-xs font-semibold text-slate-200 leading-tight line-clamp-2">{m.title}</p>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
+                    )}
+                  </CardContent>
+                </Card>
 
-                {/* 3. SAFETY / CONVENIENCE NOTES */}
-                <div className="order-6 lg:order-none p-4 sm:p-5 rounded-2xl border border-white/[0.22] bg-[#1a2744] space-y-2.5">
-                  <h4 className="text-slate-300 font-bold text-xs sm:text-sm flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                    Lưu ý vận hành:
-                  </h4>
-                  <ul className="grid grid-cols-1 gap-y-1.5 text-xs text-slate-400 list-inside list-disc">
-                    <li>Vui lòng có mặt trước giờ chiếu 10-15 phút.</li>
-                    <li>Cung cấp mã đặt vé cho nhân viên soát vé để nhận vé cứng.</li>
-                    <li>Phòng chiếu trang bị hệ thống âm thanh vòm &amp; Hologram 8K.</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* ================= RIGHT COLUMN: CUSTOMER, PAYMENT & SUMMARY (5 cols) ================= */}
-              {selectedItems.length > 0 && (
-              <div className="contents lg:block lg:col-span-5 lg:space-y-6">
-                {/* 1. CUSTOMER INFO CARD */}
+                {/* 2. CUSTOMER INFO CARD (left column on desktop: the form is the main task) */}
+                {selectedItems.length > 0 && (
+                <>
                 <Card className="order-2 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-3 px-4 sm:py-4 sm:px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
                       <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
                       <span>Thông Tin Nhận Vé</span>
                     </CardTitle>
                   </CardHeader>
 
-                  <CardContent className="p-5 space-y-4">
+                  <CardContent className="p-4 sm:p-5 space-y-4">
                     {authChecked && !userName && (
                       <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 px-3 py-1 text-xs text-slate-300 flex items-center justify-between gap-3">
                         <span>Có tài khoản? Đăng nhập để tự điền thông tin và xem lại vé.</span>
@@ -1216,16 +1187,24 @@ export default function BookingPage() {
                   </CardContent>
                 </Card>
 
-                {/* 2. VOUCHER & PAYMENT METHOD */}
+                </>
+                )}
+              </div>
+
+              {/* ================= RIGHT COLUMN: PAYMENT & NOTES, sticky on desktop (5 cols) ================= */}
+              {selectedItems.length > 0 && (
+              <div className="contents lg:block lg:col-span-5 lg:space-y-6 [@media(min-width:1024px)_and_(min-height:740px)]:sticky [@media(min-width:1024px)_and_(min-height:740px)]:top-28">
+                {/* 2. PAYMENT CARD: voucher + order summary + terms (one box) */}
                 <Card className="order-3 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5">
+                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-3 px-4 sm:py-4 sm:px-5">
                     <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
                       <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
-                      <span>Ưu Đãi &amp; Thanh Toán</span>
+                      <span>Thanh Toán</span>
                     </CardTitle>
                   </CardHeader>
 
-                  <CardContent className="p-5 space-y-5">
+                  <CardContent className="p-4 sm:p-5 space-y-3.5 text-xs sm:text-sm">
+                    <div className="pb-4 border-b border-white/10">
                     {/* Voucher */}
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold text-slate-300">Mã Giảm Giá (Voucher)</Label>
@@ -1288,19 +1267,8 @@ export default function BookingPage() {
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                    </div>
 
-                {/* 3. ORDER SUMMARY CARD */}
-                <Card className="order-4 lg:order-none bg-[#1a2744] border border-white/[0.22] rounded-2xl overflow-hidden shadow-2xl">
-                  <CardHeader className="bg-white/[0.06] border-b border-white/[0.14] py-4 px-5">
-                    <CardTitle className="text-base font-bold text-white flex items-center gap-2.5">
-                      <span className="w-1.5 h-6 bg-gradient-to-b from-cyan-400 to-blue-500 rounded-full" />
-                      <span>Tóm Tắt Thanh Toán</span>
-                    </CardTitle>
-                  </CardHeader>
-
-                  <CardContent className="p-5 space-y-3.5 text-xs sm:text-sm">
                     {/* Movie Subtotal */}
                     {movieSubtotal > 0 && (
                       <div className="flex justify-between items-center text-slate-300">
@@ -1358,7 +1326,7 @@ export default function BookingPage() {
                     </div>
 
                     {/* Terms Agreement Checkbox */}
-                    <div className="pt-4">
+                    <div>
                       <div className="flex items-start gap-2.5">
                         <Checkbox
                           id="agree-terms"
@@ -1403,6 +1371,19 @@ export default function BookingPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* 3. NOTES: always visible, small text without a box */}
+                <div className="order-4 lg:order-none px-1 space-y-2">
+                  <h4 className="text-slate-200 font-bold text-xs sm:text-sm flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                    Lưu ý khi đến rạp
+                  </h4>
+                  <ul className="grid grid-cols-1 gap-y-1.5 text-xs sm:text-sm text-slate-300 list-inside list-disc">
+                    <li>Vui lòng có mặt trước giờ chiếu 10-15 phút.</li>
+                    <li>Cung cấp mã đặt vé cho nhân viên soát vé để nhận vé cứng.</li>
+                    <li>Phòng chiếu trang bị hệ thống âm thanh vòm &amp; Hologram 8K.</li>
+                  </ul>
+                </div>
               </div>
               )}
             </div>
