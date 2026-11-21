@@ -2,7 +2,21 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { LazyMotion, domAnimation, m, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Play, Sparkles, Waves, Clock, Star, Calendar, Ticket, Gamepad2, ChevronLeft, ChevronRight, Image as ImageIcon, MapPin, Eye } from 'lucide-react';
+import {
+  Play,
+  Sparkles,
+  Waves,
+  Clock,
+  Star,
+  Calendar,
+  Ticket,
+  Gamepad2,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+  MapPin,
+  Eye
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -23,6 +37,7 @@ import { getVRPackages } from '@/lib/api/vr-packages';
 import { optimizeCloudinaryUrl, optimizeCloudinaryVideoUrl, getCloudinaryThumbnail } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useBranch } from '@/hooks/useBranch';
+import useImageAspect from '@/hooks/useImageAspect';
 import { setCookie } from '@/lib/cookies';
 
 export default function HeroSection({
@@ -104,7 +119,7 @@ export default function HeroSection({
   );
 
   const isInitialBranch = !selectedBranch?.id || selectedBranch?.id === initialBranchId;
-  const { data: movies = (isInitialBranch ? initialMovies : []) } = useQuery({
+  const { data: movies = isInitialBranch ? initialMovies : [] } = useQuery({
     queryKey: ['activeMovies', selectedBranch?.id],
     queryFn: () => getActiveMoviesToday(selectedBranch?.id),
     initialData: isInitialBranch ? initialMovies : undefined,
@@ -155,6 +170,7 @@ export default function HeroSection({
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState(1);
   const [isCarouselHovered, setIsCarouselHovered] = useState(false);
+  const activeBannerAspect = useImageAspect(activeBanners[currentBannerIndex] ?? '');
 
   // Reset index when branch changes
   useEffect(() => {
@@ -265,7 +281,12 @@ export default function HeroSection({
         {branchBanners.length > 0 && (
           <div className="container mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-4">
             <div
-              className="relative w-full aspect-[16/9] sm:aspect-[19/8] lg:aspect-[2.1/1] min-h-[240px] sm:min-h-[320px] lg:min-h-[400px] rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer"
+              className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer"
+              style={
+                activeBannerAspect
+                  ? { aspectRatio: `${1 / activeBannerAspect / 0.9}` }
+                  : { aspectRatio: `${16 / (9 * 0.9)}`, minHeight: '240px' }
+              }
               onClick={handleBannerClick}
               onMouseEnter={() => setIsCarouselHovered(true)}
               onMouseLeave={() => setIsCarouselHovered(false)}
@@ -491,9 +512,24 @@ export default function HeroSection({
               className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4"
             >
               {[
-                { icon: Waves, title: 'Âm thanh đa tầng', desc: 'Định vị 360° bao quanh không gian', color: 'from-cyan-400 to-blue-500' },
-                { icon: Sparkles, title: 'Hiệu ứng vũ trụ', desc: 'Hào quang, photon, tinh vân huyền ảo', color: 'from-fuchsia-500 to-purple-600' },
-                { icon: Play, title: 'Độ phân giải 8K', desc: 'Màn hình đa chiều siêu nét đỉnh cao', color: 'from-blue-400 to-cyan-500' }
+                {
+                  icon: Waves,
+                  title: 'Âm thanh đa tầng',
+                  desc: 'Định vị 360° bao quanh không gian',
+                  color: 'from-cyan-400 to-blue-500'
+                },
+                {
+                  icon: Sparkles,
+                  title: 'Hiệu ứng vũ trụ',
+                  desc: 'Hào quang, photon, tinh vân huyền ảo',
+                  color: 'from-fuchsia-500 to-purple-600'
+                },
+                {
+                  icon: Play,
+                  title: 'Độ phân giải 8K',
+                  desc: 'Màn hình đa chiều siêu nét đỉnh cao',
+                  color: 'from-blue-400 to-cyan-500'
+                }
               ].map(({ icon: Icon, title, desc, color }, idx) => (
                 <m.div
                   key={title}
@@ -504,7 +540,9 @@ export default function HeroSection({
                   className="rounded-2xl p-4 sm:p-5 border border-white/[0.24] bg-[#1a2744] hover:border-cyan-400/50 hover:bg-[#223156] transition-all duration-300 cursor-default shadow-lg flex items-center gap-4"
                   style={{ x: cardX, y: cardY, translateZ: 0 }}
                 >
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md shrink-0`}>
+                  <div
+                    className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md shrink-0`}
+                  >
                     <Icon className="h-6 w-6 text-white" />
                   </div>
                   <div>
@@ -531,12 +569,7 @@ export default function HeroSection({
               </DialogDescription>
             </DialogHeader>
             <div className="aspect-video w-full rounded-xl overflow-hidden bg-black mt-3 border border-white/10">
-              <video
-                src={heroVideoSrc}
-                controls
-                autoPlay
-                className="w-full h-full object-contain"
-              />
+              <video src={heroVideoSrc} controls autoPlay className="w-full h-full object-contain" />
             </div>
           </DialogContent>
         </Dialog>
