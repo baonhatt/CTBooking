@@ -30,8 +30,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { ShoppingCart, LogIn } from 'lucide-react';
-import AccountAvatar from '@/components/user/header/AccountAvatar';
+import { ShoppingCart, UserRound } from 'lucide-react';
+import AccountAvatar, { HEADER_PILL } from '@/components/user/header/AccountAvatar';
 import { scrollToElementId } from '@/lib/scroll';
 import { useHeaderEvents } from '@/hooks/useHeaderEvents';
 import BranchSelector from '@/components/user/header/BranchSelector';
@@ -329,25 +329,25 @@ export default function Header({
                         )}
                     </button>
 
-                    {/* Phone: signed in = the name's first letter on a filled circle with a green dot (to the account);
-                        signed out = an outlined "log in" button. The two never look alike. */}
+                    {/* Phone: the same 32px glass pill as the cart. Signed in = the given name's initial (to the account);
+                        signed out = a person icon ("Đăng nhập" written out on wider phones). */}
                     {isLoggedIn ? (
                         <button
                             type="button"
                             onClick={() => router.push('/account')}
                             aria-label={`Tài khoản của ${userName || 'bạn'}`}
-                            className="sm:hidden relative flex items-center justify-center before:absolute before:-inset-1.5 before:content-[''] touch-manipulation select-none active:scale-95"
+                            className={`sm:hidden h-8 w-8 p-0.5 before:absolute before:-inset-1.5 before:content-[''] ${HEADER_PILL}`}
                         >
-                            <AccountAvatar userName={userName} size="sm" />
+                            <AccountAvatar userName={userName} size="xs" />
                         </button>
                     ) : (
                         <button
                             type="button"
                             onClick={openLogin}
                             aria-label="Đăng nhập"
-                            className="sm:hidden relative flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-cyan-400/50 bg-transparent px-2 text-xs font-bold text-cyan-200 before:absolute before:-inset-1.5 before:content-[''] touch-manipulation select-none active:scale-95"
+                            className={`sm:hidden h-8 min-w-8 px-2 before:absolute before:-inset-1.5 before:content-[''] ${HEADER_PILL}`}
                         >
-                            <LogIn className="h-3.5 w-3.5" />
+                            <UserRound className="h-4 w-4 text-cyan-400" />
                             <span className="hidden min-[420px]:inline">Đăng nhập</span>
                         </button>
                     )}
@@ -365,9 +365,12 @@ export default function Header({
                         </div>
                     ) : (
                         <button
-                            className="hidden sm:inline-flex h-8 sm:h-9 items-center text-xs font-bold text-white hover:text-white px-4 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] active:scale-95 border border-cyan-400/30"
+                            type="button"
+                            className={`hidden sm:inline-flex h-9 px-3.5 group ${HEADER_PILL}`}
                             onClick={openLogin}
                         >
+                            {/* Same glass pill as the cart: the page's main action stays "Đặt vé ngay", not this button */}
+                            <UserRound className="h-4 w-4 text-cyan-400 transition-transform group-hover:scale-110" />
                             Đăng nhập
                         </button>
                     )}

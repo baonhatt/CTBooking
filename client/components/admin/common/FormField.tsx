@@ -31,24 +31,29 @@ export function FormField({ label, htmlFor, required = false, error, helper, cla
   );
 }
 
-// Section box used inside modals to group fields (title + optional icon)
+// Section box used inside modals to group fields (title + optional icon, optional action on the right of the title)
 export function FormSection({
   title,
   icon,
+  action,
   children,
   className,
 }: {
   title: string;
   icon?: React.ReactNode;
+  action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <section className={cn('rounded-xl border border-slate-200 bg-white p-4 shadow-sm', className)}>
-      <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        {icon}
-        {title}
-      </h3>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+          {icon}
+          {title}
+        </h3>
+        {action}
+      </div>
       {children}
     </section>
   );

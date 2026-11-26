@@ -1,6 +1,6 @@
 'use client';
-import { LogOut, Settings, LayoutDashboard, UserCircle } from 'lucide-react';
-import AccountAvatar from '@/components/user/header/AccountAvatar';
+import { LogOut, Settings, LayoutDashboard, UserCircle, ChevronDown } from 'lucide-react';
+import AccountAvatar, { HEADER_PILL, givenName } from '@/components/user/header/AccountAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,12 +36,12 @@ export function UserMenu({ userName, tooltipPrefix, extraMenuOptions, onNavigate
           <DropdownMenuTrigger asChild>
             <button
               aria-label={`Tài khoản của ${userName || 'bạn'}`}
-              className="flex items-center gap-2 group outline-none focus:outline-none"
+              className={cn(HEADER_PILL, 'group h-9 pl-1.5 pr-2.5 outline-none focus-visible:border-cyan-400/60')}
             >
-              {/* Signed in: the name's first letter with a green dot (see AccountAvatar) */}
-              <span className="transition-transform duration-300 group-hover:scale-105">
-                <AccountAvatar userName={userName} />
-              </span>
+              {/* Signed in: the same glass pill as the cart, with the initial and the given name (see AccountAvatar) */}
+              <AccountAvatar userName={userName} size="xs" />
+              <span className="max-w-[110px] truncate">{givenName(userName) || 'Tài khoản'}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
             </button>
           </DropdownMenuTrigger>
         </TooltipTrigger>

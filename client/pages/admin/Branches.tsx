@@ -28,7 +28,8 @@ import {
   Upload,
   Image as ImageIcon,
   ExternalLink,
-  CreditCard
+  CreditCard,
+  CopyPlus
 } from 'lucide-react';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
 import { optimizeCloudinaryUrl } from '@/lib/utils';
@@ -921,6 +922,85 @@ function getPhoneError(value: string): string {
   return '';
 }
 
+// The legal rows of a branch's settings. Older branches kept them as separate fields, newer ones as extra_info.
+function legalInfoFromSettings(parsed: any): Array<{ label: string; value: string }> {
+  if (Array.isArray(parsed?.extra_info) && parsed.extra_info.length > 0) {
+    return parsed.extra_info.map((row: any) => ({ label: String(row?.label || ''), value: String(row?.value || '') }));
+  }
+  return [
+    { label: 'Tên người đại diện', value: parsed?.representative || '' },
+    { label: 'Số ĐKKD', value: parsed?.business_reg_no || '' },
+    { label: 'Cấp tại', value: parsed?.issued_at || '' },
+    { label: 'Đăng ký lần đầu', value: parsed?.first_reg_date || '' },
+    { label: 'Đăng ký thay đổi', value: parsed?.last_change_date || '' }
+  ];
+}
+
+// PULL FROM THE DEFAULT BRANCH
+// Three sections of the form can be filled from the default branch with one click, then edited before saving.
+// Each entry lists the settings keys the section owns; nothing is saved until the form is saved.
+type PullSection = 'footer' | 'payment' | 'legal';
+
+const PULL_SECTIONS: Record<PullSection, { label: string; keys: string[] }> = {
+  footer: {
+    label: 'liên hệ & bản đồ',
+    keys: ['company_name', 'hotline', 'company_address', 'map_query', 'map_coords', 'show_zalo_button', 'show_phone_button']
+  },
+  payment: { label: 'vé & thanh toán', keys: ['ticket_expiry_days', 'payment_config'] },
+  legal: { label: 'thông tin pháp lý', keys: ['extra_info'] }
+};
+
+// The values a section takes from the default branch's settings
+function sectionValuesFrom(section: PullSection, parsed: any): Record<string, any> {
+  if (section === 'legal') return { extra_info: legalInfoFromSettings(parsed) };
+  if (section === 'payment') {
+    return {
+      ticket_expiry_days: parsed?.ticket_expiry_days || 10,
+      payment_config: {
+        qr_code_url: parsed?.payment_config?.qr_code_url || '',
+        bank_name: parsed?.payment_config?.bank_name || '',
+        bank_code: parsed?.payment_config?.bank_code || '',
+        account_number: parsed?.payment_config?.account_number || '',
+        account_name: parsed?.payment_config?.account_name || ''
+      }
+    };
+  }
+  return {
+    company_name: parsed?.company_name || '',
+    hotline: parsed?.hotline || '',
+    company_address: parsed?.company_address || '',
+    map_query: parsed?.map_query || '',
+    map_coords: parsed?.map_coords || '',
+    show_zalo_button: parsed?.show_zalo_button ?? true,
+    show_phone_button: parsed?.show_phone_button ?? true
+  };
+}
+
+// True when the section already holds something typed in, so pulling would replace it (asks first)
+function sectionHasValues(section: PullSection, settings: any): boolean {
+  if (section === 'legal') return (settings?.extra_info || []).some((row: any) => String(row?.value || '').trim());
+  if (section === 'payment') return Object.values(settings?.payment_config || {}).some((value) => String(value || '').trim());
+  return ['company_name', 'hotline', 'company_address', 'map_query', 'map_coords'].some((key) =>
+    String(settings?.[key] || '').trim()
+  );
+}
+
+// The small "Lấy từ chi nhánh mặc định" button shown on the right of a section title
+function PullFromDefaultButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title="Lấy dữ liệu mục này từ chi nhánh mặc định, rồi sửa lại trước khi lưu"
+      className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold normal-case tracking-normal text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CopyPlus className="h-3.5 w-3.5" />}
+      <span>Lấy từ chi nhánh mặc định</span>
+    </button>
+  );
+}
+
 function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
   const [formData, setFormData] = useState({
     name: '',
@@ -1005,15 +1085,6 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
       try {
         const parsed = data.settings ? JSON.parse(data.settings) : {};
 
-        // Default labels for company info if extra_info is empty
-        const defaultExtra = [
-          { label: 'Tên người đại diện', value: parsed.representative || '' },
-          { label: 'Số ĐKKD', value: parsed.business_reg_no || '' },
-          { label: 'Cấp tại', value: parsed.issued_at || '' },
-          { label: 'Đăng ký lần đầu', value: parsed.first_reg_date || '' },
-          { label: 'Đăng ký thay đổi', value: parsed.last_change_date || '' }
-        ];
-
         setSettingsData({
           company_name: parsed.company_name || '',
           company_address: parsed.company_address || '',
@@ -1030,8 +1101,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
             account_number: '',
             account_name: ''
           },
-          extra_info:
-            Array.isArray(parsed.extra_info) && parsed.extra_info.length > 0 ? parsed.extra_info : defaultExtra
+          extra_info: legalInfoFromSettings(parsed)
         });
       } catch (e) {
         console.error('Error parsing branch settings:', e);
@@ -1046,6 +1116,52 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
     setSettingsData(newSettings);
     setFormData((prev) => ({ ...prev, settings: JSON.stringify(newSettings) }));
   };
+
+  // ---- Pull a section from the default branch (the default branch itself has no such button)
+  const canPullFromDefault = !formData.is_default;
+  const [pullingSection, setPullingSection] = useState<PullSection | null>(null);
+  const [pullConfirmSection, setPullConfirmSection] = useState<PullSection | null>(null);
+
+  const pullFromDefault = async (section: PullSection) => {
+    setPullingSection(section);
+    try {
+      // The list is ordered default branch first; any page holds it, so one page is enough
+      const { items } = await getBranches({ page: 1, pageSize: 100, includeInactive: true });
+      const defaultBranch = (items || []).find((branch: any) => branch.is_default && branch.id !== data?.id);
+      if (!defaultBranch) {
+        notify.error('Chưa có chi nhánh mặc định để lấy dữ liệu.');
+        return;
+      }
+      let parsed: any = {};
+      try {
+        parsed = defaultBranch.settings ? JSON.parse(defaultBranch.settings) : {};
+      } catch {
+        parsed = {};
+      }
+      const newSettings = { ...settingsData, ...sectionValuesFrom(section, parsed) };
+      setSettingsData(newSettings);
+      setFormData((prev) => ({ ...prev, settings: JSON.stringify(newSettings) }));
+      notify.success(
+        `Đã lấy ${PULL_SECTIONS[section].label} từ ${defaultBranch.name}`,
+        'Kiểm tra và sửa lại cho chi nhánh này, rồi bấm Lưu.'
+      );
+    } catch (error) {
+      notify.error(error, 'Không lấy được dữ liệu chi nhánh mặc định');
+    } finally {
+      setPullingSection(null);
+    }
+  };
+
+  // Asks first when the section already has values, since pulling replaces them
+  const requestPull = (section: PullSection) => {
+    if (sectionHasValues(section, settingsData)) setPullConfirmSection(section);
+    else void pullFromDefault(section);
+  };
+
+  const pullButton = (section: PullSection) =>
+    canPullFromDefault ? (
+      <PullFromDefaultButton busy={pullingSection === section} onClick={() => requestPull(section)} />
+    ) : undefined;
 
   const addExtraInfo = () => {
     const newExtra = [...(settingsData.extra_info || []), { label: '', value: '' }];
@@ -1118,6 +1234,7 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
   if (!isOpen) return null;
 
   return (
+    <>
     <AdminDialog
       open={isOpen}
       onClose={onClose}
@@ -1366,7 +1483,11 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
 
             {/* SECTION 2: FOOTER CONFIG */}
             <div id="branch_section_footer" className="scroll-mt-14">
-              <FormSection title="Cấu hình footer (liên hệ & bản đồ)" icon={<Phone className="h-4 w-4 text-cyan-600" />}>
+              <FormSection
+                title="Cấu hình footer (liên hệ & bản đồ)"
+                icon={<Phone className="h-4 w-4 text-cyan-600" />}
+                action={pullButton('footer')}
+              >
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
                   <FormField label="Tên Công ty">
                     <Input
@@ -1489,7 +1610,11 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
 
             {/* SECTION 3: TICKET & PAYMENT CONFIG */}
             <div id="branch_section_payment" className="scroll-mt-14">
-              <FormSection title="Cấu hình vé & thanh toán" icon={<CreditCard className="h-4 w-4 text-purple-600" />}>
+              <FormSection
+                title="Cấu hình vé & thanh toán"
+                icon={<CreditCard className="h-4 w-4 text-purple-600" />}
+                action={pullButton('payment')}
+              >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <FormField
                     label="Thời hạn sử dụng vé (ngày)"
@@ -1613,7 +1738,11 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
 
             {/* SECTION 4: LEGAL INFO */}
             <div id="branch_section_legal" className="scroll-mt-14">
-              <FormSection title="Thông tin pháp lý" icon={<Building2 className="h-4 w-4 text-purple-600" />}>
+              <FormSection
+                title="Thông tin pháp lý"
+                icon={<Building2 className="h-4 w-4 text-purple-600" />}
+                action={pullButton('legal')}
+              >
                 <div className="mb-3 flex justify-end">
                   <Button
                     type="button"
@@ -1720,5 +1849,26 @@ function BranchEditModal({ isOpen, onClose, data, onSave, branches }: any) {
 
         </form>
     </AdminDialog>
+
+    {/* Pulling replaces what the section already holds, so it asks first */}
+    <ConfirmDialog
+      open={pullConfirmSection !== null}
+      onOpenChange={(open) => !open && setPullConfirmSection(null)}
+      variant="warning"
+      title="Lấy dữ liệu từ chi nhánh mặc định"
+      description={
+        <>
+          Mục {pullConfirmSection ? PULL_SECTIONS[pullConfirmSection].label : ''} đang có dữ liệu. Lấy từ chi nhánh mặc định sẽ
+          thay toàn bộ mục này trong form (chưa lưu, bạn vẫn sửa lại được hoặc đóng form để bỏ).
+        </>
+      }
+      confirmText="Lấy dữ liệu"
+      onConfirm={() => {
+        const section = pullConfirmSection;
+        setPullConfirmSection(null);
+        if (section) void pullFromDefault(section);
+      }}
+    />
+    </>
   );
 }

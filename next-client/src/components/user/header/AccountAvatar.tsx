@@ -2,27 +2,38 @@
 
 import { cn } from '@/lib/utils';
 
-// The signed-in customer's mark in the header: the first letter of the given name (the last word of a Vietnamese
-// name, e.g. "Nguyễn Thị Lan" -> "L") on a filled circle, with a green dot. A signed-out visitor never sees this:
-// the header shows a "Đăng nhập" button instead, so the two states cannot be confused.
-export function nameInitial(userName?: string | null): string {
+/**
+ * The signed-in customer in the header. It follows the glass pill style of the cart and branch buttons:
+ * - HEADER_PILL: the shared pill (36px on desktop, 32px on phones), used by the account and login buttons too;
+ * - AccountAvatar: the first letter of the given name on a quiet cyan circle (no gradient, glow or status dot);
+ * - givenName: the name shown beside it on desktop.
+ * A signed-out visitor sees a "Đăng nhập" pill with a person icon instead, so the two states cannot be confused.
+ */
+export const HEADER_PILL =
+  'relative inline-flex items-center justify-center gap-1.5 rounded-full border border-white/15 bg-white/[0.07] text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-cyan-400/50 hover:bg-white/[0.14] hover:text-white touch-manipulation select-none active:scale-95';
+
+/** The last word of a Vietnamese name is the given name: "Nguyễn Thị Lan" -> "Lan" */
+export function givenName(userName?: string | null): string {
   const words = String(userName || '').trim().split(/\s+/).filter(Boolean);
-  const lastWord = words[words.length - 1] || '';
-  return (lastWord[0] || '?').toLocaleUpperCase('vi-VN');
+  return words[words.length - 1] || '';
 }
 
-export default function AccountAvatar({ userName, size = 'md' }: { userName?: string | null; size?: 'sm' | 'md' }) {
+export function nameInitial(userName?: string | null): string {
+  return (givenName(userName)[0] || '?').toLocaleUpperCase('vi-VN');
+}
+
+export default function AccountAvatar({ userName, size = 'md' }: { userName?: string | null; size?: 'xs' | 'sm' | 'md' }) {
   return (
     <span
       className={cn(
-        'relative flex items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 font-black text-white shadow-[0_0_12px_rgba(6,182,212,0.35)] ring-2 ring-cyan-300/40',
-        size === 'sm' ? 'h-8 w-8 text-sm' : 'h-10 w-10 text-base'
+        'flex shrink-0 items-center justify-center rounded-full bg-cyan-400/15 font-bold text-cyan-200 ring-1 ring-cyan-300/30',
+        size === 'xs' && 'h-6 w-6 text-[11px]',
+        size === 'sm' && 'h-8 w-8 text-sm',
+        size === 'md' && 'h-10 w-10 text-base'
       )}
       aria-hidden="true"
     >
       {nameInitial(userName)}
-      {/* "signed in" dot */}
-      <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[#050915]" />
     </span>
   );
 }
