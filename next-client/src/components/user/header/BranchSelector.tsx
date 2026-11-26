@@ -32,12 +32,13 @@ export default function BranchSelector({ branches, selectedBranch, disabled, onC
         disabled={disabled}
         title={selectedBranch.name}
         className={cn(
-          'group relative flex items-center gap-1 sm:gap-2 h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-full text-xs font-semibold before:absolute before:-inset-1.5 before:content-[""] text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
+          'group relative flex items-center gap-1 sm:gap-2 min-h-8 py-1 sm:py-0 sm:h-9 px-2.5 sm:px-3.5 rounded-2xl sm:rounded-full text-xs font-semibold before:absolute before:-inset-1.5 before:content-[""] text-slate-200 hover:text-white transition-all duration-300 bg-white/[0.07] hover:bg-white/[0.14] border border-white/15 hover:border-cyan-400/50 backdrop-blur-md outline-none focus:outline-none select-none',
           disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
         )}
       >
         <MapPin className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
-        <span className="max-w-[60px] min-[360px]:max-w-[90px] min-[380px]:max-w-[110px] sm:max-w-[180px] truncate">
+        {/* Phones: up to two small lines, so "AEON MALL Bình Dương Canary" is not cut to "AEON MALL Bìn..." */}
+        <span className="line-clamp-2 max-w-[92px] whitespace-normal break-words text-left text-[11px] leading-tight min-[360px]:max-w-[108px] min-[380px]:max-w-[118px] sm:line-clamp-1 sm:max-w-[180px] sm:text-xs">
           {shortBranchName(selectedBranch.name)}
         </span>
         <ChevronDown className="w-3 h-3 text-slate-400 group-hover:text-white transition-transform duration-200 group-data-[state=open]:rotate-180 shrink-0" />

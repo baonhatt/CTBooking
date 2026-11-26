@@ -824,7 +824,7 @@ export default function TicketsContent(props: Props) {
                           </div>
                         )}
                         <div className="flex min-w-0 flex-col gap-0.5">
-                          <span className="max-w-[200px] truncate font-bold text-slate-900 2xl:max-w-[260px]" title={t.name}>
+                          <span className="line-clamp-2 max-w-[240px] whitespace-normal break-words font-bold leading-snug text-slate-900 2xl:max-w-[320px]" title={t.name}>
                             {t.name}
                           </span>
                           <div className="flex flex-wrap items-center gap-2">

@@ -254,7 +254,7 @@ export const PostManagement = () => {
                           />
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="line-clamp-1 text-sm font-semibold text-slate-800" title={post.title}>
+                          <div className="line-clamp-2 whitespace-normal break-words text-sm font-semibold leading-snug text-slate-800" title={post.title}>
                             {post.title}
                           </div>
                           {post.slug && (

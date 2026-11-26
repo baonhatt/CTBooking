@@ -1,3 +1,4 @@
+import { BranchName } from '@/components/admin/BranchName';
 import {
   formatBranchIdsLabel,
   getBranchIdsDisplayStatus,
@@ -50,6 +51,23 @@ export function BranchIdsBadge({ branch_ids, branch_id, branches, className }: B
       : status === 'all'
         ? 'bg-blue-50 text-blue-700 border-blue-200'
         : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+  // Specific branches: one chip each (region on top, name on up to two lines), wrapping onto new lines,
+  // so names like "HCM | CN AEON MALL Tân Phú Celadon" are not cut off
+  if (status === 'specific' && normalized) {
+    return (
+      <span className={`flex max-w-[260px] flex-wrap gap-1 ${className || ''}`} title={label}>
+        {normalized.map((id) => (
+          <BranchName
+            key={id}
+            name={branches.find((branch) => branch.id === id)?.name || `Chi nhánh #${id}`}
+            tone="bg-emerald-50 text-emerald-800 border-emerald-200"
+            layout="inline"
+          />
+        ))}
+      </span>
+    );
+  }
 
   return (
     <span

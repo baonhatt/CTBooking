@@ -41,7 +41,7 @@ function FilmPoster({ film, isFirst }: { film: any; isFirst: boolean }) {
       sizes="(max-width: 768px) 280px, 400px"
       alt={film.title}
       width={280}
-      height={320}
+      height={498}
       loading={isFirst ? 'eager' : 'lazy'}
       fetchPriority={isFirst ? 'high' : 'low'}
       decoding="async"
@@ -357,12 +357,14 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                     }}
                     className="group relative w-full rounded-3xl overflow-hidden border border-white/10 bg-slate-900 backdrop-blur-lg shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] transition-all duration-300"
                   >
-                    <div className="relative h-80 w-full overflow-hidden will-change-transform bg-slate-950">
+                    {/* Posters are tall (1:2); a 9:16 box trims only ~5% top and bottom, so the title printed low on
+                        the poster stays visible (a fixed 320px height cut a quarter off each end) */}
+                    <div className="relative aspect-[9/16] w-full overflow-hidden will-change-transform bg-slate-950">
                       <FilmPoster film={film} isFirst={index === 0} />
-                      {/* The poster stays clean (most posters carry their own title); "Mở chi tiết" appears on hover,
-                          and always on a touch screen, which has no hover */}
+                      {/* The poster stays clean (most posters carry their own title); "Mở chi tiết" appears at the bottom on
+                          hover, and always on a touch screen, which has no hover - there in the top corner, off the title */}
                       <div
-                        className={`absolute inset-0 flex items-end justify-start p-4 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
+                        className={`absolute inset-0 flex items-end justify-start p-4 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-300 [@media(hover:none)]:items-start [@media(hover:none)]:justify-end [@media(hover:none)]:bg-gradient-to-b [@media(hover:none)]:from-black/40 [@media(hover:none)]:p-3 [@media(hover:none)]:opacity-100 ${
                           hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
                         }`}
                       >

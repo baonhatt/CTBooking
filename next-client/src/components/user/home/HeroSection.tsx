@@ -281,11 +281,15 @@ export default function HeroSection({
         {branchBanners.length > 0 && (
           <div className="container mx-auto px-4 sm:px-6 pt-24 sm:pt-28 pb-4">
             <div
-              className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer"
+              className="relative w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-white/20 bg-slate-950 shadow-[0_15px_50px_rgba(0,0,0,0.8)] group cursor-pointer [aspect-ratio:var(--banner-ratio-phone)] sm:min-h-[240px] sm:[aspect-ratio:var(--banner-ratio-wide)]"
               style={
-                activeBannerAspect
-                  ? { aspectRatio: `${1 / activeBannerAspect / 0.9}` }
-                  : { aspectRatio: `${16 / (9 * 0.9)}`, minHeight: '240px' }
+                // From 640px the banner is cropped 10% in height for a wider strip. On phones it is small and its text
+                // sits near the edges, so it is shown whole, at its own shape. CSS picks the ratio, so the server and
+                // the first paint already use the right one (no jump after loading).
+                {
+                  '--banner-ratio-phone': `${activeBannerAspect ? 1 / activeBannerAspect : 16 / 9}`,
+                  '--banner-ratio-wide': `${activeBannerAspect ? 1 / activeBannerAspect / 0.9 : 16 / (9 * 0.9)}`
+                } as React.CSSProperties
               }
               onClick={handleBannerClick}
               onMouseEnter={() => setIsCarouselHovered(true)}
@@ -328,7 +332,7 @@ export default function HeroSection({
                     fetchPriority="high"
                   />
                   {/* Subtle dark gradient overlay at top & bottom edges of banner for badge legibility */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none z-10" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent sm:from-black/80 sm:to-black/40 pointer-events-none z-10" />
                 </m.div>
               </AnimatePresence>
 

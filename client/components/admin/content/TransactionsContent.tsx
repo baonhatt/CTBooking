@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BranchName } from '@/components/admin/BranchName';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -129,14 +130,14 @@ const parsePackageName = (name: string, t?: Tx) => {
   if (t?.booking_type === 'combo_vr' || t?.booking_type === 'vr') {
     if (t.vr_items && t.vr_items.length > 0) {
       vrItemsList = t.vr_items.map((it, idx) => (
-        <span key={`vr-${idx}`} className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]" title={`${it.package_name} (x${it.quantity})`}>
+        <span key={`vr-${idx}`} className="line-clamp-2 whitespace-normal break-words text-slate-500 mt-0.5 text-[11px] max-w-full" title={`${it.package_name} (x${it.quantity})`}>
           • {it.package_name} (x{it.quantity})
         </span>
       ));
     }
     if (!vrItemsList && t?.booking_type === 'combo_vr') {
       vrItemsList = (
-        <span className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]">
+        <span className="line-clamp-2 whitespace-normal break-words text-slate-500 mt-0.5 text-[11px] max-w-full">
           • Kèm tùy chọn VR (x{Math.max((t?.ticketCount || 1) - 1, 1)})
         </span>
       );
@@ -151,7 +152,7 @@ const parsePackageName = (name: string, t?: Tx) => {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
           movieItemsList = parsed.map((item, idx) => (
-            <span key={idx} className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]" title={`${item.name || 'Gói vé'} (x${item.quantity || 1})`}>
+            <span key={idx} className="line-clamp-2 whitespace-normal break-words text-slate-500 mt-0.5 text-[11px] max-w-full" title={`${item.name || 'Gói vé'} (x${item.quantity || 1})`}>
               • {item.name || 'Gói vé'} (x{item.quantity || 1})
             </span>
           ));
@@ -161,7 +162,7 @@ const parsePackageName = (name: string, t?: Tx) => {
     
     if (!movieItemsList) {
       movieItemsList = (
-        <span className="truncate text-slate-500 mt-0.5 text-[11px] block max-w-[160px]" title={name || '---'}>
+        <span className="line-clamp-2 whitespace-normal break-words text-slate-500 mt-0.5 text-[11px] max-w-full" title={name || '---'}>
           • {name || '---'}
         </span>
       );
@@ -169,7 +170,7 @@ const parsePackageName = (name: string, t?: Tx) => {
   }
   
   return (
-    <div className="flex flex-col gap-0.5 max-w-[160px]">
+    <div className="flex flex-col gap-0.5 max-w-full">
       <span className="font-bold text-slate-800 text-[11px] uppercase truncate" title={typeBadgeStr}>
         {typeBadgeStr}
       </span>
@@ -682,20 +683,23 @@ export default function TransactionsContent({
 
       {/* Bảng dữ liệu đã tối ưu cột */}
       <div className={`${ADMIN_CARD} overflow-hidden`}>
-        <div>
-          <Table className="w-full">
+        {/* Fixed column widths, so long names wrap inside their column; narrow screens scroll sideways */}
+        <div className="overflow-x-auto">
+          <Table className="w-full min-w-[1090px] table-fixed">
             <TableHeader className={ADMIN_TABLE_HEAD}>
               <TableRow className="hover:bg-transparent border-none">
-                <TableHead className={`w-[110px] px-2 text-center ${ADMIN_TH}`}>Mã đặt chỗ</TableHead>
-                <TableHead className={`w-[110px] px-2.5 ${ADMIN_TH}`}>Chi nhánh</TableHead>
-                <TableHead className={`w-[175px] px-2.5 ${ADMIN_TH}`}>Người dùng</TableHead>
-                <TableHead className={`w-[72px] px-1.5 text-center ${ADMIN_TH}`}>Loại</TableHead>
-                <TableHead className={`w-[162px] px-2.5 ${ADMIN_TH}`}>Sản phẩm</TableHead>
-                <TableHead className={`w-[58px] whitespace-nowrap px-1 text-center ${ADMIN_TH}`}>SL</TableHead>
-                <TableHead className={`w-[95px] px-2 ${ADMIN_TH}`}>Doanh thu</TableHead>
-                <TableHead className={`w-[130px] px-2 ${ADMIN_TH}`}>Thời gian</TableHead>
-                <TableHead className={`w-[76px] whitespace-nowrap px-1 text-center ${ADMIN_TH}`}>Phương thức</TableHead>
-                <TableHead className={`w-[90px] pl-1 pr-3 text-right ${ADMIN_TH}`}>{ADMIN_TEXT.actionColumn}</TableHead>
+                {/* Small columns (type, quantity, method, actions) are kept narrow; the space goes to the branch,
+                    customer and product, which hold long names */}
+                <TableHead className={`w-[96px] px-2 text-center ${ADMIN_TH}`}>Mã đặt chỗ</TableHead>
+                <TableHead className={`w-[150px] px-2.5 ${ADMIN_TH}`}>Chi nhánh</TableHead>
+                <TableHead className={`w-[180px] px-2.5 ${ADMIN_TH}`}>Người dùng</TableHead>
+                <TableHead className={`w-[64px] px-1 text-center ${ADMIN_TH}`}>Loại</TableHead>
+                <TableHead className={`w-[190px] px-2.5 ${ADMIN_TH}`}>Sản phẩm</TableHead>
+                <TableHead className={`w-[40px] whitespace-nowrap px-1 text-center ${ADMIN_TH}`}>SL</TableHead>
+                <TableHead className={`w-[100px] px-2 ${ADMIN_TH}`}>Doanh thu</TableHead>
+                <TableHead className={`w-[138px] px-2 ${ADMIN_TH}`}>Thời gian</TableHead>
+                <TableHead className={`w-[66px] whitespace-normal px-1 text-center leading-tight ${ADMIN_TH}`}>Thanh toán</TableHead>
+                <TableHead className={`w-[72px] pl-1 pr-3 text-right ${ADMIN_TH}`}>{ADMIN_TEXT.actionColumn}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -725,19 +729,16 @@ export default function TransactionsContent({
                         <TableCell className="font-mono text-xs text-gray-600 text-center px-2" title={`Mã đặt chỗ: ${t.booking_code || t.id}`}>
                           {t.booking_code || `#${t.id}`}
                         </TableCell>
-                        <TableCell className="px-2.5">
-                          <div
-                            className="text-[12px] font-medium text-slate-600 truncate max-w-[105px]"
-                            title={branches.find((b) => b.id === t.branch_id)?.name || 'Tất cả chi nhánh'}
-                          >
-                            {branches.find((b) => b.id === t.branch_id)?.name || (
-                              <span className="italic text-slate-400">Tất cả chi nhánh</span>
-                            )}
-                          </div>
+                        <TableCell className="px-2.5 text-slate-600">
+                          {branches.find((b) => b.id === t.branch_id)?.name ? (
+                            <BranchName name={branches.find((b) => b.id === t.branch_id)!.name} />
+                          ) : (
+                            <span className="text-[12px] italic text-slate-400">Tất cả chi nhánh</span>
+                          )}
                         </TableCell>
                         <TableCell className="px-2.5">
-                          <div className="flex flex-col max-w-[170px]">
-                            <span className="font-semibold text-xs text-gray-900 truncate" title={t.userName || 'Khách vãng lai'}>
+                          <div className="flex min-w-0 flex-col max-w-full">
+                            <span className="line-clamp-2 whitespace-normal break-words font-semibold text-xs text-gray-900" title={t.userName || 'Khách vãng lai'}>
                               {t.userName || 'Khách vãng lai'}
                             </span>
                             <span className="text-[11px] text-gray-500 truncate" title={t.email}>{t.email}</span>
