@@ -97,14 +97,12 @@ export default function PostSidebar({ postId, postTitle, postUrl }: PostSidebarP
         </div>
       </div>
 
-      {/* Recently viewed */}
-      <div className="rounded-2xl neon-border bg-white/5 p-4 md:p-5">
-        <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2">
-          <Clock3 className="w-3.5 h-3.5" /> Đã xem gần đây
-        </p>
-        {recentPosts.length === 0 ? (
-          <p className="text-slate-400 text-sm mt-3">Bạn chưa có lịch sử xem bài viết gần đây.</p>
-        ) : (
+      {/* Recently viewed: other posts read before on this device; hidden until there is one */}
+      {recentPosts.length > 0 && (
+        <div className="rounded-2xl neon-border bg-white/5 p-4 md:p-5">
+          <p className="text-cyan-300 text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2">
+            <Clock3 className="w-3.5 h-3.5" /> Đã xem gần đây
+          </p>
           <div className="mt-3 space-y-3">
             {recentPosts.map((item) => (
               <Link key={item.id} href={`/bai-viet/${item.id}`} className="block group">
@@ -115,8 +113,8 @@ export default function PostSidebar({ postId, postTitle, postUrl }: PostSidebarP
               </Link>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }

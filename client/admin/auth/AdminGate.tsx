@@ -32,6 +32,7 @@ import UploadsPage from '@/pages/admin/Uploads';
 import SettingsPage from '@/pages/admin/Settings';
 import BranchesPage from '@/pages/admin/Branches';
 import EmailLogsPage from '@/pages/admin/EmailLogs';
+import ActionItemsPage from '@/pages/admin/ActionItems';
 import StaffPage from '@/pages/admin/Staff';
 import RolesPage from '@/pages/admin/Roles';
 import RoleDetailPage from '@/pages/admin/RoleDetailPage';
@@ -100,7 +101,8 @@ const AdminLoginView = () => {
   // 2FA Flow states
   const [requireOtp, setRequireOtp] = useState(false);
   const [otpCode, setOtpCode] = useState('');
-  const [pendingStaffId, setPendingStaffId] = useState<number | null>(null);
+  // Signed by the server after the right password; the OTP step sends it back (never a bare staff id)
+  const [pendingOtpChallenge, setPendingOtpChallenge] = useState<string>('');
 
   const turnstileRef = useRef<HTMLDivElement>(null);
   const turnstileWidgetId = useRef<string | null>(null);
@@ -160,7 +162,7 @@ const AdminLoginView = () => {
         navigate('/', { replace: true });
       } else if (data.status === 'require_otp') {
         setRequireOtp(true);
-        setPendingStaffId(data.staffId);
+        setPendingOtpChallenge(String(data.otpChallenge || ''));
         setError('');
       } else {
         setError(data.message || 'Đăng nhập thất bại');
@@ -178,13 +180,13 @@ const AdminLoginView = () => {
 
   async function handleVerifyOtp(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!otpCode || !pendingStaffId) return;
+    if (!otpCode || !pendingOtpChallenge) return;
 
     try {
       setLoading(true);
       setError('');
       
-      const data = await verifyAdminLoginOtpApi({ staffId: pendingStaffId, otp: otpCode });
+      const data = await verifyAdminLoginOtpApi({ otpChallenge: pendingOtpChallenge, otp: otpCode });
 
       if (data.status === 'success') {
         localStorage.setItem('staffToken', data.token);
@@ -237,7 +239,7 @@ const AdminLoginView = () => {
             onClick={() => {
               setRequireOtp(false);
               setOtpCode('');
-              setPendingStaffId(null);
+              setPendingOtpChallenge('');
               setError('');
             }}
             className={`${ADMIN_BTN_GHOST} inline-flex w-full items-center justify-center gap-1.5`}
@@ -517,6 +519,18 @@ export const AdminGate = () => {
             </ProtectedRoute>
           }
         />
+        {/* "Đơn cần xử lý" (the old /unmatched-transfers address still opens it) */}
+        {['/action-items', '/unmatched-transfers'].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <ProtectedRoute module="transactions" action="view">
+                <ActionItemsPage />
+              </ProtectedRoute>
+            }
+          />
+        ))}
         <Route
           path="/email-logs"
           element={

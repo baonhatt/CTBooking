@@ -6,7 +6,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { ArrowLeft, CalendarDays, Clock, Eye } from 'lucide-react';
 import UserLayout from '@/layouts/UserLayout';
 import { getPostBySlugId, getPublicPosts, type PostItem } from '@/lib/api/posts';
-import { buildPostHref } from '@/lib/utils';
+import { buildPostHref, formatDate } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
 import PostViewIncrementor from './PostViewIncrementor';
 import BranchScoped from '@/components/user/posts/BranchScoped';
@@ -17,6 +17,9 @@ const SITE_URL = siteConfig.domain;
 
 // Average reading speed (words a minute) used for the "x phút đọc" label
 const WORDS_PER_MINUTE = 200;
+
+// How many related posts are shown under the article
+const RELATED_POSTS = 3;
 
 // Minutes to read the article: the words of its HTML without the tags, never less than one
 function estimateReadingMinutes(html: string): number {
@@ -93,7 +96,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 export default async function PostDetailPage({ params }: { params: { slug: string } }) {
   const [post, allPostsRes] = await Promise.all([
     getPostBySlugId(params.slug).catch(() => null),
-    getPublicPosts({ page: 1, pageSize: 13 }).catch(() => null)
+    // Three related posts are shown: one more in case the newest is this post itself
+    getPublicPosts({ page: 1, pageSize: RELATED_POSTS + 1 }).catch(() => null)
   ]);
 
   if (!post || post.status !== 'published') {
@@ -115,7 +119,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
 
   const relatedPosts = (allPostsRes?.items ?? [])
     .filter((p) => p.status === 'published' && p.id !== post.id)
-    .slice(0, 3);
+    .slice(0, RELATED_POSTS);
 
   const postUrl = `${SITE_URL}${buildPostHref(post)}`;
   const readingMinutes = estimateReadingMinutes(post.content || '');
@@ -182,7 +186,9 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
           ) : (
             <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-slate-950" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
+          {/* Darker behind the title: cover images often carry their own big text */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/75 to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent" />
 
           <div
@@ -194,7 +200,8 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <CalendarDays className="h-4 w-4 text-cyan-400" />
-                {publishedDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                {/* Same date style as the news list */}
+                {formatDate(publishedDate)}
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300">
                 <Clock className="h-4 w-4 text-cyan-400" />
@@ -262,7 +269,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
                     )}
                     <p className="text-white font-bold line-clamp-2">{item.title}</p>
                     <p className="text-slate-400 text-xs mt-2">
-                      {new Date(item.published_at || item.created_at || Date.now()).toLocaleDateString('vi-VN')}
+                      {formatDate(item.published_at || item.created_at)}
                     </p>
                   </Link>
                   </BranchScoped>

@@ -116,7 +116,3 @@ export const TOTAL_APPLICABLE_PERMISSIONS = Object.values(APPLICABLE_ACTIONS).re
   0
 );
 
-// How many of a role's permissions are in the matrix (older rows may hold permissions the matrix no longer shows)
-export function countGrantedPermissions(permissionList: { module: string; action: string }[] = []): number {
-  return permissionList.filter((item) => APPLICABLE_ACTIONS[item.module]?.includes(item.action)).length;
-}

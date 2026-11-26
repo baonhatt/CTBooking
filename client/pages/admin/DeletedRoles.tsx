@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/admin/common/PageHeader';
 import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
@@ -23,7 +22,6 @@ interface Role {
   name: string;
   description?: string;
   deleted_at: string;
-  staff_count?: number;
   deleted_by_staff_name?: string;
 }
 
@@ -172,7 +170,6 @@ export default function DeletedRolesPage() {
                     Tên vai trò {sortField === 'name' && (sortDir === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead className={ADMIN_TH}>Mô tả</TableHead>
-                  <TableHead className={ADMIN_TH}>Số nhân viên</TableHead>
                   <TableHead className={ADMIN_TH}>Xóa bởi</TableHead>
                   <TableHead
                     className={`cursor-pointer hover:bg-slate-100 ${ADMIN_TH}`}
@@ -196,9 +193,6 @@ export default function DeletedRolesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-600">{r.description || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{r.staff_count || 0} nhân viên</Badge>
-                    </TableCell>
                     <TableCell className="text-gray-600">{r.deleted_by_staff_name || '-'}</TableCell>
                     <TableCell>{formatVnDateTime(r.deleted_at)}</TableCell>
                     <TableCell className="text-right">
@@ -212,7 +206,7 @@ export default function DeletedRolesPage() {
                 ))}
                 {roles.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="p-0">
+                    <TableCell colSpan={5} className="p-0">
                       <EmptyState title={searchQuery ? 'Không tìm thấy vai trò đã xóa' : 'Chưa có vai trò nào bị xóa'} />
                     </TableCell>
                   </TableRow>

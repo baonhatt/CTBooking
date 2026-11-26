@@ -6,6 +6,10 @@ import 'dotenv/config';
 import { EMAIL_SUBJECTS, getResetPasswordEmailTemplate } from '../../lib/booking-utils';
 import { formatDateForDb } from '../../lib/date-utils';
 import { ACCOUNT_LOCKED_MESSAGE } from './auth';
+import { isStrongPassword, PASSWORD_RULE_MESSAGE } from '../../lib/password-rule';
+
+// The one answer to a reset request, whether or not the email has an account
+export const FORGET_PASSWORD_MESSAGE = 'Nếu email đã được đăng ký, chúng tôi đã gửi link đặt lại mật khẩu. Vui lòng kiểm tra hộp thư.';
 
 function randomToken() {
   const array = new Uint8Array(32);
@@ -24,8 +28,9 @@ export async function forgetPassImpl(
   const useracc = await anyDb.query.accounts.findFirst({
     where: eq(tables.accounts.email, email)
   });
+  // An unknown email gets the same answer as a known one, so this form cannot be used to find out who has an account
   if (!useracc) {
-    return { status: 404, message: 'Email không tồn tại!' };
+    return { status: 200, message: FORGET_PASSWORD_MESSAGE };
   }
   const token = randomToken();
   const expired_at_dt = new Date(Date.now() + 60 * 60 * 1000);
@@ -78,7 +83,7 @@ export async function forgetPassImpl(
     context
   );
 
-  return { status: 200, message: 'Vui lòng kiểm tra email!' };
+  return { status: 200, message: FORGET_PASSWORD_MESSAGE };
 }
 
 // Turns "nguyenvan@gmail.com" into "ng***@gmail.com", so the reset page can say whose password is being changed
@@ -117,6 +122,9 @@ export async function resetPasswordImpl(
   payload: { token?: string; newPassword?: string }
 ) {
   const { token, newPassword } = payload;
+  if (!isStrongPassword(newPassword)) {
+    return { status: 400, message: PASSWORD_RULE_MESSAGE };
+  }
   const now = new Date();
   const tokenRecord = await anyDb.query.tokens.findFirst({
     where: and(
@@ -176,6 +184,9 @@ export async function changePasswordImpl(
   const { accountId, oldPassword, newPassword } = payload;
   if (!accountId || !oldPassword || !newPassword) {
     return { status: 400, message: 'Thiếu thông tin đổi mật khẩu' };
+  }
+  if (!isStrongPassword(newPassword)) {
+    return { status: 400, message: PASSWORD_RULE_MESSAGE };
   }
   const account = await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.id, accountId) });
   if (!account || !account.password) {

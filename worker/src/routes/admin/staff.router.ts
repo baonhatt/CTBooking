@@ -6,6 +6,7 @@ import { getRestrictBranchIds, getMailer } from './admin-helpers';
 import { queueStaffCredentialsEmail, resolve_staff_login_url } from '../../../../server/lib/staff-credentials-mail';
 import { getEmailBrand } from '../../../../server/lib/email-layout';
 import { eq } from 'drizzle-orm';
+import { clampPage } from '../../../../server/lib/paging';
 
 import {
   listStaffImpl,
@@ -34,6 +35,8 @@ function sendCredentialsAndHidePassword(
 ) {
   const password = String(result?.generated_password || '');
   if (!password) return;
+  // Only the Super Admin sees the password on screen; everyone else gets it by email only
+  if (!c.get('isSuperAdmin')) delete result.generated_password;
 
   const mailer = getMailer(c);
   // Outside a real worker request (tests) there is no execution context
@@ -51,9 +54,6 @@ function sendCredentialsAndHidePassword(
     sendMailFn: mailer,
     context
   });
-
-  // Only the Super Admin sees the password on screen; everyone else gets it by email only
-  if (!c.get('isSuperAdmin')) delete result.generated_password;
 }
 
 /** The signed-in staff member, as the Impl functions expect it. */
@@ -74,9 +74,8 @@ function errorStatus(result: { code?: string }) {
 
 staffRouter.get('/api/admin/staff', requireStaffAuth, requirePermission('staff', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || '1');
-
-    const pageSize = Number(c.req.query('pageSize') || '20');
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'));
 
     const q = c.req.query('q') || '';
     const includeInactive = c.req.query('includeInactive') === 'true';
@@ -257,16 +256,17 @@ staffRouter.post('/api/admin/staff/:id/restore', requireStaffAuth, requirePermis
 // GET /api/admin/deleted/staff
 staffRouter.get('/api/admin/deleted/staff', requireStaffAuth, requirePermission('staff', 'view_deleted'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
     const search = String(c.req.query('search') || '');
 
     const db = drizzle(c.env.cinema_db, { schema });
 
     const r = await listDeletedStaffImpl(
       db,
-      { staffs: schema.staffs },
-      { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || '') }
+      { staffs: schema.staffs, staffBranches: schema.staffBranches, staffRoles: schema.staffRoles, roles: schema.roles },
+      { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || '') },
+      getRestrictBranchIds(c)
     );
 
     return c.json(r, 200);

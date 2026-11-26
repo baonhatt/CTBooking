@@ -1,18 +1,19 @@
 import { Suspense } from 'react';
 export const runtime = 'edge';
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
+import { cookies } from 'next/headers';
 import UserLayout from '@/layouts/UserLayout';
 import HeroSection from '@/components/user/home/HeroSection';
 import FilmCarousel from '@/components/user/home/FilmCarousel';
 import ClearStorageOnMount from '@/components/user/home/ClearStorageOnMount';
 import MobileBookBar from '@/components/user/home/MobileBookBar';
 
-const MovieScheduleSection = dynamic(() => import('@/components/user/home/MovieScheduleSection'));
-
-const VRShowcase = dynamic(() => import('@/components/user/home/VRShowcase'));
-const PromotionShowcase = dynamic(() => import('@/components/user/home/PromotionShowcase'));
-const TechnologyBanner = dynamic(() => import('@/components/user/home/TechnologyBanner'));
+// Static imports: these are client components, so Next already gives each its own chunk. Loading them through
+// next/dynamic from this Server Component made the server HTML and the first browser render differ (hydration error).
+import MovieScheduleSection from '@/components/user/home/MovieScheduleSection';
+import VRShowcase from '@/components/user/home/VRShowcase';
+import PromotionShowcase from '@/components/user/home/PromotionShowcase';
+import TechnologyBanner from '@/components/user/home/TechnologyBanner';
 // TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại.
 // const ProductSection = dynamic(() => import('@/components/user/home/ProductSection'));
 
@@ -20,6 +21,7 @@ import { getActiveMoviesToday } from '@/lib/api/movies';
 import { getSiteMediaApi } from '@/lib/api/uploads';
 import { getActiveTickets } from '@/lib/api/products';
 // getActiveToys: TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại.
+// Khi mở lại (20261126): các route công khai /api/toys, /api/toys-active, /api/toys/:id và hàm getActiveToys đã được bỏ vì không ai dùng; cần thêm lại một route chỉ đọc đồ chơi đang bán (cột chọn sẵn) trong publicRouter.
 import { getVRPackages } from '@/lib/api/vr-packages';
 import { getDefaultBranch, getPublicBranches } from '@/lib/api/branches';
 
@@ -65,13 +67,26 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
   // Fetch default branch for server-side rendering
   let effectiveBranchId: number | undefined = undefined;
   try {
-    const [{ branch: defaultBranch }, { items: publicBranches }] = await Promise.all([
-      getDefaultBranch(),
+    // A missing default branch (404) must not take the open-branch list down with it
+    const [defaultBranch, { items: publicBranches }] = await Promise.all([
+      getDefaultBranch()
+        .then((res) => res.branch)
+        .catch(() => null),
       getPublicBranches()
     ]);
 
-    if (searchParams.branch_id) {
-      effectiveBranchId = Number(searchParams.branch_id);
+    // Same order as the browser's useBranch: the URL, then the branch the visitor chose before (cookie), then the
+    // default. Without the cookie step the server drew the default branch while the browser drew the saved one,
+    // and the page failed to hydrate.
+    const savedBranchId = Number(cookies().get('selected_branch_id')?.value || 0);
+    const isOpenBranch = (branchId: number) => (publicBranches || []).some((branch: any) => Number(branch.id) === branchId);
+    const savedBranchIsOpen = isOpenBranch(savedBranchId);
+    // A branch in the URL counts only when it is an open branch (same check as useBranch in the browser)
+    const urlBranchId = Number(searchParams.branch_id || 0);
+    if (urlBranchId && isOpenBranch(urlBranchId)) {
+      effectiveBranchId = urlBranchId;
+    } else if (savedBranchId && savedBranchIsOpen) {
+      effectiveBranchId = savedBranchId;
     } else if (defaultBranch) {
       effectiveBranchId = defaultBranch.id;
     } else if (publicBranches && publicBranches.length > 0) {
@@ -102,7 +117,8 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
 
   return (
     <UserLayout>
-      <main>
+      {/* UserLayout already has the page's <main>; a second <main> inside it is not valid HTML */}
+      <div>
         <ClearStorageOnMount />
         <MobileBookBar />
         <HeroSection initialMovies={activeMovies} heroMedia={heroMedia} initialBranchId={effectiveBranchId} />
@@ -118,7 +134,7 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
           {/* TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại. */}
           {/* <ProductSection initialProducts={toysRes.items || []} /> */}
         </Suspense>
-      </main>
+      </div>
     </UserLayout>
   );
 }

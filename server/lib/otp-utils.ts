@@ -8,11 +8,14 @@ import {
 } from './email-templates';
 import { formatDateForDb } from './date-utils';
 
+// Digits come from crypto.getRandomValues (a cryptographic source), not Math.random(), whose next values can be predicted.
+// A 32-bit number modulo 10 has a bias of about 1 in 400 million, too small to matter for a one-time code.
 export function generateOTP(length: number = 6): string {
-  const digits = '0123456789';
+  const randomNumbers = new Uint32Array(length);
+  crypto.getRandomValues(randomNumbers);
   let otp = '';
-  for (let i = 0; i < length; i++) {
-    otp += digits[Math.floor(Math.random() * digits.length)];
+  for (const randomNumber of randomNumbers) {
+    otp += String(randomNumber % 10);
   }
   return otp;
 }
@@ -149,6 +152,14 @@ export async function canResendOTP(
   };
 }
 
+/**
+ * How a staff OTP is kept in staff_tokens.token. The column is unique, so a bare 6-digit code could clash between two
+ * staff members; the prefix also makes the row useless as a session token (the middleware only accepts type 'session').
+ */
+export function staffOtpKey(staffId: number, otp: string): string {
+  return `otp:${staffId}:${otp}`;
+}
+
 // Staff OTP functions for password change
 export async function sendStaffPasswordChangeOTP(
   anyDb: any,
@@ -164,22 +175,16 @@ export async function sendStaffPasswordChangeOTP(
   const expiredAt = new Date();
   expiredAt.setMinutes(expiredAt.getMinutes() + expiryMinutes);
 
-  // Delete existing OTP tokens for this staff
+  // One OTP per staff member: drop every earlier one (used or not)
   await anyDb
     .delete(tables.staffTokens)
-    .where(
-      and(
-        eq(tables.staffTokens.staffId, staffId),
-        eq(tables.staffTokens.type, 'otp'),
-        isNull(tables.staffTokens.revokedAt)
-      )
-    );
+    .where(and(eq(tables.staffTokens.staffId, staffId), eq(tables.staffTokens.type, 'otp')));
 
   // Insert new OTP token
   await anyDb.insert(tables.staffTokens).values({
     staffId,
     type: 'otp',
-    token: otp,
+    token: staffOtpKey(staffId, otp),
     expiredAt: expiredAt.toISOString(),
     createdAt: new Date().toISOString()
   });
@@ -240,22 +245,16 @@ export async function sendStaffLoginOTP(
   const expiredAt = new Date();
   expiredAt.setMinutes(expiredAt.getMinutes() + expiryMinutes);
 
-  // Delete existing OTP tokens for this staff
+  // One OTP per staff member: drop every earlier one (used or not)
   await anyDb
     .delete(tables.staffTokens)
-    .where(
-      and(
-        eq(tables.staffTokens.staffId, staffId),
-        eq(tables.staffTokens.type, 'otp'),
-        isNull(tables.staffTokens.revokedAt)
-      )
-    );
+    .where(and(eq(tables.staffTokens.staffId, staffId), eq(tables.staffTokens.type, 'otp')));
 
   // Insert new OTP token
   await anyDb.insert(tables.staffTokens).values({
     staffId,
     type: 'otp',
-    token: otp,
+    token: staffOtpKey(staffId, otp),
     expiredAt: expiredAt.toISOString(),
     createdAt: new Date().toISOString()
   });
@@ -312,7 +311,7 @@ export async function validateStaffOTP(
     where: and(
       eq(tables.staffTokens.staffId, staffId),
       eq(tables.staffTokens.type, 'otp'),
-      eq(tables.staffTokens.token, otp),
+      eq(tables.staffTokens.token, staffOtpKey(staffId, otp)),
       isNull(tables.staffTokens.revokedAt)
     )
   });
@@ -338,14 +337,8 @@ export async function validateStaffOTP(
 }
 
 export async function deleteStaffOTP(anyDb: any, tables: { staffTokens: any }, staffId: number) {
+  // A used code is removed, so it can never be tried again
   await anyDb
-    .update(tables.staffTokens)
-    .set({ revokedAt: new Date().toISOString(), revokeReason: 'used' })
-    .where(
-      and(
-        eq(tables.staffTokens.staffId, staffId),
-        eq(tables.staffTokens.type, 'otp'),
-        isNull(tables.staffTokens.revokedAt)
-      )
-    );
+    .delete(tables.staffTokens)
+    .where(and(eq(tables.staffTokens.staffId, staffId), eq(tables.staffTokens.type, 'otp')));
 }

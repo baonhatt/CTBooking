@@ -63,6 +63,8 @@ export default function PromotionShowcase({
     }))
     .sort((a: any, b: any) => a.display_order - b.display_order);
 
+  const anyDescription = combos.some((combo: any) => combo.description);
+
   const handleAddToCart = (combo: (typeof combos)[0]) => {
     cartStore.addItem({
       packageId: combo.id,
@@ -120,8 +122,8 @@ export default function PromotionShowcase({
       <div className="absolute left-10 top-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(245,158,11,0.15)_0%,_transparent_70%)] pointer-events-none" />
       <div className="absolute right-0 bottom-0 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.16)_0%,_transparent_70%)] pointer-events-none" />
 
-      <div className="container mx-auto px-3 sm:px-4 relative z-10">
-        <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-3">
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="max-w-3xl mb-6 sm:mb-12 space-y-2 sm:space-y-3">
           <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.2)]">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Ưu Đãi Suất Chiếu</span>
@@ -131,14 +133,14 @@ export default function PromotionShowcase({
           </h2>
         </div>
 
-        <div className="mx-auto max-w-7xl">
-          <div className="flex flex-wrap justify-center gap-2.5 sm:gap-6">
+        <div>
+          <div className="flex flex-wrap gap-2.5 sm:gap-6">
             {combos.map((combo: (typeof combos)[0], index: number) => (
               <motion.div
                 key={combo.id}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "0px 0px 120px 0px" }}
+                viewport={{ once: true, margin: "0px 0px 200px 0px" }}
                 transition={{
                   delay: Math.min(index, 4) * 0.04,
                   duration: 0.3
@@ -151,7 +153,7 @@ export default function PromotionShowcase({
                       <span className="inline-block px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-extrabold uppercase tracking-wider">
                         Gói Phim
                       </span>
-                      <h3 className="text-sm sm:text-xl font-black text-white group-hover:text-amber-200 transition-colors mt-2 line-clamp-2 min-h-[2.5rem] sm:min-h-0">
+                      <h3 className="text-sm sm:text-xl font-black text-white group-hover:text-amber-200 transition-colors mt-2 line-clamp-2 min-h-[2.5rem] sm:min-h-[3.5rem]">
                         {combo.name}
                       </h3>
                     </div>
@@ -163,8 +165,11 @@ export default function PromotionShowcase({
                       </span>
                     </div>
 
-                    {combo.description && (
-                      <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">{combo.description}</p>
+                    {/* When some package has a description, every card keeps that space, so the buttons line up */}
+                    {anyDescription && (
+                      <p className="text-xs text-slate-300 leading-relaxed line-clamp-3 min-h-[3.75rem]">
+                        {combo.description}
+                      </p>
                     )}
                   </div>
 

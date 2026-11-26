@@ -1,4 +1,3 @@
-import type { ActiveMoviesTodayResponse } from '@shared/api';
 import { eq, desc, asc, count, sql, and, inArray, isNull } from 'drizzle-orm';
 import {
   enrichItemsWithParsedBranchIds,
@@ -7,11 +6,20 @@ import {
   sqlBranchIdsStaffAccessFilter
 } from '../../lib/branch-ids';
 
+/** A movie of the "showing now" list, with only what the customer screens read (carousel, hero poster, booking). */
+export type PublicActiveMovie = {
+  id: number;
+  title: string;
+  cover_image: string;
+  genres: any[];
+  release_date: string;
+};
+
 export async function getAllActiveMoviesToday(
   anyDb: any,
   tables: { movies: any },
   branch_id?: number
-): Promise<{ activeMovies: ActiveMoviesTodayResponse[] }> {
+): Promise<{ activeMovies: PublicActiveMovie[] }> {
   const baseCondition = and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at));
   const whereCondition = branch_id
     ? and(baseCondition, sqlBranchIdsMatchFilter(tables.movies.branch_ids, tables.movies.branch_id, branch_id))
@@ -22,26 +30,17 @@ export async function getAllActiveMoviesToday(
     columns: {
       id: true,
       title: true,
-      description: true,
       cover_image: true,
       genres: true,
-      rating: true,
-      duration_min: true,
       release_date: true
-    },
-    with: {
-      branch: true
     },
     orderBy: [desc(tables.movies.release_date)]
   });
 
-  const activeMovies: ActiveMoviesTodayResponse[] = active_movies.map((m: any) => ({
+  const activeMovies: PublicActiveMovie[] = active_movies.map((m: any) => ({
     id: m.id,
     title: m.title,
-    description: m.description ?? '',
     cover_image: m.cover_image ?? '',
-    // TẠM BỎ QUA NHIỀU ẢNH (20261110): hiện mỗi phim chỉ dùng 1 poster (cover_image). Ảnh chi tiết (detail_images) chưa dùng: website khách không hiển thị và form sửa chưa có chỗ thêm/xóa ảnh này. Khi cần thư viện ảnh phim: thêm upload nhiều ảnh vào form sửa (MovieEditModal), hiển thị ở website khách, rồi bỏ ghi chú này.
-    detail_images: [] as any,
     genres: m.genres
       ? Array.isArray(m.genres)
         ? m.genres
@@ -53,10 +52,7 @@ export async function getAllActiveMoviesToday(
             }
           })()
       : [],
-    rating: m.rating?.toString() ?? '0',
-    duration_min: m.duration_min ?? 0,
-    release_date: m.release_date ?? new Date().toISOString(),
-    price: 0
+    release_date: m.release_date ?? new Date().toISOString()
   }));
   return { activeMovies };
 }

@@ -695,8 +695,7 @@ export default function BookingPage() {
         'pendingOrder',
         JSON.stringify({
           ...summary,
-          booking_id: booking?.id,
-          user_id: booking?.user_id
+          booking_id: booking?.id
         })
       );
 
@@ -705,7 +704,6 @@ export default function BookingPage() {
         JSON.stringify({
           ...summary,
           booking_id: booking?.id,
-          user_id: booking?.user_id,
           totalAmount: canonicalTotal,
           movieTitle: summary.movie,
           ticketType: summary.ticketPackageName,
@@ -714,6 +712,26 @@ export default function BookingPage() {
           branch_settings: selectedBranch?.settings
         })
       );
+      // A 0đ order (100% voucher) was paid by the server at once: straight to the result page, no QR
+      if (String(booking.payment_status || '').toLowerCase() === 'paid') {
+        localStorage.setItem(
+          'lastCheckoutOrder',
+          JSON.stringify({
+            ...summary,
+            booking_id: booking?.id,
+            bookingId: booking?.id,
+            totalAmount: canonicalTotal,
+            booking_code: booking.booking_code || null,
+            payment_status: 'paid',
+            paidAt: new Date().toISOString()
+          })
+        );
+        localStorage.removeItem('pendingOrder');
+        localStorage.removeItem('qrPaymentData');
+        router.push('/checkout');
+        return;
+      }
+
       // The countdown ends on the server's deadline (moved onto this browser's clock), not on the browser's own idea of 10 minutes
       localStorage.setItem('qrPaymentEndTime', String(paymentDeadlineMs));
       router.push('/qr-payment');

@@ -7,6 +7,7 @@
     "dev:worker": "wrangler dev --env preview --port 8787 --config worker/wrangler.toml",
     "dev:worker:local": "wrangler dev --local --config worker/wrangler.toml",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:worker\"",
+    "all": "concurrently -k -n api,admin,client -c yellow,cyan,magenta \"npm run dev:worker:local\" \"npm run dev\" \"npm --prefix next-client run dev\"",
     "dev:debug": "tsx --inspect=9229 --tsconfig tsconfig.json node_modules/vite/bin/vite.js",
     "build": "npm run build:client",
     "build:next": "cd next-client && npm run build:cf",

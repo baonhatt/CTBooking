@@ -497,6 +497,42 @@ export const staffBranches = sqliteTable('staff_branches', {
     .references(() => branches.id, { onDelete: 'cascade' })
 });
 
+// A registration waiting for its email code. No account exists until the code is right (register-otp.ts).
+// One row per email; registration_id changes with every new start, so an older challenge can no longer finish it.
+// Times are epoch milliseconds. fails is raised in one UPDATE ... RETURNING, so parallel guesses cannot share a count.
+export const register_pending = sqliteTable('register_pending', {
+  email: text('email').primaryKey(), // lower case
+  registration_id: text('registration_id').notNull(),
+  name: text('name').notNull(),
+  phone: text('phone'),
+  gender: text('gender'),
+  dob: text('dob'),
+  password_hash: text('password_hash').notNull(),
+  code_hash: text('code_hash').notNull(),
+  code_expires_at: integer('code_expires_at').notNull(),
+  sent_at: integer('sent_at').notNull(),
+  fails: integer('fails').notNull().default(0),
+  expires_at: integer('expires_at').notNull()
+});
+
+// Money that reached the bank account but matched no order (no "CS..." code in the transfer text, or a code of no order).
+// Filled by the SePay webhook; staff assign it to an order or set it aside (worker admin route unmatched-transfers).
+export const unmatched_transfers = sqliteTable('unmatched_transfers', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sepay_id: text('sepay_id').unique(), // SePay transaction id: the same transfer sent twice is stored once
+  amount: integer('amount').notNull().default(0),
+  content: text('content'), // the transfer text exactly as the bank sent it
+  bank_ref: text('bank_ref'), // bank reference (SePay referenceCode)
+  transfer_at: text('transfer_at'), // when the bank recorded it (SePay transactionDate)
+  status: text('status').notNull().default('open'), // open | matched | ignored
+  booking_id: integer('booking_id'), // the order it was assigned to (status matched)
+  note: text('note'), // staff note, required when set aside
+  resolved_by_staff_id: integer('resolved_by_staff_id'),
+  resolved_by_name: text('resolved_by_name'),
+  resolved_at: text('resolved_at'),
+  created_at: text('created_at').notNull()
+});
+
 export const auditLogs = sqliteTable('audit_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   staffId: integer('staff_id').references(() => staffs.id, { onDelete: 'set null' }),

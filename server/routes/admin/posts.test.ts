@@ -211,13 +211,44 @@ describe('loadPostStaffNames', () => {
       { entityId: '7', action: 'update', staffFullname: 'Chi' },
       { entityId: '8', action: 'create', staffFullname: 'Dung' }
     ];
-    const db: any = { select: () => ({ from: () => ({ where: () => ({ orderBy: async () => logs }) }) }) };
+    // The first select builds the "first create / last update per post" subquery, the second reads those rows
+    const db: any = {
+      select: () => ({ from: () => ({ where: () => ({ groupBy: () => ({}), orderBy: async () => logs }) }) })
+    };
 
     const names = await loadPostStaffNames(db, tables, [7, 8, 9]);
 
     expect(names.get(7)).toEqual({ created_by_staff_name: 'An', updated_by_staff_name: 'Chi' });
     expect(names.get(8)).toEqual({ created_by_staff_name: 'Dung', updated_by_staff_name: null });
     expect(names.has(9)).toBe(false);
+  });
+
+  it('reads only the first create and the last update of each post', async () => {
+    const { SQLiteSyncDialect } = await import('drizzle-orm/sqlite-core');
+    let subquery: any = null;
+    let outerWhere: any = null;
+    const db: any = {
+      select: () => ({
+        from: () => ({
+          where: (condition: any) => ({
+            groupBy: () => {
+              subquery = condition;
+              return { getSQL: () => condition };
+            },
+            orderBy: async () => {
+              outerWhere = condition;
+              return [];
+            }
+          })
+        })
+      })
+    };
+
+    await loadPostStaffNames(db, tables, [7]);
+
+    expect(subquery).not.toBeNull();
+    const outerSql = new SQLiteSyncDialect().sqlToQuery(outerWhere).sql;
+    expect(outerSql).toMatch(/"id" in/i);
   });
 
   it('does not query when there are no posts', async () => {

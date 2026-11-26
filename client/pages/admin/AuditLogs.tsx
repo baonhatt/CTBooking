@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { request } from '@/lib/api/http';
+import { getAuditLogDetailApi } from '@/lib/api/admin-ops';
 import { formatVnDateTime } from '@/lib/format';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
@@ -22,6 +23,7 @@ import {
   ADMIN_TEXT
 } from '@/components/admin/common/adminTokens';
 
+/** One line of the list. The saved values and the browser are loaded when the detail opens (AuditLogDetail). */
 interface AuditLog {
   id: number;
   staffId: number;
@@ -29,12 +31,16 @@ interface AuditLog {
   staffFullname: string;
   action: string;
   entityType: string;
-  entityId: string;
-  oldValues?: string;
-  newValues?: string;
+  /** Readable name of the record (booking code, name ...), worked out by the server; empty when there is none */
+  entity_name: string;
   ipAddress?: string;
-  userAgent?: string | null;
   createdAt: string;
+}
+
+interface AuditLogDetail {
+  oldValues?: string | null;
+  newValues?: string | null;
+  userAgent?: string | null;
 }
 
 interface Staff {
@@ -125,6 +131,17 @@ export default function AuditLogsPage() {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
 
+  // The saved values of the open line: the list does not carry them
+  const {
+    data: selectedDetail,
+    isFetching: detailLoading,
+    isError: detailFailed
+  } = useQuery({
+    queryKey: ['audit-log-detail', selectedLog?.id],
+    queryFn: async () => (await getAuditLogDetailApi(selectedLog!.id)).log as AuditLogDetail,
+    enabled: isDetailDialogOpen && !!selectedLog
+  });
+
   // Fetch audit logs
   const {
     data: logsData,
@@ -178,24 +195,9 @@ export default function AuditLogsPage() {
     return String(value);
   };
 
-  // The most readable name of the record (booking code, name, title ...) taken from the saved values
-  const getEntityName = (log: AuditLog): string => {
-    for (const rawValues of [log.newValues, log.oldValues]) {
-      if (!rawValues) continue;
-      try {
-        const values = JSON.parse(rawValues);
-        const name = values.booking_code || values.code || values.name || values.fullname || values.title || values.email;
-        if (name) return String(name);
-      } catch {
-        // values that are not JSON have no name to show
-      }
-    }
-    return '';
-  };
-
   const formatEntityLabel = (log: AuditLog) => {
     const entityLabel = ENTITY_LABELS[log.entityType] || log.entityType;
-    const entityName = getEntityName(log);
+    const entityName = log.entity_name;
     // The internal id is never shown: without a name the label alone is shown
     return entityName ? `${entityLabel}: ${entityName}` : entityLabel;
   };
@@ -214,7 +216,7 @@ export default function AuditLogsPage() {
     setFilterToDate('');
   };
 
-  const parseAuditJson = (value?: string) => {
+  const parseAuditJson = (value?: string | null) => {
     if (!value) return {};
     try {
       return JSON.parse(value);
@@ -223,11 +225,11 @@ export default function AuditLogsPage() {
     }
   };
 
-  const getDiffEntries = (log: AuditLog) => {
-    const oldData = parseAuditJson(log.oldValues);
-    const newData = parseAuditJson(log.newValues);
+  const getDiffEntries = (entityType: string, detail: AuditLogDetail) => {
+    const oldData = parseAuditJson(detail.oldValues);
+    const newData = parseAuditJson(detail.newValues);
     const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
-    const ignored = new Set(IGNORED_FIELDS[log.entityType] || ['id', 'created_at', 'updated_at']);
+    const ignored = new Set(IGNORED_FIELDS[entityType] || ['id', 'created_at', 'updated_at']);
 
     const normalize = (val: unknown) => (val === null ? undefined : val);
 
@@ -438,16 +440,16 @@ export default function AuditLogsPage() {
     </div>
   );
 
-  const renderDiffTable = (log: AuditLog) => {
-    const diffEntries = getDiffEntries(log);
+  const renderDiffTable = (log: AuditLog, detail: AuditLogDetail) => {
+    const diffEntries = getDiffEntries(log.entityType, detail);
     return (
       <div className={`${ADMIN_CARD} overflow-hidden`}>
         <table className="w-full">
           <thead className={ADMIN_TABLE_HEAD}>
             <tr>
               <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trường</th>
-              {log.oldValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trước</th>}
-              {log.newValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Sau</th>}
+              {detail.oldValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trước</th>}
+              {detail.newValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Sau</th>}
             </tr>
           </thead>
           <tbody>
@@ -461,8 +463,8 @@ export default function AuditLogsPage() {
               diffEntries.map(({ key, oldValue, newValue }) => (
                 <tr key={key} className="border-b border-slate-100 last:border-b-0">
                   <td className="p-3 text-sm font-medium">{key}</td>
-                  {log.oldValues && <td className="bg-red-50 p-3 text-sm">{renderValue(oldValue)}</td>}
-                  {log.newValues && <td className="bg-emerald-50 p-3 text-sm">{renderValue(newValue)}</td>}
+                  {detail.oldValues && <td className="bg-red-50 p-3 text-sm">{renderValue(oldValue)}</td>}
+                  {detail.newValues && <td className="bg-emerald-50 p-3 text-sm">{renderValue(newValue)}</td>}
                 </tr>
               ))
             )}
@@ -479,12 +481,14 @@ export default function AuditLogsPage() {
         <div className={`${ADMIN_CARD} grid grid-cols-2 gap-4 p-5`}>
           {renderInfoItem('Thời gian', formatDate(selectedLog.createdAt))}
           {renderInfoItem('Địa chỉ IP', selectedLog.ipAddress || '-')}
-          {renderInfoItem('Trình duyệt / thiết bị', selectedLog.userAgent || '-', true)}
+          {renderInfoItem('Trình duyệt / thiết bị', detailLoading ? '...' : selectedDetail?.userAgent || '-', true)}
           {renderInfoItem('Nhân viên', `${selectedLog.staffFullname || 'Nhân viên'} (${selectedLog.staffEmail || '-'})`)}
           {renderInfoItem('Hành động', ACTION_LABELS[selectedLog.action] || selectedLog.action)}
           {renderInfoItem('Đối tượng', formatEntityLabel(selectedLog))}
         </div>
-        {(selectedLog.oldValues || selectedLog.newValues) && renderDiffTable(selectedLog)}
+        {detailLoading && <TableSkeleton rows={3} />}
+        {detailFailed && <p className="text-sm text-red-600">Không tải được chi tiết thay đổi.</p>}
+        {!detailLoading && selectedDetail && (selectedDetail.oldValues || selectedDetail.newValues) && renderDiffTable(selectedLog, selectedDetail)}
       </div>
     );
   };

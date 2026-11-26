@@ -2,6 +2,47 @@ import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import { sqlBranchIdsStaffAccessFilter, staffCanModifyBranchRecord } from '../../lib/branch-ids';
+
+/**
+ * Cloudinary folders the admin screens upload into (lib/api/uploads.ts builds "ctbooking/images/<name>" or
+ * "ctbooking/videos/<name>"). The sign route signs no other folder.
+ */
+export const CLOUDINARY_UPLOAD_SUBFOLDERS = [
+  'hero_section',
+  'technology_section1',
+  'technology_section2',
+  'posts',
+  'vr_packages',
+  'branch_banners'
+];
+
+/** True when the folder is one the admin screens use, under the root that matches the resource type. */
+export function isAllowedUploadFolder(folder: string, resourceType: string): boolean {
+  const root = resourceType === 'video' ? 'ctbooking/videos' : resourceType === 'image' ? 'ctbooking/images' : null;
+  if (!root) return false;
+  return CLOUDINARY_UPLOAD_SUBFOLDERS.some((name) => folder === `${root}/${name}`);
+}
+
+/**
+ * Whether a staff member may change or delete a media row. Rows for all branches (branch_ids NULL, which is every row
+ * the admin screens create today) are for the Super Admin only; other staff only rows fully inside their branches.
+ * restrictToBranchIds: null for the Super Admin.
+ */
+export function staffCanModifySiteMedia(rowBranchIds: string | null | undefined, restrictToBranchIds: number[] | null): boolean {
+  if (restrictToBranchIds === null) return true;
+  return staffCanModifyBranchRecord(rowBranchIds ?? null, restrictToBranchIds, false);
+}
+
+/** The branch targeting of one media row, or null when the row does not exist. */
+export async function findSiteMediaBranchIdsImpl(anyDb: any, tables: { site_media: any }, id: number) {
+  const [row] = await anyDb
+    .select({ id: tables.site_media.id, branch_ids: tables.site_media.branch_ids })
+    .from(tables.site_media)
+    .where(eq(tables.site_media.id, Number(id)))
+    .limit(1);
+  return row ? { branch_ids: row.branch_ids as string | null } : null;
+}
 
 export async function createSiteMediaImpl(
   anyDb: any,
@@ -116,10 +157,13 @@ export async function createSiteMediaImpl(
 export async function listSiteMediaImpl(
   anyDb: any,
   tables: { site_media: any },
-  args: { section?: string; type?: string; active?: string }
+  args: { section?: string; type?: string; active?: string; restrictToBranchIds?: number[] | null }
 ) {
   const { section, type, active } = args;
+  const restrictToBranchIds = args.restrictToBranchIds ?? null;
   const conditions: any[] = [];
+  // Staff of some branches see the media for all branches and the media of their branches
+  if (restrictToBranchIds) conditions.push(sqlBranchIdsStaffAccessFilter(tables.site_media.branch_ids, restrictToBranchIds));
   if (section) conditions.push(eq(tables.site_media.section, String(section)));
   if (type) conditions.push(eq(tables.site_media.type, String(type)));
   if (active)
@@ -131,6 +175,22 @@ export async function listSiteMediaImpl(
     orderBy: [asc(tables.site_media.display_order), desc(tables.site_media.created_at)]
   });
   return { items };
+}
+
+/**
+ * Whether saving points the row at a DIFFERENT stored file, so the old one can be deleted. The storage id (public_id)
+ * decides: the same id means the file was overwritten in place (only the version in the url changed), and deleting
+ * "the old file" would delete the new one. Rows without a storage id compare the url.
+ */
+export function isAssetReplaced(
+  existing: { url?: string | null; public_id?: string | null },
+  changes: { url?: string | null; public_id?: string | null }
+): boolean {
+  if (existing.public_id) {
+    const newPublicId = changes.public_id === undefined ? existing.public_id : changes.public_id;
+    return Boolean(newPublicId) && newPublicId !== existing.public_id;
+  }
+  return Boolean(existing.url && changes.url && changes.url !== existing.url);
 }
 
 export async function updateSiteMediaImpl(
@@ -197,13 +257,9 @@ export async function updateSiteMediaImpl(
   //   item = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
   // }
 
-  if (existing && deleter) {
-    const oldChanged = existing.url && payload.url && existing.url !== payload.url;
-    const oldPublicIdChanged = existing.public_id && payload.public_id && existing.public_id !== payload.public_id;
-    if (oldChanged || oldPublicIdChanged) {
-      const resourceType = existing.type === 'video' ? 'video' : 'image';
-      deleter(existing.url, resourceType).catch((e) => console.error('Failed to delete old site media asset:', e));
-    }
+  if (existing && deleter && isAssetReplaced(existing, payload)) {
+    const resourceType = existing.type === 'video' ? 'video' : 'image';
+    deleter(existing.url, resourceType).catch((e) => console.error('Failed to delete old site media asset:', e));
   }
 
   const auditOld = buildAuditPayload(existing);

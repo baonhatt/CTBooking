@@ -1,21 +1,30 @@
+import { hasStaffSession } from '../middleware';
 import { Hono } from 'hono';
-import { isLocal, parseMediaUrl, logSystemError, withCache } from '../utils';
+import { isLocal, parseMediaUrl, logSystemError, withCache, getBookingEmailTemplate } from '../utils';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../shared/schema';
-import { getAllActiveMoviesToday, listMovies, getMovie } from '../../../server/routes/user/movies';
-import { getMovieByIdImpl } from '../../../server/routes/admin/movies';
+import { getAllActiveMoviesToday } from '../../../server/routes/user/movies';
 import { getPublicScheduleImpl } from '../../../server/routes/user/showtimes';
-import { listToysImpl, getToyImpl } from '../../../server/routes/admin/toys';
-import { listActiveToys } from '../../../server/routes/user/toys';
 import { sendMail } from '../../../server/routes/mail-service';
-import { listSiteMediaImpl } from '../../../server/routes/admin/site-media';
 import { listActiveTicketPackages } from '../../../server/routes/user/tickets';
-import { listTicketPackagesImpl, getTicketPackageImpl } from '../../../server/routes/admin/tickets';
-import { listPostsImpl, getPostImpl } from '../../../server/routes/admin/posts';
+import {
+  listPublicBranches,
+  getPublicDefaultBranch,
+  getPublicBranchPaymentInfo,
+  getPublicMovieDetail,
+  listPublicSiteMedia,
+  toPublicTicketPackage,
+  toPublicVrPackage
+} from '../../../server/routes/user/public-catalog';
+import { listPublicPosts, getPublicPost } from '../../../server/routes/user/public-posts';
+import { clampPage } from '../../../server/lib/paging';
 import { validateBookingImpl } from '../../../server/routes/user/booking/validate';
 import { createPaymentImpl } from '../../../server/routes/user/booking/create';
 import { updatePaymentImpl } from '../../../server/routes/user/booking/update';
+import { payFreeOrderNow } from '../../../server/routes/user/booking/free-order';
+import { getMailer } from './admin/admin-helpers';
 import { findBookingForOwner, bookingStatusPayload } from '../../../server/routes/user/booking/access';
+import { expireBookingIfOverdue, isOverduePending } from '../../../server/routes/scheduled/booking-expiry';
 import { resolveOrderTokenSecret, makeOrderToken, ORDER_TOKEN_HEADER } from '../../../server/lib/order-token';
 import { validateSessionTokenImpl } from '../../../server/routes/user/auth';
 import { formatDateForDb } from '../../../server/lib/date-utils';
@@ -33,39 +42,8 @@ import {
   incrementPostViewImpl,
 } from '../../../server/routes/admin/posts';
 
-import {
-  getBranchImpl,
-  listBranchOptionsImpl,
-  getDefaultBranchImpl
-} from '../../../server/routes/admin/branches';
-
 
 const publicRouter = new Hono<any>();
-
-function stripAuditLogs(obj: any): any {
-  if (obj === null || typeof obj !== 'object') return obj;
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => stripAuditLogs(item));
-  }
-
-  const clone: any = { ...obj };
-  delete clone.created_at;
-  delete clone.created_by;
-  delete clone.updated_at;
-  delete clone.updated_by;
-  delete clone.created_by_staff_name;
-  delete clone.updated_by_staff_name;
-  delete clone.deleted_by_staff_id;
-
-  for (const key in clone) {
-    if (Object.prototype.hasOwnProperty.call(clone, key)) {
-      clone[key] = stripAuditLogs(clone[key]);
-    }
-  }
-
-  return clone;
-}
 
 // 3. Serve local uploads during development
 publicRouter.get('/uploads/*', async (c) => {
@@ -154,10 +132,38 @@ const getD1Tables = (schema: any) => ({
   voucher_redemption_logs: schema.voucher_redemption_logs
 });
 
-function getRestrictBranchIds(c: any): number[] | null {
-  const isSuperAdmin = c.get('isSuperAdmin');
-  const staffBranchIds = c.get('staffBranchIds') || [];
-  return isSuperAdmin ? null : staffBranchIds;
+/**
+ * A 0đ order (100% test voucher) is paid at once: ticket code and ticket email, no bank transfer. The booking in the
+ * reply then says payment_status 'paid' and carries the ticket code, so the page goes straight to the result.
+ */
+async function payIfFree(c: any, db: any, createdBooking: any) {
+  if (!createdBooking?.id) return;
+  const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
+  const paid = await payFreeOrderNow(
+    db,
+    { ...getD1Tables(schema), auditLogs: schema.auditLogs },
+    Number(createdBooking.id),
+    getMailer(c),
+    (data: any) => getBookingEmailTemplate(appBaseUrl, data),
+    c.executionCtx
+  );
+  if (paid) Object.assign(createdBooking, paid);
+}
+
+/**
+ * The new order as the booking page reads it: the id, the payment reference and deadline, the order token and the
+ * server clock, and (for a 0đ order paid at once) the payment state and ticket code. Nothing else of the row is sent.
+ */
+function toCustomerBooking(booking: any) {
+  return {
+    id: booking.id,
+    pay_txt_code: booking.pay_txt_code,
+    order_token: booking.order_token,
+    payment_expires_at: booking.payment_expires_at ?? null,
+    server_now: booking.server_now,
+    payment_status: booking.payment_status ?? 'pending',
+    booking_code: booking.booking_code || null
+  };
 }
 
 /**
@@ -174,6 +180,24 @@ function readOrderTokenSecret(c: any): string | null {
 }
 
 const ORDER_SYSTEM_NOT_READY = 'Hệ thống chưa sẵn sàng nhận đặt vé. Vui lòng thử lại sau.';
+
+/**
+ * The order form plus who is really signed in (from the session, never from the form): member-only packages are
+ * checked against it. Any signed_in_account_id the browser sent is overwritten.
+ */
+async function withSignedInAccount(c: any, db: any, body: any) {
+  return { ...(body || {}), signed_in_account_id: await getOptionalAccountId(c, db) };
+}
+
+/**
+ * Packages marked "chỉ thành viên" are shown only to a signed-in customer (or a signed-in staff member, for the admin
+ * screens). Everybody else gets the list without them.
+ */
+async function withoutMemberOnlyForVisitors<T extends { is_member_only?: any }>(c: any, db: any, packages: T[]): Promise<T[]> {
+  if (!packages.some((pkg) => pkg?.is_member_only)) return packages;
+  if ((await getOptionalAccountId(c, db)) || (await hasStaffSession(c))) return packages;
+  return packages.filter((pkg) => !pkg?.is_member_only);
+}
 
 /** The signed-in customer's account id, when the request carries a valid customer session. Never throws. */
 async function getOptionalAccountId(c: any, db: any): Promise<number | null> {
@@ -202,15 +226,10 @@ publicRouter.get('/api/getActiveMovies', async (c) => {
       },
       branchId
     );
-    const optimized = activeMovies.map((m) => {
-      const opt = {
-        ...m,
-        cover_image: parseMediaUrl(m.cover_image ?? '', c)
-      };
-      delete (opt as any).detail_images;
-      delete (opt as any).price;
-      return opt;
-    });
+    const optimized = activeMovies.map((m) => ({
+      ...m,
+      cover_image: parseMediaUrl(m.cover_image ?? '', c)
+    }));
 
     const responseBody = JSON.stringify({ activeMovies: optimized });
 
@@ -245,7 +264,7 @@ publicRouter.post('/api/validate-booking', async (c) => {
 
     const tables = getD1Tables(schema);
 
-    const r = await validateBookingImpl(db, await c.req.json(), tables);
+    const r = await validateBookingImpl(db, await withSignedInAccount(c, db, await c.req.json().catch(() => ({}))), tables);
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
@@ -280,7 +299,7 @@ publicRouter.post('/api/create-booking', async (c) => {
 
     // Pass schema tables to ensure correct schema is used (D1 schema instead of PostgreSQL)
 
-    const r = await createPaymentImpl(db, body as any, tables);
+    const r = await createPaymentImpl(db, (await withSignedInAccount(c, db, body)) as any, tables);
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
@@ -295,6 +314,8 @@ publicRouter.post('/api/create-booking', async (c) => {
     if (status === 201 && payload.booking?.pay_txt_code) {
       payload.booking.order_token = await makeOrderToken(secret, payload.booking.id, payload.booking.pay_txt_code);
       payload.booking.server_now = formatDateForDb(new Date());
+      await payIfFree(c, db, payload.booking);
+      payload.booking = toCustomerBooking(payload.booking);
     }
 
     return c.json(payload, status as any);
@@ -328,23 +349,21 @@ publicRouter.post('/api/cancel-booking', async (c) => {
       return c.json({ status: 'error', message: 'Không tìm thấy đặt vé' }, 404);
     }
 
-    // The status is fixed to 'failed': a customer can cancel but can never confirm a payment.
-    // Nothing from the body except the booking id is used.
+    // A customer can only close an order, never confirm a payment. Nothing from the body except the booking id is used.
+    // Past the 10 minutes (the payment page's countdown ran out) the order is 'expired'; before that, 'cancelled'.
+    const closingStatus = isOverduePending(booking) ? 'expired' : 'cancelled';
     const r = await updatePaymentImpl(
       db,
-      { payment_id: booking.id, payment_status: 'failed' },
+      { payment_id: booking.id, payment_status: closingStatus },
       undefined,
       undefined,
       tables,
       c.executionCtx
     );
 
+    // The callers read only the HTTP status (200 cancelled, 409 already paid): the booking row is not sent back
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
-    const payload = {
-      ...(r as any),
-      status: status >= 400 ? 'error' : 'success'
-    };
-    return c.json(payload, status as any);
+    return c.json({ status: status >= 400 ? 'error' : 'success', message: (r as any).message }, status as any);
   } catch (err: any) {
     logSystemError('cancel-booking', err, body);
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
@@ -370,7 +389,9 @@ async function handleBookingStatus(c: any) {
       return c.json({ status: 'error', message: 'Không tìm thấy đặt vé' }, 404);
     }
 
-    return c.json(bookingStatusPayload(booking), 200);
+    // An order past its 10 minutes is expired now (voucher use given back), not at the next cron run
+    const current = await expireBookingIfOverdue(db, getD1Tables(schema), booking);
+    return c.json(bookingStatusPayload(current), 200);
   } catch (err: any) {
     logSystemError('booking-status', err);
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
@@ -379,109 +400,38 @@ async function handleBookingStatus(c: any) {
 
 publicRouter.get('/api/bookings/:id', handleBookingStatus);
 
-publicRouter.get('/api/movies', async (c) => {
+// The film popup of the home page: one active, not deleted movie with the fields the popup shows
+publicRouter.get('/api/movies-detail/:id', async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 20);
-
-    const q = String(c.req.query('q') || '').toLowerCase();
-
-    const sortKey = String(c.req.query('sort') || 'updated_at');
-
-    const dir = String(c.req.query('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
-
-    const status = String(c.req.query('status') || 'all');
-
-    const branchIdRaw = c.req.query('branch_id');
-    const branchId = branchIdRaw && branchIdRaw !== 'all' ? Number(branchIdRaw) : undefined;
-
     const db = drizzle(c.env.cinema_db, { schema });
-    const restrictBranchIds = getRestrictBranchIds(c);
+    const movie = await getPublicMovieDetail(db, { movies: schema.movies }, Number(c.req.param('id')));
 
-    const { items, total } = await listMovies(
-      db,
+    if (!movie) return c.json({ status: 'error', message: 'Không tìm thấy phim' }, 404);
 
-      { movies: schema.movies },
+    const parsed = { ...movie, cover_image: parseMediaUrl(movie.cover_image, c) };
 
-      {
-        page,
-        pageSize,
-        q,
-        sort: sortKey,
-        dir,
-        status: status as any,
-        branch_id: branchId,
-        restrictToBranchIds: restrictBranchIds
+    return new Response(JSON.stringify(parsed), {
+      status: 200,
+
+      headers: {
+        'Content-Type': 'application/json',
+
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+
+        'Cloudflare-CDN-Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+
+        Pragma: 'no-cache',
+
+        Expires: '0',
+
+        Vary: 'Origin'
       }
-    );
-
-    const parsedItems = items.map((m: any) => ({
-      ...m,
-
-      cover_image: parseMediaUrl(m.cover_image, c)
-    }));
-
-    return c.json({ items: parsedItems, page, pageSize, total }, 200);
+    });
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 
-
-
-publicRouter.get('/api/movies-detail/:id', async (c) => {
-  const id = Number(c.req.param('id'));
-
-  const db = drizzle(c.env.cinema_db, { schema });
-  const restrictBranchIds = getRestrictBranchIds(c);
-
-  const r = await getMovieByIdImpl(
-    db,
-
-    {
-      movies: schema.movies,
-
-      bookings: schema.bookings,
-
-      ticket_packages: schema.ticket_packages,
-
-      auditLogs: schema.auditLogs
-    },
-
-    id,
-    restrictBranchIds
-  );
-
-  if (!r) return c.json({ status: 'error', message: 'Không tìm thấy phim' }, 404);
-
-  const parsed = stripAuditLogs({
-    ...r,
-    cover_image: parseMediaUrl((r as any).cover_image, c)
-  });
-  
-  delete parsed.detail_images;
-  delete parsed.stats;
-  delete parsed.applicable_packages;
-
-  return new Response(JSON.stringify(parsed), {
-    status: 200,
-
-    headers: {
-      'Content-Type': 'application/json',
-
-      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-
-      'Cloudflare-CDN-Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-
-      Pragma: 'no-cache',
-
-      Expires: '0',
-
-      Vary: 'Origin'
-    }
-  });
-});
 publicRouter.get('/api/schedule', async (c) => {
   try {
     const branchId = Number(c.req.query('branch_id') || 0);
@@ -497,105 +447,6 @@ publicRouter.get('/api/schedule', async (c) => {
     return c.json(r, 200);
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
-
-publicRouter.get('/api/toys', async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 20);
-
-    const q = String(c.req.query('q') || '');
-
-    const status = String(c.req.query('status') || 'all');
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await listToysImpl(db, { toys: schema.toys }, { page, pageSize, q, status });
-
-    return c.json(
-      stripAuditLogs({
-        ...r,
-        items: (r.items as any[]).map((t: any) => ({
-          ...t,
-          image: parseMediaUrl(t.image, c)
-        }))
-      }),
-      200
-    );
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
-
-publicRouter.get('/api/toys-active', async (c) => {
-  try {
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await listActiveToys(db, { toys: schema.toys });
-
-    const parsed = (r.items || []).map((t: any) => ({
-      ...t,
-
-      image: parseMediaUrl(t.image, c)
-    }));
-
-    return c.json(parsed, 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-  }
-});
-
-publicRouter.get('/api/toys/:id', async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await getToyImpl(db, { toys: schema.toys, auditLogs: schema.auditLogs }, id);
-
-    if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
-
-    const parsedToy = stripAuditLogs({
-      ...r,
-      image: parseMediaUrl((r as any).image, c)
-    });
-    return c.json({ toy: parsedToy }, 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
-publicRouter.get('/api/tickets', async (c) => {
-  try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 20);
-
-    const q = String(c.req.query('q') || '');
-
-    const includeInactive = c.req.query('includeInactive') === 'true';
-
-    const typeRaw = c.req.query('type') || 'all';
-    const type = typeRaw === 'movie' || typeRaw === 'vr' ? typeRaw : 'all';
-
-    const db = drizzle(c.env.cinema_db, { schema });
-    const restrictBranchIds = getRestrictBranchIds(c);
-
-    const branchIdRaw = c.req.query('branch_id');
-    const branchId = branchIdRaw && branchIdRaw !== 'all' ? Number(branchIdRaw) : undefined;
-
-    const r = await listTicketPackagesImpl(
-      db,
-
-      { ticket_packages: schema.ticket_packages, movies: schema.movies },
-
-      { page, pageSize, q, includeInactive, branch_id: branchId, restrictToBranchIds: restrictBranchIds, type }
-    );
-
-    return c.json(stripAuditLogs(r), 200);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
 });
 
@@ -615,7 +466,9 @@ publicRouter.get('/api/tickets-active', async (c) => {
       branchId
     );
 
-    const responseBody = JSON.stringify(r);
+    // Member-only packages are hidden from visitors first (that needs is_member_only), then each package is trimmed
+    const visibleItems = await withoutMemberOnlyForVisitors(c, db, (r as any).items || []);
+    const responseBody = JSON.stringify({ items: visibleItems.map(toPublicTicketPackage) });
 
     // Không ghi KV cache: trả thẳng kết quả từ DB
     return new Response(responseBody, {
@@ -642,28 +495,6 @@ publicRouter.get('/api/tickets-active', async (c) => {
   }
 });
 
-publicRouter.get('/api/tickets/:id', async (c) => {
-  try {
-    const id = Number(c.req.param('id'));
-
-    const db = drizzle(c.env.cinema_db, { schema });
-    const restrictBranchIds = getRestrictBranchIds(c);
-
-    const r = await getTicketPackageImpl(
-      db,
-      { ticket_packages: schema.ticket_packages, auditLogs: schema.auditLogs },
-      id,
-      restrictBranchIds
-    );
-
-    if (!r) return c.json({ message: 'Không tìm thấy' }, 404);
-
-    return c.json(stripAuditLogs(r), 200);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
-  }
-});
-
 publicRouter.get('/api/site-media', async (c) => {
   return await withCache(
     c.req.raw, // Đối tượng Request gốc
@@ -679,21 +510,19 @@ publicRouter.get('/api/site-media', async (c) => {
 
       const type = String(c.req.query('type') || '');
 
-      const active = String(c.req.query('active') || '');
-
-      // Khởi tạo Drizzle và truy vấn Database
+      // Khởi tạo Drizzle và truy vấn Database. Visitors only ever get active, not deleted media (an "active" query
+      // parameter is ignored).
 
       const db = drizzle(c.env.cinema_db, { schema });
 
-      const r = await listSiteMediaImpl(db, { site_media: schema.site_media }, { section, type, active });
+      const items = await listPublicSiteMedia(db, { site_media: schema.site_media }, { section, type });
 
-      const parsed = stripAuditLogs({
-        ...r,
-        items: (r.items as any[]).map((m: any) => ({
+      const parsed = {
+        items: (items as any[]).map((m: any) => ({
           ...m,
           url: parseMediaUrl(m.url, c)
         }))
-      });
+      };
 
       return new Response(JSON.stringify(parsed), {
         status: 200,
@@ -727,84 +556,19 @@ publicRouter.get('/api/debug/mail', async (_c) => {
 });
 
 
-// ===== SITEMAP XML =====
-
-publicRouter.get('/sitemap.xml', async (c) => {
-  try {
-    const baseUrl = (c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn').replace(/\/$/, '');
-
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await listPostsImpl(
-      db,
-      { posts: schema.posts, auditLogs: schema.auditLogs },
-      { page: 1, pageSize: 1000, status: 'published' }
-    );
-
-    const posts = r.items as Array<{ id: number; slug?: string | null; updated_at?: string | null }>;
-
-    const now = new Date().toISOString().split('T')[0];
-
-    const staticPages = [
-      { url: '/', priority: '1.0', changefreq: 'weekly' },
-
-      { url: '/bai-viet', priority: '0.9', changefreq: 'daily' }
-    ];
-
-    const urlBlocks = [
-      ...staticPages.map(
-        (p) =>
-          `  <url>\n    <loc>${baseUrl}${p.url}</loc>\n    <lastmod>${now}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`
-      ),
-
-      ...posts.map((p) => {
-        const slug = p.slug ? `${p.slug}-${p.id}` : String(p.id);
-
-        const lastmod = p.updated_at ? String(p.updated_at).split('T')[0] : now;
-
-        return `  <url>\n    <loc>${baseUrl}/bai-viet/${slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
-      })
-    ];
-
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlBlocks.join('\n')}\n</urlset>`;
-
-    return new Response(xml, {
-      headers: {
-        'Content-Type': 'application/xml; charset=utf-8',
-
-        'Cache-Control': 'public, max-age=600'
-      }
-    });
-  } catch {
-    return new Response('Error generating sitemap', { status: 500 });
-  }
-});
-
 publicRouter.get('/api/posts', async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 10);
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
 
     const q = String(c.req.query('q') || '');
 
-    const status = 'published';
-
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listPostsImpl(
-      db,
-      { posts: schema.posts, auditLogs: schema.auditLogs },
-      { page, pageSize, q, status }
-    );
+    // Published posts only, without the article text, the SEO fields or the author
+    const r = await listPublicPosts(db, { posts: schema.posts }, { page, pageSize, q });
 
-    const parsedItems = (r.items || []).map((p: any) => ({
-      ...p,
-
-      cover_image: parseMediaUrl(p.cover_image, c)
-    }));
-
-    return c.json(stripAuditLogs({ ...r, items: parsedItems }));
+    return c.json(r);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
@@ -818,20 +582,16 @@ publicRouter.get('/api/posts/:identifier', async (c) => {
 
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const post = await getPostImpl(db, { posts: schema.posts, auditLogs: schema.auditLogs }, identifier, true);
+    // Published posts only (a draft is "not found"), without the author or the staff names of the audit log
+    const post: any = await getPublicPost(db, { posts: schema.posts }, identifier);
 
     if (!post) return c.json({ message: 'Không tìm thấy bài viết' }, 404);
 
-    if (post.status !== 'published' && c.env.IS_PREVIEW !== 'true') {
-      return c.json({ message: 'Bài viết không công khai' }, 403);
-    }
-
     // Posts saved before the save-time cleaning existed are cleaned here too, without touching the database
-    const parsed = stripAuditLogs({
+    const parsed = {
       ...post,
-      content: sanitizePostHtml(post.content),
-      cover_image: parseMediaUrl(post.cover_image, c)
-    });
+      content: sanitizePostHtml(post.content)
+    };
     return c.json({ post: parsed }, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
@@ -863,7 +623,9 @@ publicRouter.get('/api/vr/packages', async (c) => {
 
     const r = await listActiveVRPackagesImpl(db, { ticket_packages: schema.ticket_packages }, branchId);
 
-    return c.json(r, 200 as any);
+    // Member-only packages are hidden from visitors first (that needs is_member_only), then each package is trimmed
+    const visibleItems = await withoutMemberOnlyForVisitors(c, db, r.items || []);
+    return c.json({ items: visibleItems.map(toPublicVrPackage) }, 200 as any);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
   }
@@ -879,20 +641,33 @@ publicRouter.post('/api/vr/voucher/validate', async (c) => {
       {
         vouchers: schema.vouchers,
         voucher_redemption_logs: schema.voucher_redemption_logs,
-        ticket_packages: schema.ticket_packages
+        ticket_packages: schema.ticket_packages,
+        // Needed for the per-customer limit: by email, and the customer's orders still waiting for payment
+        bookings: schema.bookings
       },
       body
     );
 
-    const stripped = stripAuditLogs(r);
-    if (stripped.voucher_details) {
-      delete stripped.voucher_details.sale_staff_id;
-      delete stripped.voucher_details.sale_email;
-      delete stripped.voucher_details.usage_limit;
-      delete stripped.voucher_details.per_user_limit;
-      delete stripped.voucher_details.used_count;
-    }
-    return c.json(stripped, 200 as any);
+    // What the booking page reads: valid, the message, the amount saved, and the code and note of the voucher.
+    // The voucher's Sales person, usage counters and rules stay on the server.
+    const result: any = r;
+    return c.json(
+      {
+        valid: Boolean(result.valid),
+        message: result.message,
+        ...(result.error_code ? { error_code: result.error_code } : {}),
+        ...(result.valid
+          ? {
+              discount_amount: result.discount_amount,
+              voucher_details: {
+                code: result.voucher_details?.code,
+                description: result.voucher_details?.description || ''
+              }
+            }
+          : {})
+      },
+      200 as any
+    );
   } catch (err: any) {
     const errStatus = Number(err?.statusCode) || 500;
     return c.json({ valid: false, message: String(err?.message || 'Internal error') }, errStatus as any);
@@ -904,7 +679,7 @@ publicRouter.post('/api/vr/validate-booking', async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await validateVRBookingImpl(db, body, {
+    const r = await validateVRBookingImpl(db, await withSignedInAccount(c, db, body), {
       ticket_packages: schema.ticket_packages,
       vouchers: schema.vouchers,
       voucher_redemption_logs: schema.voucher_redemption_logs,
@@ -928,11 +703,12 @@ publicRouter.post('/api/vr/create-booking', async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await createVRBookingImpl(db, body, {
+    const r = await createVRBookingImpl(db, await withSignedInAccount(c, db, body), {
       ticket_packages: schema.ticket_packages,
       vouchers: schema.vouchers,
       voucher_redemption_logs: schema.voucher_redemption_logs,
       users: schema.users,
+      accounts: schema.accounts,
       bookings: schema.bookings,
       booking_vr_items: schema.booking_vr_items,
       branches: schema.branches
@@ -945,6 +721,8 @@ publicRouter.post('/api/vr/create-booking', async (c) => {
     if (status === 201 && clone.booking?.pay_txt_code) {
       clone.booking.order_token = await makeOrderToken(secret, clone.booking.id, clone.booking.pay_txt_code);
       clone.booking.server_now = formatDateForDb(new Date());
+      await payIfFree(c, db, clone.booking);
+      clone.booking = toCustomerBooking(clone.booking);
     }
     return c.json(clone, status as any);
   } catch (err: any) {
@@ -960,11 +738,13 @@ publicRouter.get('/api/vr/bookings/:id', handleBookingStatus);
 // ===== BRANCHES (Public) ====================================
 // ============================================================
 
+// The default branch, with the same fields as the list (the home page uses its id, the browser keeps it as the
+// selected branch)
 publicRouter.get('/api/branches/default', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const branch = await getDefaultBranchImpl(db, { branches: schema.branches });
+    const branch = await getPublicDefaultBranch(db, { branches: schema.branches });
 
     if (!branch) return c.json({ message: 'Không tìm thấy chi nhánh mặc định' }, 404);
 
@@ -974,56 +754,32 @@ publicRouter.get('/api/branches/default', async (c) => {
   }
 });
 
-publicRouter.get('/api/branches/options', async (c) => {
-  try {
-    const db = drizzle(c.env.cinema_db, { schema });
-
-    const r = await listBranchOptionsImpl(
-      db,
-      { branches: schema.branches },
-      { includeInactive: false, onlyOpen: true }
-    );
-
-    return c.json(stripAuditLogs(r));
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-  }
-});
-
+// The order's branch for the QR payment page: its name and bank account only
 publicRouter.get('/api/branches/:id', async (c) => {
   try {
     const id = Number(c.req.param('id'));
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const branch = await getBranchImpl(db, { branches: schema.branches, auditLogs: schema.auditLogs }, id);
+    const branch = await getPublicBranchPaymentInfo(db, { branches: schema.branches }, id);
 
-    if (!branch || branch.deleted_at || !branch.is_active) {
+    if (!branch) {
       return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
     }
 
-    return c.json({ branch: stripAuditLogs(branch) }, 200);
+    return c.json({ branch }, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }
 });
 
+// The branches a customer can choose (active and open)
 publicRouter.get('/api/branches', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listBranchOptionsImpl(
-      db,
-      { branches: schema.branches },
-      { includeInactive: false, onlyOpen: true }
-    );
+    const items = await listPublicBranches(db, { branches: schema.branches });
 
-    return c.json({
-      items: stripAuditLogs(r.items),
-      page: 1,
-      pageSize: r.items.length,
-      total: r.items.length,
-      totalPages: 1
-    });
+    return c.json({ items });
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
   }

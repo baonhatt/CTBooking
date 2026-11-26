@@ -42,8 +42,8 @@ export async function makeOrderToken(secret: string, bookingId: number, payTxtCo
   return toHex(signature);
 }
 
-/** Compares two strings without stopping at the first difference. */
-function constantTimeEqual(first: string, second: string): boolean {
+/** Compares two strings without stopping at the first difference. Also used by otp-challenge.ts. */
+export function constantTimeEqual(first: string, second: string): boolean {
   if (first.length !== second.length) return false;
   let difference = 0;
   for (let index = 0; index < first.length; index++) {

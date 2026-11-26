@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
 import { getRestrictBranchIds } from './admin-helpers';
+import { clampPage, MAX_PAGE_SIZE } from '../../../../server/lib/paging';
 
 import {
   listRolesImpl,
@@ -18,10 +19,13 @@ import {
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const rolesRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
+/** HTTP status of a refused role restore, by the reason restoreRoleImpl gives */
+const RESTORE_ERROR_STATUS: Record<string, 403 | 404 | 409> = { forbidden: 403, not_found: 404, conflict: 409 };
+
 rolesRouter.get('/api/admin/roles', requireStaffAuth, requirePermission('roles', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || '1');
-    const pageSize = Number(c.req.query('pageSize') || '100');
+    // The page size is capped at 100 (the screens ask for 100) and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: MAX_PAGE_SIZE });
     const q = c.req.query('q') || '';
     const isSystemParam = c.req.query('isSystem');
     const isSystem = isSystemParam === 'true' ? true : isSystemParam === 'false' ? false : undefined;
@@ -214,6 +218,8 @@ rolesRouter.post('/api/admin/roles/:id/restore', requireStaffAuth, requirePermis
       isSuperAdmin: Boolean(c.get('isSuperAdmin'))
     });
 
+    // A refusal is an error status, so the screen does not report it as a success
+    if (r.status === 'error') return c.json(r, RESTORE_ERROR_STATUS[(r as any).code] || 400);
     return c.json(r, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: err.message || 'Lỗi máy chủ nội bộ' }, err.statusCode || 500);
@@ -223,8 +229,8 @@ rolesRouter.post('/api/admin/roles/:id/restore', requireStaffAuth, requirePermis
 // GET /api/admin/deleted/roles
 rolesRouter.get('/api/admin/deleted/roles', requireStaffAuth, requirePermission('roles', 'view_deleted'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
     const search = String(c.req.query('search') || '');
 
     const db = drizzle(c.env.cinema_db, { schema });

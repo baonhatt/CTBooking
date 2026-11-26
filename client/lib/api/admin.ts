@@ -172,12 +172,10 @@ export async function getTransactionById(id: number) {
     ticket_package: {
       name: string;
       ticket_unit_price: number;
-      movies: string;
     };
     booking_details: {
       ticket_count: number;
       total_price: number;
-      combo: string;
       pay_txt_code: string | null;
       booking_code: string | null;
       is_used: boolean;
@@ -326,17 +324,130 @@ export async function listStaffOptionsApi() {
   return request<{ status?: string; items: any[]; total: number }>('/api/admin/staff?pageSize=100');
 }
 
-/* ========== LIST VR TICKET PACKAGES FOR VOUCHER FORM ========== */
-export async function listVRTicketPackagesForVoucher(
-  type: string = 'vr',
-  branchFilter?: { branch_id?: number | null; restrictToBranchIds?: number[] | null }
-) {
+/* ========== LIST TICKET PACKAGES FOR VOUCHER FORM ========== */
+/** A ticket package the voucher form can pick (active or not; the server scopes it to the staff member's branches). */
+export interface VoucherPackageOption {
+  id: number;
+  name: string;
+  price: number;
+  type: string | null;
+  branch_id: number | null;
+  branch_ids: number[] | null;
+  is_active: boolean;
+}
+
+export async function listVRTicketPackagesForVoucher(type: string = 'vr', branchFilter?: { branch_id?: number | null }) {
   const params = new URLSearchParams();
   params.set('type', type);
-  params.set('pageSize', '100');
-  params.set('is_active', 'all');
   if (branchFilter?.branch_id) {
     params.set('branch_id', String(branchFilter.branch_id));
   }
-  return request<{ items: any[]; total: number }>(`/api/tickets?${params.toString()}`);
+  return request<{ items: VoucherPackageOption[]; total: number }>(`/api/admin/vouchers/package-options?${params.toString()}`);
+}
+
+// ============================================================
+// UNMATCHED TRANSFERS ("Chuyển khoản chưa khớp")
+// ============================================================
+
+export interface UnmatchedTransfer {
+  id: number;
+  sepay_id: string | null;
+  amount: number;
+  content: string | null;
+  bank_ref: string | null;
+  transfer_at: string | null;
+  status: 'open' | 'matched' | 'ignored';
+  booking_id: number | null;
+  note: string | null;
+  resolved_by_name: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
+export async function getUnmatchedTransfersApi(options: {
+  status: 'open' | 'matched' | 'ignored';
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const params = new URLSearchParams({ status: options.status });
+  if (options.q) params.set('q', options.q);
+  if (options.page) params.set('page', String(options.page));
+  if (options.pageSize) params.set('pageSize', String(options.pageSize));
+  return request<{ items: UnmatchedTransfer[]; total: number; page: number; pageSize: number }>(
+    `/api/admin/unmatched-transfers?${params.toString()}`
+  );
+}
+
+export async function assignUnmatchedTransferApi(id: number, payCode: string) {
+  return request<{ message: string; booking_id: number; voucher_slot_unavailable?: boolean }>(
+    `/api/admin/unmatched-transfers/${id}/assign`,
+    { method: 'POST', body: JSON.stringify({ pay_code: payCode }) }
+  );
+}
+
+export async function ignoreUnmatchedTransferApi(id: number, note: string) {
+  return request<{ message: string }>(`/api/admin/unmatched-transfers/${id}/ignore`, {
+    method: 'POST',
+    body: JSON.stringify({ note })
+  });
+}
+
+// ============================================================
+// ACTION ITEMS ("Đơn cần xử lý")
+// ============================================================
+
+export interface ActionItemResolution {
+  by: string;
+  at: string;
+  note: string;
+  how: string;
+}
+
+export interface OrderIssue {
+  id: number;
+  reason: string;
+  reason_label: string;
+  details: string;
+  created_at: string;
+  pay_txt_code: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  payment_status: string;
+  amount_received: number | null;
+  amount_needed: number | null;
+  bank_ref: string;
+  resolved: ActionItemResolution | null;
+}
+
+export interface EmailIssue {
+  id: number;
+  recipient: string;
+  email_type: string;
+  error_message: string;
+  created_at: string;
+  can_resend: boolean;
+  resolved: ActionItemResolution | null;
+}
+
+export async function getActionItemsCountApi() {
+  return request<{ unmatched: number; orders: number; emails: number; total: number }>('/api/admin/action-items/count');
+}
+
+export async function getActionItemsApi<T>(kind: 'orders' | 'emails', status: 'open' | 'done', page = 1, pageSize = 20) {
+  const params = new URLSearchParams({ status, page: String(page), pageSize: String(pageSize) });
+  return request<{ items: T[]; total: number; page: number; pageSize: number }>(`/api/admin/action-items/${kind}?${params.toString()}`);
+}
+
+export async function actOnActionItemApi(
+  kind: 'orders' | 'emails',
+  id: number,
+  action: 'resolve' | 'confirm' | 'resend',
+  note?: string
+) {
+  return request<{ message: string; voucher_slot_unavailable?: boolean }>(`/api/admin/action-items/${kind}/${id}/${action}`, {
+    method: 'POST',
+    body: JSON.stringify(note ? { note } : {})
+  });
 }

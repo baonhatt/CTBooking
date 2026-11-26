@@ -58,7 +58,8 @@ export function LoginDialog({
 
   // OTP states
   const [showOTPDialog, setShowOTPDialog] = useState(false);
-  const [tempAccountId, setTempAccountId] = useState<number | null>(null);
+  // Signed, short-lived ticket from /api/login that the OTP step sends back (the server never takes a bare account id)
+  const [otpChallenge, setOtpChallenge] = useState<string | null>(null);
   const [otpEmail, setOtpEmail] = useState('');
 
   // Ensure all states are clean when the dialog opens
@@ -70,7 +71,7 @@ export function LoginDialog({
       setPasswordError('');
       setSubmitError('');
       setShowOTPDialog(false);
-      setTempAccountId(null);
+      setOtpChallenge(null);
       setOtpEmail('');
     }
   }, [isOpen]);
@@ -114,7 +115,7 @@ export function LoginDialog({
 
       if (data?.requires_otp) {
         // Show OTP dialog
-        setTempAccountId(data.temp_account_id);
+        setOtpChallenge(data.otp_challenge);
         setOtpEmail(data.email);
         setShowOTPDialog(true);
         setIsLoading(false);
@@ -231,17 +232,17 @@ export function LoginDialog({
       </AuthDialogShell>
 
       {/* OTP Dialog */}
-      {tempAccountId && (
+      {otpChallenge && (
         <OTPDialog
           isOpen={showOTPDialog}
           onOpenChange={(open) => {
             setShowOTPDialog(open);
             if (!open) {
-              setTempAccountId(null);
+              setOtpChallenge(null);
               setOtpEmail('');
             }
           }}
-          tempAccountId={tempAccountId}
+          otpChallenge={otpChallenge}
           email={otpEmail}
           onSuccess={(userData, token) => {
             saveSignedInUser(userData, token);

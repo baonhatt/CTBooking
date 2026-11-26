@@ -4,6 +4,7 @@ import * as schema from '../../../../shared/schema';
 import { requireStaffAuth } from '../../middleware';
 import { isLocal } from '../../utils';
 import { getMailer } from './admin-helpers';
+import { resolveOrderTokenSecret } from '../../../../server/lib/order-token';
 import {
   LOCKED_MESSAGE,
   clearStaffLoginFailures,
@@ -172,7 +173,8 @@ authRouter.post('/api/admin/auth/login', async (c) => {
         permissions: schema.permissions
       },
       c.env.SETTINGS_KV,
-      body
+      body,
+      resolveOrderTokenSecret(c.env, c.req.url)
     );
 
     if (r.status === 'error') {
@@ -202,7 +204,7 @@ authRouter.post('/api/admin/auth/login', async (c) => {
 authRouter.post('/api/admin/auth/verify-login-otp', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    if (!body.staffId || !body.otp) {
+    if (!body.otpChallenge || !body.otp) {
       return c.json({ status: 'error', message: 'Thiếu thông tin xác thực' }, 400);
     }
 
@@ -227,7 +229,8 @@ authRouter.post('/api/admin/auth/verify-login-otp', async (c) => {
         permissions: schema.permissions
       },
       c.env.SETTINGS_KV,
-      body
+      { otpChallenge: String(body.otpChallenge), otp: String(body.otp) },
+      resolveOrderTokenSecret(c.env, c.req.url)
     );
 
     if (r.status === 'error') return c.json(r, 400);
@@ -311,7 +314,9 @@ authRouter.get('/api/admin/auth/me', requireStaffAuth, async (c) => {
         staffBranches: schema.staffBranches,
         roles: schema.roles,
         rolePermissions: schema.rolePermissions,
-        permissions: schema.permissions
+        permissions: schema.permissions,
+        // Without it the branch names on the profile page were always empty
+        branches: schema.branches
       },
       c.env.SETTINGS_KV,
       staffId

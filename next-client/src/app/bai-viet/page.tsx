@@ -64,6 +64,17 @@ export default async function PostsPage() {
   const featured = posts.slice(0, 3);
   const others = posts.slice(3);
 
+  // The search box runs in the browser: it gets only what a search result shows, not whole posts
+  const searchPosts: PostItem[] = posts.map((post) => ({
+    id: post.id,
+    title: post.title,
+    slug: post.slug,
+    excerpt: post.excerpt,
+    featured_image: post.featured_image,
+    status: post.status,
+    branch_ids: post.branch_ids
+  }));
+
   const listSchema = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -97,7 +108,7 @@ export default async function PostsPage() {
               </h1>
             </div>
             {/* Search: tách "use client" riêng để giữ phần còn lại là Server */}
-            <PostsSearchClient initialPosts={posts} />
+            <PostsSearchClient initialPosts={searchPosts} />
           </div>
 
           {/* Featured Grid – Server rendered */}

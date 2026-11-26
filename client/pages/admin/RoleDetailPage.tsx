@@ -29,9 +29,9 @@ interface Role {
   isSystem: boolean;
   staffCount?: number;
   permissionIds?: number[];
-  created_at?: string;
+  createdAt?: string;
   created_by_staff_name?: string;
-  updated_at?: string;
+  updatedAt?: string;
   updated_by_staff_name?: string;
 }
 
@@ -620,7 +620,7 @@ export default function RoleDetailPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-500">Ngày tạo</Label>
                   <div className="text-sm">
-                    {formatVnDateTime(role.created_at)}
+                    {formatVnDateTime(role.createdAt)}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -630,7 +630,7 @@ export default function RoleDetailPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-slate-500">Cập nhật lần cuối</Label>
                   <div className="text-sm">
-                    {formatVnDateTime(role.updated_at)}
+                    {formatVnDateTime(role.updatedAt)}
                   </div>
                 </div>
                 <div className="space-y-2">

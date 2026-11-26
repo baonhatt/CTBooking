@@ -2,6 +2,11 @@ import { siteConfig } from '@/config/site';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
+/**
+ * A post from the public API. The list (GET /api/posts) has only the card fields (id, title, slug, excerpt,
+ * featured_image, status, is_featured, published_at, created_at, updated_at, branch_ids); the article
+ * (GET /api/posts/:slug-id) also has the text, the SEO fields and the view count.
+ */
 export type PostItem = {
   id: number;
   title: string;

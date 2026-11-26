@@ -1,4 +1,4 @@
-import { eq, and, isNull, or, inArray, like, desc } from 'drizzle-orm';
+import { eq, and, isNull, or, inArray, desc } from 'drizzle-orm';
 import { formatDateForDb } from '../../../lib/date-utils';
 import { logAuditAction } from '../../../lib/audit-logger';
 
@@ -36,57 +36,100 @@ export async function getBookingImpl(anyDb: any, id: number, tables: { bookings:
 // The public booking lookup by id was removed: it returned names, phones, emails and the ticket code to anyone.
 // The payment page now reads a minimal status through bookingStatusPayload (see access.ts).
 
-function buildCodeSearchConditions(normalizedCode: string, bookingsTable: any) {
-  const conditions = [
-    eq(bookingsTable.booking_code, normalizedCode),
-    eq(bookingsTable.pay_txt_code, normalizedCode),
-    like(bookingsTable.booking_code, `%${normalizedCode}%`),
-    like(bookingsTable.pay_txt_code, `%${normalizedCode}%`)
-  ];
+/**
+ * The codes staff may type or scan at the ticket check, each compared EXACTLY (never "contains"):
+ *  - the ticket code (booking_code, 8 letters/digits),
+ *  - the payment code (pay_txt_code, CS + 12 digits), also found inside longer scanned text, or given as the 12 digits,
+ *  - BK<order id> (older printed tickets).
+ * A partial code finds nothing, so a typo can never open somebody else's ticket.
+ */
+export function ticketCodeCandidates(codeRaw: string): { codes: string[]; bookingId: number | null } {
+  const compact = String(codeRaw || '').toUpperCase().replace(/\s+/g, '');
+  const codes = new Set<string>();
+  if (compact) codes.add(compact);
+  const payCode = compact.match(/CS\d{12}/);
+  if (payCode) codes.add(payCode[0]);
+  if (/^\d{12}$/.test(compact)) codes.add(`CS${compact}`);
+  const bookingIdText = compact.match(/^BK(\d+)$/)?.[1];
+  const bookingId = bookingIdText ? Number(bookingIdText) : null;
+  return { codes: [...codes], bookingId: bookingId && Number.isSafeInteger(bookingId) ? bookingId : null };
+}
 
-  if (normalizedCode.startsWith('BK')) {
-    const idStr = normalizedCode.slice(2);
-    if (/^\d+$/.test(idStr)) {
-      conditions.push(eq(bookingsTable.id, Number(idStr)));
-    }
-  }
-
-  const digitsMatch = normalizedCode.match(/\d{6,}/);
-  if (digitsMatch) {
-    const digits = digitsMatch[0];
-    conditions.push(
-      like(bookingsTable.booking_code, `%${digits}%`),
-      like(bookingsTable.pay_txt_code, `%${digits}%`),
-      inArray(bookingsTable.pay_txt_code, [
-        normalizedCode,
-        `CS${digits}`,
-        `CP${digits}`,
-        `CINESPHERE${digits}`,
-        digits
-      ]),
-      inArray(bookingsTable.booking_code, [normalizedCode, `CS${digits}`, `CP${digits}`, `CINESPHERE${digits}`, digits])
-    );
-  }
-
+function buildCodeSearchConditions(codeRaw: string, bookingsTable: any) {
+  const { codes, bookingId } = ticketCodeCandidates(codeRaw);
+  const conditions = [inArray(bookingsTable.booking_code, codes), inArray(bookingsTable.pay_txt_code, codes)];
+  if (bookingId) conditions.push(eq(bookingsTable.id, bookingId));
   return or(...conditions);
 }
 
-export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: { bookings: any; auditLogs?: any }) {
+/** Staff only see tickets of their branches (null = Super Admin, every branch). */
+function withinBranches(condition: any, bookingsTable: any, restrictToBranchIds: number[] | null) {
+  return restrictToBranchIds ? and(condition, inArray(bookingsTable.branch_id, restrictToBranchIds)) : condition;
+}
+
+/**
+ * Finds the one order a code points to. Two different orders matching the same text (should never happen with exact
+ * codes) is refused rather than guessed.
+ */
+async function findOrderByCode(
+  anyDb: any,
+  codeRaw: string,
+  bookingsTable: any,
+  restrictToBranchIds: number[] | null,
+  columns?: Record<string, true>
+) {
+  const found = await anyDb.query.bookings.findMany({
+    where: withinBranches(buildCodeSearchConditions(codeRaw, bookingsTable), bookingsTable, restrictToBranchIds),
+    ...(columns ? { columns } : {}),
+    limit: 2
+  });
+  if (!Array.isArray(found) || found.length === 0) return { booking: null, ambiguous: false };
+  if (found.length > 1) return { booking: null, ambiguous: true };
+  return { booking: found[0], ambiguous: false };
+}
+
+const AMBIGUOUS_CODE_MESSAGE = 'Mã khớp với nhiều đơn, vui lòng nhập đầy đủ mã vé hoặc mã thanh toán';
+
+/** The order columns the ticket check screen reads (plus voucher_id, used to load the voucher rules). */
+const TICKET_CHECK_COLUMNS: Record<string, true> = {
+  id: true,
+  booking_code: true,
+  pay_txt_code: true,
+  payment_status: true,
+  payment_method: true,
+  transaction_id: true,
+  user_id: true,
+  branch_id: true,
+  name: true,
+  phone: true,
+  email: true,
+  ticket_count: true,
+  total_price: true,
+  original_total_price: true,
+  voucher_id: true,
+  voucher_discount_amount: true,
+  voucher_code_snapshot: true,
+  booking_type: true,
+  ticket_package_name: true,
+  created_at: true,
+  paid_at: true,
+  expiry_date: true,
+  is_used: true,
+  checked_in_at: true
+};
+
+export async function getBookingByCodeImpl(
+  anyDb: any,
+  codeRaw: string,
+  tables: { bookings: any; auditLogs?: any },
+  restrictToBranchIds: number[] | null = null
+) {
   const code = String(codeRaw || '');
   if (!code || code.trim() === '') return { status: 400, message: 'Thiếu mã vé' };
-  const normalizedCode = code.trim().toUpperCase();
   const bookingsTable = tables.bookings;
 
-  const booking = await anyDb.query.bookings.findFirst({
-    where: buildCodeSearchConditions(normalizedCode, bookingsTable),
-    with: {
-      user: {
-        columns: {
-          fullname: true
-        }
-      }
-    }
-  });
+  const { booking, ambiguous } = await findOrderByCode(anyDb, code, bookingsTable, restrictToBranchIds, TICKET_CHECK_COLUMNS);
+  if (ambiguous) return { status: 409, message: AMBIGUOUS_CODE_MESSAGE };
   if (!booking) return { status: 404, message: 'Không tìm thấy vé' };
   const now = new Date();
   const paidAt = booking.paid_at ? new Date(booking.paid_at) : null;
@@ -95,14 +138,23 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
   const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
   const valid = Boolean(isPaid && paidAt && expiryAt && !expired && !booking.is_used);
   const can_use = Boolean(valid);
-  const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
   let vr_items: any[] = [];
   if ((tables as any).booking_vr_items) {
     try {
+      const vrItems = (tables as any).booking_vr_items;
+      // Only the columns the screen reads for a VR line
       vr_items = await anyDb
-        .select()
-        .from((tables as any).booking_vr_items)
-        .where(eq((tables as any).booking_vr_items.booking_id, booking.id));
+        .select({
+          id: vrItems.id,
+          vr_ticket_package_id: vrItems.vr_ticket_package_id,
+          package_name: vrItems.package_name,
+          quantity: vrItems.quantity,
+          unit_price: vrItems.unit_price,
+          discounted_unit_price: vrItems.discounted_unit_price,
+          line_total: vrItems.line_total
+        })
+        .from(vrItems)
+        .where(eq(vrItems.booking_id, booking.id));
     } catch {}
   }
 
@@ -110,7 +162,8 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
   if (booking.branch_id && (tables as any).branches) {
     try {
       const br = await anyDb.query.branches.findFirst({
-        where: eq((tables as any).branches.id, booking.branch_id)
+        where: eq((tables as any).branches.id, booking.branch_id),
+        columns: { name: true }
       });
       branch_name = br?.name || null;
     } catch {}
@@ -122,7 +175,7 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     try {
       const emailLogs = (tables as any).email_logs;
       const latest = await anyDb
-        .select()
+        .select({ status: emailLogs.status, sent_at: emailLogs.sent_at, created_at: emailLogs.created_at })
         .from(emailLogs)
         .where(and(eq(emailLogs.booking_id, booking.id), eq(emailLogs.email_type, 'booking_confirmation')))
         .orderBy(desc(emailLogs.id))
@@ -137,16 +190,16 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     } catch {}
   }
 
-  let voucher_details: { scope: string; description: string | null; applicable_ids: any } | null = null;
+  let voucher_details: { scope: string; applicable_ids: any } | null = null;
   if (booking.voucher_id && (tables as any).vouchers) {
     try {
       const v = await anyDb.query.vouchers.findFirst({
-        where: eq((tables as any).vouchers.id, booking.voucher_id)
+        where: eq((tables as any).vouchers.id, booking.voucher_id),
+        columns: { scope: true, applicable_ticket_package_ids: true }
       });
       if (v) {
         voucher_details = {
           scope: v.scope || 'all',
-          description: v.description || null,
           applicable_ids: v.applicable_ticket_package_ids ?? null
         };
       }
@@ -192,25 +245,17 @@ export async function getBookingByCodeImpl(anyDb: any, codeRaw: string, tables: 
     voucher_discount_amount: booking.voucher_discount_amount,
     voucher_code_snapshot: booking.voucher_code_snapshot,
     booking_type: booking.booking_type,
-    movie_id: booking.movie_id,
-    ticket_package_id: booking.ticket_package_id,
     created_at: booking.created_at,
     paid_at: booking.paid_at,
     expiry_date: booking.expiry_date,
     payment_method: booking.payment_method,
-    userName: booking.user?.fullname || '',
     is_used: Boolean(booking.is_used),
-    movie_title: booking.movie_title || '',
-    movie_duration: booking.movie_duration || '',
-    movie_poster: booking.movie_poster || '',
     ticket_package_name: booking.ticket_package_name || '',
-    ticket_unit_price: Number(booking.ticket_unit_price) || 0,
     valid,
     can_use,
     pay_txt_code: booking.pay_txt_code,
     // The bank's reference for the transfer, when one was recorded (shown to staff on the ticket check screen)
     transaction_id: booking.transaction_id || null,
-    validity_days: daysLeft,
     expired,
     checked_in_at: booking.checked_in_at,
     checked_in_by_staff_name: checkedInByStaffName,
@@ -231,21 +276,14 @@ export async function confirmUseTicketImpl(
   try {
     const code = String(codeRaw || '');
     if (!code || !code.trim()) return { status: 400, message: 'Vui lòng nhập mã vé' };
-    const normalizedCode = code.trim().toUpperCase();
     const bookingsTable = tables.bookings;
-    const searchCondition = buildCodeSearchConditions(normalizedCode, bookingsTable);
 
-    const booking = await anyDb.query.bookings.findFirst({
-      where:
-        restrictToBranchIds && restrictToBranchIds.length > 0
-          ? and(searchCondition, inArray(bookingsTable.branch_id, restrictToBranchIds))
-          : searchCondition
-    });
-
+    const { booking, ambiguous } = await findOrderByCode(anyDb, code, bookingsTable, restrictToBranchIds);
+    if (ambiguous) return { status: 409, message: AMBIGUOUS_CODE_MESSAGE };
     if (!booking) return { status: 404, message: 'Không tìm thấy vé' };
 
     // Kiểm tra chi nhánh (RBAC)
-    if (restrictToBranchIds && restrictToBranchIds.length > 0) {
+    if (restrictToBranchIds) {
       if (!booking.branch_id || !restrictToBranchIds.includes(booking.branch_id)) {
         return { status: 403, message: 'Bạn không có quyền xác nhận vé thuộc chi nhánh khác' };
       }

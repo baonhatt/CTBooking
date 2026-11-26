@@ -7,6 +7,7 @@ vi.mock('../../middleware', () => ({
   requireStaffAuth: async (c: any, next: any) => {
     c.set('staffId', 1);
     c.set('isSuperAdmin', c.req.header('x-test-super') === '1');
+    c.set('staffBranchIds', [1]);
     await next();
   },
   requirePermission: () => async (_c: any, next: any) => next()
@@ -15,6 +16,12 @@ vi.mock('../../middleware', () => ({
 vi.mock('../../../../server/routes/admin/posts', async (importOriginal) => ({
   ...(await importOriginal<any>()),
   deletePostImpl: vi.fn(async () => ({ id: 7 }))
+}));
+
+// The post being changed belongs to the branches in postBranchIds (JSON text, null = all branches)
+let postBranchIds: string | null = '[1]';
+vi.mock('drizzle-orm/d1', () => ({
+  drizzle: () => ({ query: { posts: { findFirst: async () => ({ branch_ids: postBranchIds }) } } })
 }));
 
 const env = { cinema_db: {} };
@@ -26,6 +33,30 @@ function del(path: string, superAdmin: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  postBranchIds = '[1]';
+});
+
+describe('posts of other branches', () => {
+  it('branch staff cannot archive a post of another branch, or one for all branches', async () => {
+    for (const branchIds of ['[2]', '[1,2]', null]) {
+      postBranchIds = branchIds;
+      const response = await del('/api/admin/posts/7', false);
+      expect(response.status).toBe(403);
+    }
+    expect(deletePostImpl).not.toHaveBeenCalled();
+  });
+
+  it('branch staff cannot create a post for all branches or for another branch', async () => {
+    for (const branch_ids of [null, undefined, [2], [1, 2]]) {
+      const response = await postsRouter.request(
+        '/api/admin/posts',
+        { method: 'POST', headers: { 'x-test-super': '0', 'content-type': 'application/json' }, body: JSON.stringify({ title: 'A', branch_ids }) },
+        env,
+        executionContext
+      );
+      expect(response.status).toBe(403);
+    }
+  });
 });
 
 describe('DELETE /api/admin/posts/:id', () => {

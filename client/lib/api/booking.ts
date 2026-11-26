@@ -55,7 +55,7 @@ export async function confirmBookingApi(body: {
   transaction_id?: string;
   paid_at?: string;
 }) {
-  return request<{ message: string; booking: any }>('/api/admin/confirm-booking', {
+  return request<{ message: string; voucher_slot_unavailable?: boolean }>('/api/admin/confirm-booking', {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -84,11 +84,9 @@ export async function getBookingByCodeApi(code: string) {
     expiry_date: string | null;
     checked_in_at: string | null;
     payment_method: string | null;
-    userName: string;
     is_used: boolean;
     valid: boolean;
     can_use: boolean;
-    validity_days: number | null;
     expired: boolean;
     transaction_id?: string | null;
     email_status?: { state: 'sent' | 'failed' | 'pending' | 'none'; at: string | null };

@@ -6,13 +6,30 @@ import { buildAuditPayload } from '../../lib/audit-utils';
 export async function listBranchesImpl(
   anyDb: any,
   tables: { branches: any; movies: any; ticket_packages: any; bookings: any },
-  args: { page: number; pageSize: number; q: string; includeInactive?: boolean; onlyOpen?: boolean }
+  args: {
+    page: number;
+    pageSize: number;
+    q: string;
+    includeInactive?: boolean;
+    onlyOpen?: boolean;
+    /** No longer used: the unused ticket codes are read on demand (listBranchUnusedCodesImpl). Kept so old callers compile. */
+    codesForBranchIds?: number[] | null;
+    /** The staff member's branches (null = Super Admin, every branch) */
+    restrictToBranchIds?: number[] | null;
+  }
 ) {
   const { page, pageSize, q, includeInactive = false, onlyOpen = false } = args;
+  const restrictToBranchIds = args.restrictToBranchIds ?? null;
 
   let whereCondition = includeInactive
     ? isNull(tables.branches.deleted_at)
     : and(eq(tables.branches.is_active, true), isNull(tables.branches.deleted_at));
+
+  // Staff of some branches see only their own branches
+  if (restrictToBranchIds) {
+    const scopeCondition = restrictToBranchIds.length ? inArray(tables.branches.id, restrictToBranchIds) : sql`1 = 0`;
+    whereCondition = and(whereCondition, scopeCondition);
+  }
 
   if (onlyOpen) {
     const openCondition = eq(tables.branches.is_open, true);
@@ -59,8 +76,9 @@ export async function listBranchesImpl(
   const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
   const fifteenMinutesAgoStr = formatDateForDb(fifteenMinutesAgo);
 
-  // Tối ưu hóa triệt để: Gom 6N queries riêng lẻ thành 4 truy vấn batch GROUP BY
-  const [movieStats, packageStats, bookingStats, paidUnusedCodes] = await Promise.all([
+  // Tối ưu hóa triệt để: Gom 6N queries riêng lẻ thành 3 truy vấn batch GROUP BY
+  // (the unused ticket codes are read on demand, when the close-branch dialog opens)
+  const [movieStats, packageStats, bookingStats] = await Promise.all([
     // 1. Movie stats theo branch
     anyDb
       .select({
@@ -103,38 +121,12 @@ export async function listBranchesImpl(
       })
       .from(tables.bookings)
       .where(inArray(tables.bookings.branch_id, branchIds))
-      .groupBy(tables.bookings.branch_id),
-
-    // 4. Lấy mã đơn paid chưa dùng (giới hạn 100 mã tổng)
-    anyDb
-      .select({
-        branch_id: tables.bookings.branch_id,
-        code: tables.bookings.booking_code
-      })
-      .from(tables.bookings)
-      .where(
-        and(
-          inArray(tables.bookings.branch_id, branchIds),
-          eq(tables.bookings.payment_status, 'paid'),
-          or(eq(tables.bookings.is_used, false), isNull(tables.bookings.is_used))
-        )
-      )
-      .limit(100)
+      .groupBy(tables.bookings.branch_id)
   ]);
 
   const movieMap = new Map<number, number>(movieStats.map((r: any) => [r.branch_id, Number(r.count || 0)]));
   const packageMap = new Map<number, number>(packageStats.map((r: any) => [r.branch_id, Number(r.count || 0)]));
   const bookingMap = new Map<number, any>(bookingStats.map((r: any) => [r.branch_id, r]));
-
-  const codesByBranch = new Map<number, string[]>();
-  paidUnusedCodes.forEach((r: any) => {
-    if (!codesByBranch.has(r.branch_id)) {
-      codesByBranch.set(r.branch_id, []);
-    }
-    if (r.code && (codesByBranch.get(r.branch_id)?.length || 0) < 50) {
-      codesByBranch.get(r.branch_id)!.push(r.code);
-    }
-  });
 
   const itemsWithStats = branches.map((branch: any) => {
     const bStat = bookingMap.get(branch.id);
@@ -144,8 +136,7 @@ export async function listBranchesImpl(
       package_count: packageMap.get(branch.id) || 0,
       booking_count: Number(bStat?.booking_count || 0),
       pending_bookings_count: Number(bStat?.pending_bookings_count || 0),
-      paid_unused_count: Number(bStat?.paid_unused_count || 0),
-      paid_unused_codes: (codesByBranch.get(branch.id) || []).join(', ')
+      paid_unused_count: Number(bStat?.paid_unused_count || 0)
     };
   });
 
@@ -205,6 +196,71 @@ export async function listBranchOptionsImpl(
   return {
     items: branches
   };
+}
+
+/** The most unused ticket codes the close-branch dialog lists for one branch. */
+export const UNUSED_CODES_LIMIT = 50;
+
+/**
+ * Paid tickets of one branch that were never used, for the close-branch warning: their booking codes (newest first,
+ * at most UNUSED_CODES_LIMIT) and how many there are in all.
+ */
+export async function listBranchUnusedCodesImpl(
+  anyDb: any,
+  tables: { bookings: any },
+  branchId: number,
+  limit: number = UNUSED_CODES_LIMIT
+) {
+  const bookings = tables.bookings;
+  const unusedPaid = and(
+    eq(bookings.branch_id, branchId),
+    eq(bookings.payment_status, 'paid'),
+    or(eq(bookings.is_used, false), isNull(bookings.is_used))
+  );
+  const [rows, [countRow]] = await Promise.all([
+    anyDb
+      .select({ code: bookings.booking_code })
+      .from(bookings)
+      .where(and(unusedPaid, isNotNull(bookings.booking_code)))
+      .orderBy(desc(bookings.id))
+      .limit(limit),
+    anyDb.select({ count: count() }).from(bookings).where(unusedPaid)
+  ]);
+  return { codes: rows.map((row: any) => row.code as string), total: Number(countRow?.count || 0) };
+}
+
+/** Branch choices of the admin screens: only the fields the pickers and filters read. */
+export async function listAdminBranchOptionsImpl(
+  anyDb: any,
+  tables: { branches: any },
+  args?: { includeInactive?: boolean; onlyOpen?: boolean; restrictToBranchIds?: number[] | null }
+) {
+  const { includeInactive = false, onlyOpen = false, restrictToBranchIds = null } = args || {};
+  const conditions: any[] = [isNull(tables.branches.deleted_at)];
+  if (!includeInactive) conditions.push(eq(tables.branches.is_active, true));
+  if (onlyOpen) conditions.push(eq(tables.branches.is_open, true));
+  if (restrictToBranchIds) {
+    if (restrictToBranchIds.length === 0) return { items: [] };
+    conditions.push(inArray(tables.branches.id, restrictToBranchIds));
+  }
+
+  const items = await anyDb
+    .select({
+      // branch_id repeats id: TicketCheckContent still reads it as a fallback
+      branch_id: tables.branches.id,
+      id: tables.branches.id,
+      name: tables.branches.name,
+      code: tables.branches.code,
+      address: tables.branches.address,
+      is_default: tables.branches.is_default,
+      is_open: tables.branches.is_open,
+      is_active: tables.branches.is_active
+    })
+    .from(tables.branches)
+    .where(and(...conditions))
+    .orderBy(desc(tables.branches.is_default), asc(tables.branches.name));
+
+  return { items };
 }
 
 export async function getBranchImpl(anyDb: any, tables: { branches: any; auditLogs: any }, id: number) {
@@ -669,16 +725,28 @@ export async function toggleBranchStatusImpl(
 export async function listDeletedBranchesImpl(
   anyDb: any,
   tables: { branches: any; staffs: any },
-  options: { page?: number; pageSize?: number; search?: string; sort?: string; dir?: string } = {}
+  options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    sort?: string;
+    dir?: string;
+    /** The staff member's branches (null = Super Admin, every branch) */
+    restrictToBranchIds?: number[] | null;
+  } = {}
 ) {
   const { branches, staffs } = tables;
   const { page = 1, pageSize = 10, search = '', sort, dir } = options;
+  const restrictToBranchIds = options.restrictToBranchIds ?? null;
 
   const conditions = [];
   if (search) {
     conditions.push(like(branches.name, `%${search}%`));
   }
   conditions.push(isNotNull(branches.deleted_at));
+  if (restrictToBranchIds) {
+    conditions.push(restrictToBranchIds.length ? inArray(branches.id, restrictToBranchIds) : sql`1 = 0`);
+  }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -691,11 +759,7 @@ export async function listDeletedBranchesImpl(
       phone: branches.phone,
       email: branches.email,
       is_default: branches.is_default,
-      is_active: branches.is_active,
-      created_at: branches.created_at,
-      updated_at: branches.updated_at,
       deleted_at: branches.deleted_at,
-      deleted_by_staff_id: branches.deleted_by_staff_id,
       deleted_by_staff_name: staffs.fullname
     })
     .from(branches)

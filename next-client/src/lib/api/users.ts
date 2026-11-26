@@ -46,7 +46,7 @@ export async function updateUserProfileApi(body: {
   gender?: string;
   dob?: string;
 }) {
-  return request<{ ok: boolean; user: any }>(`/api/user/profile`, {
+  return request<{ status: string; message: string }>(`/api/user/profile`, {
     method: 'POST',
     body: JSON.stringify(body)
   });
@@ -72,16 +72,10 @@ export async function getUserProfileByEmailApi(email: string) {
   const params = new URLSearchParams();
   params.set('email', email);
   return request<{
-    id?: number;
     fullname?: string;
     phone?: string;
     gender?: string | null;
     dob?: string | null;
     email: string;
-    is_active?: boolean;
-    login_type?: string;
-    user_created_at?: string | null;
-    user_updated_at?: string | null;
-    account_created_at?: string | null;
   }>(`/api/user/profile?${params.toString()}`);
 }

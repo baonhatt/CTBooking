@@ -1,70 +1,83 @@
-import { describe, it, expect } from 'vitest';
-import { getRevenue7DaysImpl } from './dashboard';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { DatabaseSync } from 'node:sqlite';
+import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import { bookings } from '../../../shared/schema';
+import { getRevenue7DaysImpl, getRevenueByMonthImpl, getRevenueByDateImpl } from './dashboard';
 import { getVnParts } from '../../lib/date-utils';
 
-// A strict mock for anyDb and tables to test the JS-side execution logic in getRevenue7DaysImpl
+// The revenue numbers are summed by the database now, so they are tested on a real SQLite database in memory
+function makeRevenueDb(rows: Array<{ total_price: number; paid_at?: string | null; created_at: string; payment_status?: string; payment_method?: string }>) {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(`CREATE TABLE bookings (id INTEGER PRIMARY KEY AUTOINCREMENT, total_price REAL, paid_at TEXT, created_at TEXT,
+    payment_status TEXT, payment_method TEXT, branch_id INTEGER)`);
+  const insert = sqlite.prepare('insert into bookings (total_price, paid_at, created_at, payment_status, payment_method, branch_id) values (?, ?, ?, ?, ?, 1)');
+  for (const row of rows) {
+    insert.run(row.total_price, row.paid_at ?? null, row.created_at, row.payment_status || 'paid', row.payment_method || 'vietqr');
+  }
+  return drizzle(async (query, params, method) => {
+    const statement: any = sqlite.prepare(query);
+    statement.setReturnArrays(true); // like D1: rows as arrays
+    const rows = statement.all(...(params as any[]));
+    return { rows: method === 'get' ? rows[0] : rows };
+  });
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('getRevenue7DaysImpl', () => {
-  it('groups revenue by VN time correctly preventing UTC day drift', async () => {
-    // Generate an exact date from today's perspective to mock boundaries so the test is deterministic
-    const now = new Date();
-    now.setUTCHours(18, 0, 0, 0); 
-    // 18:00 UTC = 01:00 VN Time the NEXT day
+  it('groups revenue by VN day: 18:00 UTC on May 15 is already May 16 in Vietnam', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2024-05-16T12:00:00Z'));
+    const db = makeRevenueDb([
+      { total_price: 150000, created_at: '2024-05-15T18:00:00.000Z' }, // 01:00 May 16 in Vietnam
+      { total_price: 50000, created_at: '2024-05-16T00:00:00.000Z' }, // 07:00 May 16 in Vietnam
+      { total_price: 30000, created_at: '2024-05-15T16:59:59.000Z' }, // 23:59 May 15 in Vietnam
+      { total_price: 99000, created_at: '2024-05-16T01:00:00.000Z', payment_status: 'pending' } // not paid: not counted
+    ]);
 
-    // Let's create a fake created_at that represents 01:00 AM VN time (18:00 UTC previous day)
-    const fixedDate = new Date('2024-05-15T18:00:00Z'); 
-    // In VN this is '2024-05-16' (01:00 AM)
+    const result = await getRevenue7DaysImpl(db, { bookings });
 
-    // And another date at 12:00 AM UTC (07:00 AM VN time the same day)
-    const fixedDate2 = new Date('2024-05-16T00:00:00Z'); 
-    // In VN this is '2024-05-16' (07:00 AM)
+    expect(result.data.map((day) => day.day)).toEqual(['05-10', '05-11', '05-12', '05-13', '05-14', '05-15', '05-16']);
+    expect(result.data.find((day) => day.day === '05-16')?.revenue).toBe(200000);
+    expect(result.data.find((day) => day.day === '05-15')?.revenue).toBe(30000);
+  });
 
-    // They should BOTH group into '05-16'. With pure UTC grouping, the first one used to fall into '05-15' and the second '05-16'.
+  it('a paid order counts on the day it was PAID, not the day it was ordered', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2024-05-16T12:00:00Z'));
+    const db = makeRevenueDb([{ total_price: 70000, created_at: '2024-05-12T03:00:00.000Z', paid_at: '2024-05-14T03:00:00.000Z' }]);
 
-    const mockDb = {
-      select: () => mockDb,
-      from: () => mockDb,
-      where: () => {
-        // Return fake query results
-        return [
-          { total_price: 150000, created_at: fixedDate.toISOString() }, // 18:00 UTC on May 15
-          { total_price: 50000, created_at: fixedDate2.toISOString() }  // 00:00 UTC on May 16
-        ];
-      }
-    };
+    const result = await getRevenue7DaysImpl(db, { bookings });
 
-    const mockTables = {
-      bookings: {
-        total_price: 'total_price',
-        created_at: 'created_at',
-        payment_status: 'payment_status'
-      }
-    };
+    expect(result.data.find((day) => day.day === '05-14')?.revenue).toBe(70000);
+    expect(result.data.find((day) => day.day === '05-12')?.revenue).toBe(0);
+  });
+});
 
-    // Replace Date.now() or new Date() locally during the test so it doesn't fail based on current day
-    const originalDate = global.Date;
-    class MockDate extends originalDate {
-      constructor(dateStr?: string | number | Date) {
-        super(dateStr || '2024-05-16T12:00:00Z'); 
-      }
-    }
-    (global as any).Date = MockDate;
-    global.Date.now = () => new Date('2024-05-16T12:00:00Z').getTime();
-    global.Date.UTC = originalDate.UTC;
+describe('revenue by month and by day (summed in SQL)', () => {
+  const rows = [
+    { total_price: 100000, created_at: '2026-05-31T16:59:59.000Z', payment_method: 'Cash' }, // May 31, 23:59 VN
+    { total_price: 40000, created_at: '2026-05-31T17:00:00.000Z', payment_method: 'vietqr' }, // June 1, 00:00 VN
+    { total_price: 60000, created_at: '2026-06-10T02:00:00.000Z', payment_method: 'VietQR' },
+    { total_price: 5000, created_at: '2026-06-11T02:00:00.000Z', payment_status: 'expired' }
+  ];
 
-    try {
-      const result = await getRevenue7DaysImpl(mockDb, mockTables);
-      
-      const day16 = result.data.find(d => d.day === '05-16');
-      const day15 = result.data.find(d => d.day === '05-15');
+  it('every month of the year: the Vietnam month decides', async () => {
+    const result: any = await getRevenueByMonthImpl(makeRevenueDb(rows), { bookings }, { year: '2026' });
+    expect(result.data[4]).toEqual({ month: 5, revenue: 100000 });
+    expect(result.data[5]).toEqual({ month: 6, revenue: 100000 });
+  });
 
-      expect(day16).toBeDefined();
-      expect(day16?.revenue).toBe(200000); // 150000 + 50000, correctly summed into the SAME VN day
+  it('one month: total, number of orders and the cash / VietQR split (any letter case)', async () => {
+    const result: any = await getRevenueByMonthImpl(makeRevenueDb(rows), { bookings }, { year: '2026', month: '6' });
+    expect(result).toEqual({ total: 100000, count: 2, revenueByMethod: { cash: 0, vietqr: 100000 } });
+  });
 
-      expect(day15).toBeDefined();
-      expect(day15?.revenue).toBe(0); // UTC 18:00 May 15 should NOT fall into VN May 15
-    } finally {
-      global.Date = originalDate;
-    }
+  it('one day', async () => {
+    const result: any = await getRevenueByDateImpl(makeRevenueDb(rows), { bookings }, { date: '2026-05-31' });
+    expect(result).toEqual({ date: '2026-05-31', total: 100000, count: 1, revenueByMethod: { cash: 100000, vietqr: 0 } });
   });
 });
 

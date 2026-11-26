@@ -17,6 +17,7 @@ import {
   listToysImpl,
   getToyImpl
 } from '../../../../server/routes/admin/toys';
+import { clampPage } from '../../../../server/lib/paging';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const toysRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
@@ -224,8 +225,7 @@ toysRouter.post('/api/admin/toys/:id/restore', requireStaffAuth, requirePermissi
 
 toysRouter.get('/api/admin/deleted/toys', requireStaffAuth, requirePermission('toys', 'view_deleted'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 10);
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
     const search = String(c.req.query('search') || '');
 
     const db = drizzle(c.env.cinema_db, { schema });
@@ -244,8 +244,7 @@ toysRouter.get('/api/admin/deleted/toys', requireStaffAuth, requirePermission('t
 
 toysRouter.get('/api/admin/toys', requireStaffAuth, requirePermission('toys', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 20);
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'));
     const q = String(c.req.query('q') || '');
     const status = String(c.req.query('status') || 'all');
     const db = drizzle(c.env.cinema_db, { schema });

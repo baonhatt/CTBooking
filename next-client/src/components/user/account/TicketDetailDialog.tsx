@@ -84,6 +84,10 @@ export default function TicketDetailDialog({ open, onOpenChange, tx, onCopy }: T
                                     <span className="text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight border-slate-500/30 text-slate-400 bg-slate-500/5">
                                         Hết hạn thanh toán
                                     </span>
+                                ) : tx.payment_received_late ? (
+                                    <span className="text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight border-amber-500/30 text-amber-400 bg-amber-500/5">
+                                        Đã nhận tiền – chờ xác nhận
+                                    </span>
                                 ) : tx.payment_status === 'failed' || tx.payment_status === 'cancelled' ? (
                                     <span className="text-xs px-2.5 py-1 rounded-full border font-bold tracking-tight border-rose-500/30 text-rose-400 bg-rose-500/5">
                                         Đã hủy thanh toán

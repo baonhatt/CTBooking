@@ -29,13 +29,20 @@ import {
   Folder,
   FolderOpen,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  AlertTriangle,
+  Banknote
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { request } from '@/lib/api/http';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { performLogout } from '@/lib/auth-utils';
+import { getActionItemsCountApi } from '@/lib/api/admin';
+import { UNMATCHED_TRANSFERS_CHANGED_EVENT } from '@/components/admin/content/UnmatchedTransfersContent';
+
+// How often the sidebar asks for the number of things staff must handle (the red alert, see ActionItemsContent)
+const UNMATCHED_COUNT_REFRESH_MS = 60 * 1000;
 
 
 
@@ -48,6 +55,7 @@ interface Props {
     | 'toys'
     | 'posts'
     | 'transactions'
+    | 'action-items'
     | 'tickets'
     | 'vouchers'
     | 'deleted-vouchers'
@@ -153,6 +161,7 @@ export default function AdminLayout({
       icon: <CreditCard className="h-4 w-4 text-amber-400" />,
       items: [
         { key: 'transactions', label: 'Hóa đơn & đơn hàng', icon: <CreditCard className="h-4 w-4 text-amber-400" /> },
+        { key: 'action-items', label: 'Đơn cần xử lý', icon: <Banknote className="h-4 w-4 text-amber-400" /> },
         { key: 'vouchers', label: 'Mã giảm giá (Voucher)', icon: <Percent className="h-4 w-4 text-amber-400" /> },
         { key: 'ticket-check', label: 'Soát vé xem phim', icon: <ScanLine className="h-4 w-4 text-amber-400" /> },
         { key: 'users', label: 'Tài khoản khách hàng', icon: <UsersIcon className="h-4 w-4 text-amber-400" /> }
@@ -184,6 +193,7 @@ export default function AdminLayout({
     tickets: { module: 'tickets', action: 'view' },
     vouchers: { module: 'vouchers', action: 'view' },
     transactions: { module: 'transactions', action: 'view' },
+    'action-items': { module: 'transactions', action: 'view' },
     'ticket-check': { module: 'ticket_check', action: 'scan' },
     branches: { module: 'branches', action: 'view' },
     staff: { module: 'staff', action: 'view' },
@@ -199,6 +209,30 @@ export default function AdminLayout({
     if (isSuperAdmin) return true;
     return permissions.some((p) => p.module === module && p.action === action);
   };
+
+  // Number of open items on "Đơn cần xử lý" (unmatched transfers + orders + failed emails): the red sidebar alert
+  const canSeeUnmatched = hasPermission('transactions', 'view');
+  const [unmatchedCount, setUnmatchedCount] = useState(0);
+  useEffect(() => {
+    if (!canSeeUnmatched) return;
+    let isCancelled = false;
+    const refresh = async () => {
+      try {
+        const oData = await getActionItemsCountApi();
+        if (!isCancelled) setUnmatchedCount(Number(oData?.total || 0));
+      } catch {
+        // The alert is a helper: a failed count leaves the last value
+      }
+    };
+    void refresh();
+    const timerId = setInterval(refresh, UNMATCHED_COUNT_REFRESH_MS);
+    window.addEventListener(UNMATCHED_TRANSFERS_CHANGED_EVENT, refresh);
+    return () => {
+      isCancelled = true;
+      clearInterval(timerId);
+      window.removeEventListener(UNMATCHED_TRANSFERS_CHANGED_EVENT, refresh);
+    };
+  }, [canSeeUnmatched]);
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -315,6 +349,29 @@ export default function AdminLayout({
               </div>
             </div>
 
+            {/* Red alert: things staff must handle. Click opens "Đơn cần xử lý". */}
+            {unmatchedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => go('action-items')}
+                title={`${unmatchedCount} việc cần xử lý`}
+                className={`mb-4 w-full rounded-xl border border-red-500/40 bg-red-500/15 text-left text-red-200 hover:bg-red-500/25 transition-colors ${
+                  isRail ? 'lg:flex lg:justify-center lg:p-2.5' : ''
+                } p-3`}
+              >
+                <span className={`flex items-center gap-2 ${isRail ? 'lg:justify-center' : ''}`}>
+                  <span className="relative shrink-0">
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 animate-ping" />
+                  </span>
+                  <span className={`min-w-0 ${isRail ? 'lg:hidden' : ''}`}>
+                    <span className="block text-sm font-bold text-red-300">{unmatchedCount} việc cần xử lý</span>
+                    <span className="block text-xs text-red-200/80">Đơn, chuyển khoản hoặc mail cần nhân viên. Bấm để xem.</span>
+                  </span>
+                </span>
+              </button>
+            )}
+
             {/* Search Box / Search Icon */}
             {!isRail ? (
               <div className="mb-6">
@@ -413,6 +470,15 @@ export default function AdminLayout({
                                   {item.icon}
                                 </span>
                                 {!isRail && <span className="truncate flex-1">{item.label}</span>}
+                                {item.key === 'action-items' && unmatchedCount > 0 && (
+                                  <span
+                                    className={`rounded-full bg-red-500 text-[10px] font-bold text-white ${
+                                      isRail ? 'absolute right-0.5 top-0.5 h-4 min-w-4 px-1 leading-4' : 'px-2 py-0.5'
+                                    }`}
+                                  >
+                                    {unmatchedCount}
+                                  </span>
+                                )}
                               </button>
                             );
 

@@ -1,5 +1,6 @@
 'use client';
-import { User, LogOut, Settings, LayoutDashboard, UserCircle } from 'lucide-react';
+import { LogOut, Settings, LayoutDashboard, UserCircle } from 'lucide-react';
+import AccountAvatar from '@/components/user/header/AccountAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,10 +38,10 @@ export function UserMenu({ userName, tooltipPrefix, extraMenuOptions, onNavigate
               aria-label={`Tài khoản của ${userName || 'bạn'}`}
               className="flex items-center gap-2 group outline-none focus:outline-none"
             >
-              <div className="w-11 h-11 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center group-hover:border-blue-500/50 group-hover:bg-blue-500/10 transition-all duration-500 shadow-inner overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <User className="h-5 w-5 text-white/70 group-hover:text-blue-400 transition-colors duration-300 relative z-10" />
-              </div>
+              {/* Signed in: the name's first letter with a green dot (see AccountAvatar) */}
+              <span className="transition-transform duration-300 group-hover:scale-105">
+                <AccountAvatar userName={userName} />
+              </span>
             </button>
           </DropdownMenuTrigger>
         </TooltipTrigger>

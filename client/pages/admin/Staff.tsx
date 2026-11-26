@@ -28,6 +28,7 @@ import {
   ADMIN_TEXT
 } from '@/components/admin/common/adminTokens';
 import { getAdminBranchOptions } from '@/lib/api';
+import { getStaffTrackingApi } from '@/lib/api/admin-ops';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -56,7 +57,6 @@ interface Staff {
   email: string;
   fullname: string;
   phone?: string;
-  avatar?: string;
   isSuperAdmin: boolean;
   forcePasswordChange: boolean;
   isActive?: boolean;
@@ -67,8 +67,6 @@ interface Staff {
   lastLoginAt?: string;
   createdAt: string;
   updatedAt: string;
-  created_by_staff_name?: string;
-  updated_by_staff_name?: string;
 }
 
 interface Role {
@@ -82,6 +80,7 @@ interface Branch {
   id: number;
   name: string;
   address?: string;
+  is_default?: boolean;
 }
 
 interface StaffListResponse {
@@ -163,6 +162,14 @@ export default function StaffPage() {
       return request(`/api/admin/staff?${params}`) as Promise<StaffListResponse>;
     }
   });
+
+  // Who created / last changed the staff member: the list does not carry it, so it is read when the detail opens
+  const { data: staffTracking, isFetching: staffTrackingLoading } = useQuery({
+    queryKey: ['staff-tracking', selectedStaff?.id],
+    queryFn: async () => (await getStaffTrackingApi(selectedStaff!.id)).staff,
+    enabled: isDetailDialogOpen && !!selectedStaff
+  });
+  const trackingName = (name: string | null | undefined) => (staffTrackingLoading ? '...' : name || 'Hệ thống');
 
   // Permission helpers
   const canViewBranches = useStaffPermission('branches', 'view');
@@ -286,7 +293,7 @@ export default function StaffPage() {
     formData.fullname !== '' ||
     formData.phone !== '' ||
     formData.roleIds.length > 0 ||
-    formData.branchIds.length > 0;
+    JSON.stringify(formData.branchIds) !== JSON.stringify(startingBranchIds());
 
   const isEditDirty = selectedStaff
     ? formData.fullname !== selectedStaff.fullname ||
@@ -307,13 +314,20 @@ export default function StaffPage() {
     resetForm();
   };
 
+  // A new staff member starts with the default branch ticked; when the creator does not manage it, their first branch
+  function startingBranchIds(): number[] {
+    const branchOptions: Branch[] = (branchesData as any)?.items || [];
+    const defaultBranch = branchOptions.find((branch) => branch.is_default) || branchOptions[0];
+    return defaultBranch ? [defaultBranch.id] : [];
+  }
+
   const resetForm = () => {
     setFormData({
       email: '',
       fullname: '',
       phone: '',
       roleIds: [],
-      branchIds: [],
+      branchIds: startingBranchIds(),
       isActive: true
     });
     setErrors({});
@@ -333,6 +347,9 @@ export default function StaffPage() {
     }
     if (isSuperAdmin && !editedStaffIsSuperAdmin && formData.roleIds.length === 0) {
       newErrors.roleIds = 'Vui lòng chọn ít nhất một vai trò';
+    }
+    if (!editedStaffIsSuperAdmin && formData.branchIds.length === 0) {
+      newErrors.branchIds = 'Vui lòng chọn ít nhất một chi nhánh';
     }
     return newErrors;
   };
@@ -418,6 +435,7 @@ export default function StaffPage() {
   };
 
   const toggleBranch = (branchId: number) => {
+    if (errors.branchIds) setErrors((prev) => ({ ...prev, branchIds: '' }));
     setFormData((prev) => ({
       ...prev,
       branchIds: prev.branchIds.includes(branchId)
@@ -777,6 +795,7 @@ export default function StaffPage() {
                   </div>
                 ))}
               </div>
+              {errors.branchIds && <p className="text-destructive text-xs mt-1">{errors.branchIds}</p>}
             </div>
             <div className="flex items-start gap-2 px-1 text-xs text-gray-500">
               <Info className="mt-0.5 h-3.5 w-3.5 text-blue-400/70" />
@@ -871,6 +890,7 @@ export default function StaffPage() {
                   ))}
                 </div>
               )}
+              {errors.branchIds && <p className="text-destructive text-xs mt-1">{errors.branchIds}</p>}
             </div>
             {!selectedStaff?.isSuperAdmin && (
               <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
@@ -1079,7 +1099,7 @@ export default function StaffPage() {
                     <Label className="text-[11px] font-medium uppercase text-slate-500">Ngày tạo</Label>
                     <div className="text-xs font-medium text-slate-700">{formatVnDateTime(selectedStaff.createdAt)}</div>
                     <div className="text-[11px] font-medium italic text-slate-400">
-                      Bởi: {selectedStaff.created_by_staff_name || 'Hệ thống'}
+                      Bởi: {trackingName(staffTracking?.created_by_staff_name)}
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -1088,7 +1108,7 @@ export default function StaffPage() {
                       {selectedStaff.updatedAt ? formatVnDateTime(selectedStaff.updatedAt) : 'Chưa cập nhật'}
                     </div>
                     <div className="text-[11px] font-medium italic text-slate-400">
-                      Bởi: {selectedStaff.updated_by_staff_name || 'Hệ thống'}
+                      Bởi: {trackingName(staffTracking?.updated_by_staff_name)}
                     </div>
                   </div>
                   <div className="space-y-1">

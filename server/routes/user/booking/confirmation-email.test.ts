@@ -114,7 +114,7 @@ describe('getBookingByCodeImpl: email status', () => {
       orderBy: () => chain,
       limit: async () => emailRows
     };
-    return { query: { bookings: { findFirst: async () => booking } }, select: () => chain } as any;
+    return { query: { bookings: { findFirst: async () => booking, findMany: async () => (booking ? [booking] : []) } }, select: () => chain } as any;
   }
   const bookingTables: any = { bookings: (schema as any).bookings, email_logs: (schema as any).email_logs };
 
@@ -144,5 +144,24 @@ describe('getBookingByCodeImpl: email status', () => {
       bookingTables
     );
     expect(result.email_status.at).toBe('2026-11-09 09:59:00');
+  });
+});
+
+describe('getBookingByCodeImpl: only what the ticket check screen reads', () => {
+  it('reads named columns, joins no user and sends no unused fields', async () => {
+    const findMany = vi.fn(async () => [{ id: 55, payment_status: 'paid', booking_code: 'ABCD2345', total_price: 100000, ticket_count: 1 }]);
+    const chain: any = { from: () => chain, where: () => chain, orderBy: () => chain, limit: async () => [] };
+    const db: any = { query: { bookings: { findMany } }, select: () => chain };
+
+    const result: any = await getBookingByCodeImpl(db, 'ABCD2345', { bookings: (schema as any).bookings });
+
+    const options: any = (findMany.mock.calls[0] as any[])[0];
+    expect(options.with).toBeUndefined();
+    expect(options.columns).toMatchObject({ id: true, booking_code: true, voucher_id: true, checked_in_at: true });
+    expect(options.columns.movie_id).toBeUndefined();
+    for (const dropped of ['userName', 'movie_title', 'movie_duration', 'movie_poster', 'ticket_unit_price', 'validity_days', 'movie_id', 'ticket_package_id']) {
+      expect(result).not.toHaveProperty(dropped);
+    }
+    expect(result).toMatchObject({ status: 200, id: 55, booking_code: 'ABCD2345' });
   });
 });

@@ -61,8 +61,7 @@ export async function checkSepayTransactionImpl(
       if (amountIn >= expectedAmount) {
         return {
           success: true,
-          message: 'Giao dịch hợp lệ',
-          transaction: tx
+          message: 'Giao dịch hợp lệ'
         };
       } else {
         foundMismatch = true;

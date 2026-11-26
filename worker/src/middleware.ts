@@ -97,6 +97,8 @@ export async function requireStaffAuth(c: Context, next: Next) {
       .where(
         and(
           eq(staffTokens.token, token),
+          // Only a session token signs a staff member in. OTP codes and reset links live in the same table.
+          eq(staffTokens.type, 'session'),
           isNull(staffTokens.revokedAt),
           gt(staffTokens.expiredAt, now),
           eq(staffs.isActive, true)
@@ -115,6 +117,15 @@ export async function requireStaffAuth(c: Context, next: Next) {
       tokenRecord.staff.id
     );
 
+    // A staff member with no branch sees no branch data at all (an empty list never means "all branches").
+    // Only their own account routes stay open (me, logout, change password...), so they can still sign out.
+    if (!isSuperAdmin && (!Array.isArray(branchIds) || branchIds.length === 0) && !c.req.path.startsWith('/api/admin/auth/')) {
+      return c.json(
+        { status: 'error', code: 'no_branch', message: 'Tài khoản chưa được gán chi nhánh. Vui lòng liên hệ quản trị viên.' },
+        403
+      );
+    }
+
     // Set context values
     c.set('staffId', tokenRecord.staff.id);
     c.set('staffEmail', tokenRecord.staff.email);
@@ -126,6 +137,37 @@ export async function requireStaffAuth(c: Context, next: Next) {
     await next();
   } catch (error) {
     return c.json({ status: 'error', message: 'Internal server error' }, 500);
+  }
+}
+
+/**
+ * For public routes that show more to staff (inactive packages, hidden movies...): true when the request carries a
+ * valid staff session (same check as requireStaffAuth, without refusing anyone).
+ */
+export async function hasStaffSession(c: Context): Promise<boolean> {
+  try {
+    const token =
+      c.req.header('cookie')?.match(/staff_session=([^;]+)/)?.[1] || c.req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) return false;
+    const db = drizzle(c.env.cinema_db, { schema });
+    const { staffTokens, staffs } = schema;
+    const rows = await db
+      .select({ staffId: staffTokens.staffId })
+      .from(staffTokens)
+      .innerJoin(staffs, eq(staffTokens.staffId, staffs.id))
+      .where(
+        and(
+          eq(staffTokens.token, token),
+          eq(staffTokens.type, 'session'),
+          isNull(staffTokens.revokedAt),
+          gt(staffTokens.expiredAt, new Date().toISOString()),
+          eq(staffs.isActive, true)
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
+  } catch {
+    return false;
   }
 }
 

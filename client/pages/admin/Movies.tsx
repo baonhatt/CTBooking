@@ -101,7 +101,6 @@ export default function MoviesPage() {
         release_date: m.release_date ? new Date(m.release_date).toISOString() : null,
         updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
         rating: m.rating ?? null,
-        price: Number(m.price || 0),
         is_active: m.is_active,
         branch_id: m.branch_id,
         branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : (m.branch_ids ?? null)
@@ -189,7 +188,6 @@ export default function MoviesPage() {
       posterUrl: m.cover_image || '',
       release_date: m.release_date ? new Date(m.release_date).toISOString() : null,
       rating: m.rating ?? null,
-      price: Number(m.price || 0),
       is_active: m.is_active,
       branch_id: m.branch_id,
       branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : (m.branch_ids ?? null),

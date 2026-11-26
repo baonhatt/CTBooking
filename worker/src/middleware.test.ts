@@ -15,11 +15,13 @@ vi.mock('drizzle-orm/d1', () => {
   return { drizzle: () => ({ select: () => chain }) };
 });
 
+let staffBranchIds: number[] = [1];
+let staffIsSuperAdmin = false;
 vi.mock('../../server/lib/staff-auth', () => ({
   loadStaffPermissions: vi.fn(async () => ({
     permissions: [{ module: 'staff', action: 'view' }],
-    branchIds: [1],
-    isSuperAdmin: false
+    branchIds: staffBranchIds,
+    isSuperAdmin: staffIsSuperAdmin
   }))
 }));
 
@@ -50,6 +52,31 @@ const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}`
 
 beforeEach(() => {
   tokenRows = [];
+  staffBranchIds = [1];
+  staffIsSuperAdmin = false;
+});
+
+describe('staff without any branch', () => {
+  it('get nothing outside their own account routes (an empty list never means every branch)', async () => {
+    tokenRows = [validRow()];
+    staffBranchIds = [];
+    const app = makeApp();
+
+    const staffList = await app.request('/api/admin/staff', bearer('good-token'), env);
+    expect(staffList.status).toBe(403);
+    expect((await staffList.json()).code).toBe('no_branch');
+
+    const me = await app.request('/api/admin/auth/me', bearer('good-token'), env);
+    expect(me.status).toBe(200);
+  });
+
+  it('the Super Admin needs no branch', async () => {
+    tokenRows = [validRow()];
+    staffBranchIds = [];
+    staffIsSuperAdmin = true;
+    const response = await makeApp().request('/api/admin/staff', bearer('good-token'), env);
+    expect(response.status).toBe(200);
+  });
 });
 
 describe('public admin paths', () => {

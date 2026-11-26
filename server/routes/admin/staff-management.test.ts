@@ -246,6 +246,31 @@ describe('createStaffImpl', () => {
   });
 });
 
+describe('staff always have at least one branch', () => {
+  it('creating a staff member without a branch is refused, even by the Super Admin', async () => {
+    for (const branchIds of [[], undefined, [0], ['1' as any]]) {
+      const { db, inserted } = makeDb(new Map());
+      const result: any = await createStaffImpl(
+        db,
+        tables,
+        null,
+        { email: 'new@example.com', fullname: 'New', roleIds: [3], branchIds: branchIds as any },
+        SUPER_ADMIN
+      );
+      expect(result.status).toBe('error');
+      expect(result.message).toBe('Vui lòng chọn ít nhất một chi nhánh cho nhân viên');
+      expect(inserted.find((entry) => entry.table === staffs)).toBeUndefined();
+    }
+  });
+
+  it('an edit may change the branches but never empty them', async () => {
+    const { db, updated } = makeDb(new Map<any, any[]>([[staffs, [staffRow()]], [staffBranches, [{ branchId: 1 }]]]));
+    const result: any = await updateStaffImpl(db, tables, null, 30, { branchIds: [] }, SUPER_ADMIN);
+    expect(result.status).toBe('error');
+    expect(updated).toHaveLength(0);
+  });
+});
+
 describe('updateStaffImpl scope', () => {
   const target = staffRow();
 

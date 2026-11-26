@@ -234,5 +234,5 @@ export async function getSiteMediaApi(options?: {
 }
 
 export async function deleteSiteMediaApi(id: number) {
-  return request<{ ok: boolean; item?: any }>(`/api/admin/site-media/${id}`, { method: 'DELETE' });
+  return request<{ ok: boolean; message?: string }>(`/api/admin/site-media/${id}`, { method: 'DELETE' });
 }

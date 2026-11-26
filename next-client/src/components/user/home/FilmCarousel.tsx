@@ -4,8 +4,9 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Film as FilmIcon, Play, Clock, Star, Ticket } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMovieById, getActiveMoviesToday } from '@/lib/api/movies';
+import { getActiveTickets } from '@/lib/api/products';
 import { useBranch } from '@/hooks/useBranch';
 import { optimizeCloudinaryUrl, generateCloudinarySrcSet, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,24 @@ function FilmPoster({ film, isFirst }: { film: any; isFirst: boolean }) {
       className="absolute object-cover inset-0 w-full h-full transition-transform duration-500 group-hover:scale-105"
     />
   );
+}
+
+// Genres come as an array (list and detail API) or, from older rows, as a JSON text. Card and popup both use this,
+// so they always show the same thing.
+function formatGenres(value: unknown): string {
+  let genres: unknown = value;
+  if (typeof value === 'string') {
+    try {
+      genres = JSON.parse(value);
+    } catch {
+      genres = value.trim() ? [value.trim()] : [];
+    }
+  }
+  if (!Array.isArray(genres)) return 'Chưa phân loại';
+  const names = genres
+    .map((genre: any) => (typeof genre === 'string' ? genre : genre?.name))
+    .filter((name: unknown): name is string => typeof name === 'string' && name.trim() !== '');
+  return names.length > 0 ? names.join(' • ') : 'Chưa phân loại';
 }
 
 export default function FilmCarousel({ initialFilms = [], initialBranchId, onSelectFilm }: FilmCarouselProps) {
@@ -101,14 +120,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
       .map((m: any) => ({
         id: m.id,
         title: m.title,
-        genre: (() => {
-          try {
-            const parsed = JSON.parse(m.genres);
-            return Array.isArray(parsed) ? parsed.join(' • ') : 'Sci‑Fi';
-          } catch {
-            return 'Sci‑Fi';
-          }
-        })(),
+        genre: formatGenres(m.genres),
         poster:
           m.cover_image ||
           'https://images.unsplash.com/photo-1464375117522-1311d6a5b81f?auto=format&fit=crop&w=900&q=80'
@@ -179,8 +191,61 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
     return movieStore.getMovie(selectedMovieId);
   }, [selectedMovieId, storeUpdateTrigger]);
 
-  const handleBookTicket = () => {
+  const queryClient = useQueryClient();
+
+  // The package used by "Đặt vé ngay" in the film popup: the first one in display order (the 1-person ticket)
+  // among the branch's packages that include this film. The packages are read only when the button is pressed
+  // (from the cache the price section already filled, or the API). Subscribing to that query while rendering
+  // would take the price section's server data away from it and break hydration.
+  const findPackageForFilm = async (filmId: number) => {
+    let packages: any[] = [];
+    try {
+      const ticketsRes: any = await queryClient.fetchQuery({
+        queryKey: ['activeTickets', selectedBranch?.id],
+        queryFn: () => getActiveTickets(selectedBranch?.id),
+        staleTime: 60 * 1000
+      });
+      packages = Array.isArray(ticketsRes?.items) ? ticketsRes.items : [];
+    } catch {
+      packages = [];
+    }
+    return (
+      packages
+        .filter((pkg) => Array.isArray(pkg.movies) && pkg.movies.some((movie: any) => Number(movie?.id) === filmId))
+        .sort((first, second) => (first.display_order || 0) - (second.display_order || 0) || Number(first.price) - Number(second.price))[0] ||
+      null
+    );
+  };
+
+  const handleBookTicket = async () => {
     setIsModalOpen(false);
+
+    // Open the booking page with the 1-person package of this film already chosen
+    const filmPackage = movieDetails ? await findPackageForFilm(Number(movieDetails.id)) : null;
+    if (filmPackage) {
+      try {
+        sessionStorage.setItem(
+          'directBookingItem',
+          JSON.stringify({
+            packageId: filmPackage.id,
+            type: 'movie',
+            name: filmPackage.name,
+            price: Number(filmPackage.price || 0),
+            movies: filmPackage.movies || [],
+            quantity: 1,
+            branchId: selectedBranch?.id
+          })
+        );
+        const params = new URLSearchParams();
+        if (selectedBranch?.id) params.set('branch_id', String(selectedBranch.id));
+        params.set('direct', '1');
+        router.push(`/booking?${params.toString()}`);
+        return;
+      } catch {
+        // No session storage (private mode): fall back to the price section below
+      }
+    }
+
     if (movieDetails) {
       try {
         localStorage.setItem(
@@ -215,7 +280,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
   return (
     <section
       id="films"
-      className="relative py-14 sm:py-20 px-2 bg-gradient-to-b from-[#050915] via-[#070b1e] to-[#050915] overflow-hidden"
+      className="relative py-14 sm:py-20 bg-gradient-to-b from-[#050915] via-[#070b1e] to-[#050915] overflow-hidden"
     >
       <div className="absolute inset-0 opacity-60 neon-noise pointer-events-none" />
       <div className="absolute -left-20 -top-10 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.18)_0%,_transparent_70%)] pointer-events-none" />
@@ -276,7 +341,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                   key={film.id}
                   initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "0px 0px 120px 0px" }}
+                  viewport={{ once: true, margin: "0px 0px 200px 0px" }}
                   transition={{ delay: Math.min(index, 4) * 0.04, duration: 0.3 }}
                   className="flex-[0_0_auto] min-w-[240px] md:min-w-[280px] pl-6"
                 >
@@ -294,27 +359,23 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                   >
                     <div className="relative h-80 w-full overflow-hidden will-change-transform bg-slate-950">
                       <FilmPoster film={film} isFirst={index === 0} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                      {/* The title is always shown, so a poster can be told apart at rest; genre and the button appear on hover
-                          (a touch screen has no hover, so there they are always shown) */}
-                      <div className="absolute bottom-4 left-4 right-4 space-y-2 text-left">
-                        <div
-                          className={`space-y-2 opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
-                            hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
-                          }`}
-                        >
-                          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">{film.genre}</p>
-                        </div>
-                        <h3 className="text-xl font-semibold text-white drop-shadow-lg">{film.title}</h3>
-                        <div
-                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
-                            hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
-                          }`}
-                        >
+                      {/* The poster stays clean (most posters carry their own title); "Mở chi tiết" appears on hover,
+                          and always on a touch screen, which has no hover */}
+                      <div
+                        className={`absolute inset-0 flex items-end justify-start p-4 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 [@media(hover:none)]:opacity-100 transition-opacity duration-300 ${
+                          hoveredIndex === index ? 'opacity-100' : 'group-hover:opacity-100'
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-sm text-white backdrop-blur-sm">
                           <Play className="h-4 w-4 text-cyan-300" />
                           Mở chi tiết
-                        </div>
+                        </span>
                       </div>
+                    </div>
+                    {/* Genre and title under the poster, readable whatever the poster looks like */}
+                    <div className="px-4 py-3 text-left space-y-1">
+                      <p className="text-xs uppercase tracking-[0.18em] text-cyan-300 truncate">{film.genre}</p>
+                      <h3 className="text-lg font-semibold text-white leading-snug line-clamp-2 min-h-[3.5rem]">{film.title}</h3>
                     </div>
                   </motion.button>
                 </motion.div>
@@ -352,18 +413,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                 </DialogTitle>
                 <DialogDescription className={cn('text-gray-300 text-sm', !movieDetails && 'sr-only')}>
                   {movieDetails
-                    ? (() => {
-                        try {
-                          const genres = Array.isArray(movieDetails.genres)
-                            ? movieDetails.genres
-                            : typeof movieDetails.genres === 'string'
-                              ? JSON.parse(movieDetails.genres as string)
-                              : [];
-                          return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
-                        } catch {
-                          return 'Chưa phân loại';
-                        }
-                      })()
+                    ? formatGenres(movieDetails.genres)
                     : 'Thông tin chi tiết về bộ phim'}
                 </DialogDescription>
               </DialogHeader>
@@ -411,18 +461,7 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
                               {movieDetails.title}
                             </h2>
                             <p className="text-gray-400 text-sm mt-0.5">
-                              {(() => {
-                                try {
-                                  const genres = Array.isArray(movieDetails.genres)
-                                    ? movieDetails.genres
-                                    : typeof movieDetails.genres === 'string'
-                                      ? JSON.parse(movieDetails.genres as string)
-                                      : [];
-                                  return Array.isArray(genres) && genres.length > 0 ? genres.join(' • ') : 'Chưa phân loại';
-                                } catch {
-                                  return 'Chưa phân loại';
-                                }
-                              })()}
+                              {formatGenres(movieDetails.genres)}
                             </p>
                           </div>
                           {/* Rating + duration ngay dưới tên phim */}

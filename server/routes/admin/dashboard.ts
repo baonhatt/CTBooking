@@ -1,5 +1,5 @@
-import { count, sum, eq, inArray, and, or, gte, lte, gt, sql, isNull, isNotNull } from 'drizzle-orm';
-import { formatDateForDb, getVnParts } from '../../../server/lib/date-utils';
+import { count, sum, eq, inArray, and, or, gte, lte, sql, isNull, isNotNull } from 'drizzle-orm';
+import { formatDateForDb } from '../../../server/lib/date-utils';
 import {
   currentVnYear,
   vnDayStart,
@@ -11,8 +11,7 @@ import {
   sqlRevenueTimeInRange,
   sqlPaidInRange,
   sqlListedInRange,
-  sqlCreatedInRange,
-  revenueInstant
+  sqlCreatedInRange
 } from '../../../server/lib/vn-time';
 
 /**
@@ -31,6 +30,31 @@ export function topTicketsRange(period: string, selectedYear: number, now: Date 
   return { start: start < yearRange.start ? yearRange.start : start, end: yearRange.end };
 }
 import { sqlBranchIdsStaffAccessFilter } from '../../../server/lib/branch-ids';
+
+// ---- SQL aggregation helpers ----
+// Dates are stored as ISO text in UTC. Vietnam is UTC+7 all year (no daylight saving), so "+7 hours" gives the
+// Vietnam wall clock. A row whose date cannot be read gives NULL and is left out, as the JS version skipped it.
+
+/** The paid time of an order (paid_at, or created_at for old rows), like revenueInstant(). Empty text counts as missing. */
+function sqlRevenueInstant(bookingsTable: any) {
+  return sql`coalesce(nullif(${bookingsTable.paid_at}, ''), nullif(${bookingsTable.created_at}, ''))`;
+}
+
+/** strftime on a stored date, in Vietnam time. */
+function sqlVnFormat(format: string, column: any) {
+  return sql`strftime(${format}, ${column}, '+7 hours')`;
+}
+
+/** Sum of a money column, 0 when there are no rows (Number(x || 0) per row in the JS version). */
+function sqlMoneySum(column: any) {
+  return sql<number>`coalesce(sum(coalesce(${column}, 0)), 0)`;
+}
+
+/** Sum of one payment method, matched without case ("cash", "Cash"...). The method is one of two fixed words. */
+function sqlMethodSum(bookingsTable: any, method: 'cash' | 'vietqr') {
+  const methodWord = sql.raw(method === 'cash' ? "'cash'" : "'vietqr'");
+  return sql<number>`coalesce(sum(case when lower(${bookingsTable.payment_method}) = ${methodWord} then coalesce(${bookingsTable.total_price}, 0) else 0 end), 0)`;
+}
 
 function buildBranchBookingCondition(bookingsTable: any, restrictToBranchIds: number[] | null | undefined) {
   if (restrictToBranchIds === null || restrictToBranchIds === undefined) return undefined;
@@ -105,13 +129,22 @@ export async function getDashboardMetricsImpl(
     }
   })();
 
+  // Branch staff only count customers who booked at their branches (users have no branch of their own)
   const [totalUsersRes] = await anyDb
     .select({ count: count() })
     .from(tables.users)
     .where(
       and(
         gte(tables.users.created_at, formatDateForDb(yearStart)),
-        lte(tables.users.created_at, formatDateForDb(yearEnd))
+        lte(tables.users.created_at, formatDateForDb(yearEnd)),
+        ...(branchConditionBookings
+          ? [
+              inArray(
+                tables.users.id,
+                anyDb.select({ userId: tables.bookings.user_id }).from(tables.bookings).where(branchConditionBookings)
+              )
+            ]
+          : [])
       )
     );
   const totalUsers = totalUsersRes?.count || 0;
@@ -387,7 +420,7 @@ export async function getDashboardMetricsImpl(
         .from(tables.bookings)
         .where(
           and(
-            inArray(tables.bookings.payment_status, ['paid', 'pending', 'failed', 'expired']),
+            inArray(tables.bookings.payment_status, ['paid', 'pending', 'failed', 'expired', 'cancelled']),
             createdYearCondition,
             branchConditionBookings
           )
@@ -403,79 +436,63 @@ export async function getDashboardMetricsImpl(
       return { paid, pending, failed };
     })(),
     bookingHours: await (async () => {
-      // For cross-platform safety (Postgres vs SQLite/D1), we fetch hours of paid bookings and aggregate in JS
-      // This is efficient enough for dashboard use cases
-      const results = await anyDb
-        .select({ createdAt: tables.bookings.created_at })
+      // Paid orders per Vietnam hour of ordering, counted by the database
+      const hourSql = sqlVnFormat('%H', tables.bookings.created_at);
+      const rows = await anyDb
+        .select({ hour: hourSql, cnt: count() })
         .from(tables.bookings)
-        .where(and(inArray(tables.bookings.payment_status, ['paid']), createdYearCondition, branchConditionBookings));
+        .where(and(inArray(tables.bookings.payment_status, ['paid']), createdYearCondition, branchConditionBookings))
+        .groupBy(hourSql);
       const hours = Array(24).fill(0);
-      results.forEach((r: any) => {
-        const parts = getVnParts(r.createdAt);
-        if (parts && parts.hour >= 0 && parts.hour < 24) hours[parts.hour]++;
-      });
+      for (const row of rows) {
+        const hour = Number(row.hour);
+        if (row.hour !== null && hour >= 0 && hour < 24) hours[hour] += Number(row.cnt || 0);
+      }
       return hours;
     })(),
     revenueBreakdown: await (async () => {
-      const paidBookings = await anyDb
-        .select({
-          id: tables.bookings.id,
-          total_price: tables.bookings.total_price,
-          booking_type: tables.bookings.booking_type
-        })
+      // Movie / VR split of the paid revenue, summed by the database.
+      // VR part of an order = what its VR lines charged (line_total after the voucher, else unit price x quantity);
+      // a VR order with no saved lines is all VR; the part is kept between 0 and the order total.
+      const lines = tables.booking_vr_items;
+      const total = sql`coalesce(${tables.bookings.total_price}, 0)`;
+      const isVrOrder = sql`${tables.bookings.booking_type} in ('vr', 'combo_vr')`;
+      const lineSum = lines
+        ? sql`(select sum(case when ${lines.line_total} is not null then ${lines.line_total} else coalesce(${lines.unit_price}, 0) * coalesce(nullif(${lines.quantity}, 0), 1) end) from ${lines} where ${lines.booking_id} = ${tables.bookings.id})`
+        : sql`null`;
+      const vrPart = sql`min(max(case
+          when ${isVrOrder} and ${lineSum} is not null then ${lineSum}
+          when ${tables.bookings.booking_type} = 'vr' then ${total}
+          else 0 end, 0), ${total})`;
+      const [row] = await anyDb
+        .select({ total: sql<number>`coalesce(sum(${total}), 0)`, vr: sql<number>`coalesce(sum(${vrPart}), 0)` })
         .from(tables.bookings)
         .where(and(inArray(tables.bookings.payment_status, ['paid']), yearCondition, branchConditionBookings));
-
-      // VR lines of these orders, in chunks of 100 ids (the limit of bound values in one query)
-      const vrRevenueByBooking = new Map<number, number>();
-      const bookingsWithVrLines = new Set<number>();
-      const vrBookingIds = paidBookings
-        .filter((b: any) => b.booking_type === 'vr' || b.booking_type === 'combo_vr')
-        .map((b: any) => b.id);
-      if (tables.booking_vr_items) {
-        for (let from = 0; from < vrBookingIds.length; from += 100) {
-          const lines = await anyDb
-            .select({
-              booking_id: tables.booking_vr_items.booking_id,
-              unit_price: tables.booking_vr_items.unit_price,
-              quantity: tables.booking_vr_items.quantity,
-              line_total: tables.booking_vr_items.line_total
-            })
-            .from(tables.booking_vr_items)
-            .where(inArray(tables.booking_vr_items.booking_id, vrBookingIds.slice(from, from + 100)));
-          for (const line of lines) {
-            // line_total is what was charged for the line, after the voucher
-            const charged =
-              line.line_total !== null && line.line_total !== undefined
-                ? Number(line.line_total)
-                : Number(line.unit_price || 0) * Number(line.quantity || 1);
-            vrRevenueByBooking.set(line.booking_id, (vrRevenueByBooking.get(line.booking_id) || 0) + charged);
-            bookingsWithVrLines.add(line.booking_id);
-          }
-        }
-      }
-
-      let movie = 0;
-      let vr = 0;
-      for (const b of paidBookings) {
-        const total = Number(b.total_price || 0);
-        let vrPart = vrRevenueByBooking.get(b.id) || 0;
-        // A VR order with no saved lines is all VR
-        if (b.booking_type === 'vr' && !bookingsWithVrLines.has(b.id)) vrPart = total;
-        vrPart = Math.min(Math.max(vrPart, 0), total);
-        vr += vrPart;
-        movie += total - vrPart;
-      }
+      const vr = Number(row?.vr || 0);
       // The two parts add up to the revenue total
-      return { movie, vr };
+      return { movie: Number(row?.total || 0) - vr, vr };
     })(),
     checkinTraffic: await (async () => {
-      const arr = Array(7).fill(0); // Sun(0) to Sat(6)
-      const res = await anyDb.select({ checked_in_at: tables.bookings.checked_in_at }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ['paid']), eq(tables.bookings.is_used, true), isNotNull(tables.bookings.checked_in_at), yearCondition, branchConditionBookings));
-      res.forEach((r: any) => {
-         const parts = getVnParts(r.checked_in_at);
-         if (parts && parts.dayOfWeek >= 0 && parts.dayOfWeek <= 6) arr[parts.dayOfWeek]++;
-      });
+      // Check-ins per Vietnam weekday, Sunday (0) to Saturday (6), counted by the database
+      const weekdaySql = sqlVnFormat('%w', tables.bookings.checked_in_at);
+      const rows = await anyDb
+        .select({ weekday: weekdaySql, cnt: count() })
+        .from(tables.bookings)
+        .where(
+          and(
+            inArray(tables.bookings.payment_status, ['paid']),
+            eq(tables.bookings.is_used, true),
+            isNotNull(tables.bookings.checked_in_at),
+            yearCondition,
+            branchConditionBookings
+          )
+        )
+        .groupBy(weekdaySql);
+      const arr = Array(7).fill(0);
+      for (const row of rows) {
+        const weekday = Number(row.weekday);
+        if (row.weekday !== null && weekday >= 0 && weekday <= 6) arr[weekday] += Number(row.cnt || 0);
+      }
       return arr;
     })(),
     voucherImpact: await (async () => {
@@ -492,38 +509,42 @@ export async function getDashboardMetricsImpl(
       return Number(res?.total || 0);
     })(),
     ticketBurnRate: await (async () => {
-      let totalHoldMs = 0;
-      let count = 0;
-      const res = await anyDb.select({ paid_at: tables.bookings.paid_at, checked_in_at: tables.bookings.checked_in_at }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ['paid']), eq(tables.bookings.is_used, true), isNotNull(tables.bookings.checked_in_at), isNotNull(tables.bookings.paid_at), yearCondition, branchConditionBookings));
-      res.forEach((r: any) => {
-         const diff = new Date(r.checked_in_at).getTime() - new Date(r.paid_at).getTime();
-         if (diff >= 0) { totalHoldMs += diff; count++; }
-      });
-      const avgHours = count > 0 ? (totalHoldMs / count / 3600000) : 0;
-      return avgHours;
+      // Average hours from payment to check-in (check-ins before the payment time are left out), by the database
+      const holdDays = sql`julianday(${tables.bookings.checked_in_at}) - julianday(${tables.bookings.paid_at})`;
+      const [row] = await anyDb
+        .select({ avgDays: sql<number | null>`avg(${holdDays})` })
+        .from(tables.bookings)
+        .where(
+          and(
+            inArray(tables.bookings.payment_status, ['paid']),
+            eq(tables.bookings.is_used, true),
+            isNotNull(tables.bookings.checked_in_at),
+            isNotNull(tables.bookings.paid_at),
+            sql`${holdDays} >= 0`,
+            yearCondition,
+            branchConditionBookings
+          )
+        );
+      return row?.avgDays ? Number(row.avgDays) * 24 : 0;
     })(),
     customerRetention: await (async () => {
-       const usersInPeriod = await anyDb.select({ user_id: tables.bookings.user_id }).from(tables.bookings).where(and(inArray(tables.bookings.payment_status, ['paid']), isNotNull(tables.bookings.user_id), yearCondition, branchConditionBookings));
-       const distinctIds = Array.from(new Set(usersInPeriod.map((u: any) => u.user_id)));
-       if (distinctIds.length === 0) return { newUsers: 0, returningUsers: 0 };
-       
-       let newUsers = 0;
-       let returningUsers = 0;
-       const chunk = 100;
-       for(let i = 0; i<distinctIds.length; i+=chunk) {
-          const slice = distinctIds.slice(i, i+chunk);
-          const usrs = await anyDb.select({ id: tables.users.id, created_at: tables.users.created_at }).from(tables.users).where(inArray(tables.users.id, slice));
-          usrs.forEach((u: any) => {
-             const cAt = new Date(u.created_at);
-             if (year) {
-               if (cAt.getFullYear() === year) newUsers++;
-               else returningUsers++;
-             } else {
-               returningUsers++; // fallback when selecting 'all time'
-             }
-          });
-       }
-       return { newUsers, returningUsers };
+      // Customers who paid in the period: "new" when their account was made in the selected year (Vietnam time),
+      // otherwise "returning" (all of them when no year is selected). Counted by the database.
+      const payingCustomers = anyDb
+        .select({ userId: tables.bookings.user_id })
+        .from(tables.bookings)
+        .where(and(inArray(tables.bookings.payment_status, ['paid']), isNotNull(tables.bookings.user_id), yearCondition, branchConditionBookings));
+      const createdYear = sqlVnFormat('%Y', tables.users.created_at);
+      const [row] = await anyDb
+        .select({
+          total: count(),
+          newUsers: year ? sql<number>`coalesce(sum(case when ${createdYear} = ${String(year)} then 1 else 0 end), 0)` : sql<number>`0`
+        })
+        .from(tables.users)
+        .where(inArray(tables.users.id, payingCustomers));
+      const total = Number(row?.total || 0);
+      const newUsers = Number(row?.newUsers || 0);
+      return { newUsers, returningUsers: total - newUsers };
     })()
   };
 
@@ -537,13 +558,6 @@ export async function getDashboardMetricsImpl(
     };
   }
   return metrics;
-}
-
-/** Adds a paid order to the cash / VietQR totals. */
-function addToMethodTotals(totals: { cash: number; vietqr: number }, paymentMethod: unknown, price: number) {
-  const method = String(paymentMethod || '').toLowerCase();
-  if (method === 'cash') totals.cash += price;
-  else if (method === 'vietqr') totals.vietqr += price;
 }
 
 /**
@@ -569,20 +583,26 @@ export async function getRevenueByDateImpl(
   const timeCondition = status === 'all' ? sqlListedInRange(tables.bookings, range) : sqlPaidInRange(tables.bookings, range);
   const branchCondition = buildBranchBookingCondition(tables.bookings, args.branchIds);
 
-  const bookings = await anyDb
-    .select({ total_price: tables.bookings.total_price, payment_method: tables.bookings.payment_method })
+  const totals = await sumOrders(anyDb, tables, and(timeCondition, branchCondition));
+  return { date: dateStr || 'all', ...totals };
+}
+
+/** Total, number of orders and cash / VietQR totals of the matching orders, summed by the database. */
+async function sumOrders(anyDb: any, tables: { bookings: any }, where: any) {
+  const [row] = await anyDb
+    .select({
+      total: sqlMoneySum(tables.bookings.total_price),
+      cnt: count(),
+      cash: sqlMethodSum(tables.bookings, 'cash'),
+      vietqr: sqlMethodSum(tables.bookings, 'vietqr')
+    })
     .from(tables.bookings)
-    .where(and(timeCondition, branchCondition));
-
-  const methods = { cash: 0, vietqr: 0 };
-  let total = 0;
-  for (const b of bookings) {
-    const price = Number(b.total_price || 0);
-    total += price;
-    addToMethodTotals(methods, b.payment_method, price);
-  }
-
-  return { date: dateStr || 'all', total, count: bookings.length, revenueByMethod: methods };
+    .where(where);
+  return {
+    total: Number(row?.total || 0),
+    count: Number(row?.cnt || 0),
+    revenueByMethod: { cash: Number(row?.cash || 0), vietqr: Number(row?.vietqr || 0) }
+  };
 }
 
 /** Revenue of the last 7 Vietnam days, today last. */
@@ -601,20 +621,17 @@ export async function getRevenue7DaysImpl(anyDb: any, tables: { bookings: any },
     end: vnDayStart(today.year, today.month, today.day + 1).toISOString()
   };
 
-  const bookings = await anyDb
-    .select({
-      total_price: tables.bookings.total_price,
-      paid_at: tables.bookings.paid_at,
-      created_at: tables.bookings.created_at
-    })
+  // Revenue per Vietnam day of payment, summed by the database (a row with a broken date is left out)
+  const daySql = sqlVnFormat('%Y-%m-%d', sqlRevenueInstant(tables.bookings));
+  const rows = await anyDb
+    .select({ day: daySql, revenue: sqlMoneySum(tables.bookings.total_price) })
     .from(tables.bookings)
-    .where(and(sqlPaidInRange(tables.bookings, range), branchCondition));
+    .where(and(sqlPaidInRange(tables.bookings, range), branchCondition))
+    .groupBy(daySql);
 
-  for (const b of bookings) {
-    const instant = revenueInstant(b);
-    if (!instant) continue; // one row with a broken date does not stop the report
-    const key = vnKey(vnYmd(instant));
-    if (daysMap.has(key)) daysMap.set(key, daysMap.get(key)! + Number(b.total_price || 0));
+  for (const row of rows) {
+    const key = String(row.day || '');
+    if (daysMap.has(key)) daysMap.set(key, daysMap.get(key)! + Number(row.revenue || 0));
   }
 
   const days: { day: string; revenue: number }[] = [];
@@ -654,38 +671,26 @@ export async function getRevenueByMonthImpl(
   const range = oneMonth ? vnMonthRange(targetYear, targetMonth) : vnYearRange(targetYear);
   const timeCondition = status === 'all' ? sqlListedInRange(tables.bookings, range) : sqlPaidInRange(tables.bookings, range);
 
-  const bookings = await anyDb
-    .select({
-      total_price: tables.bookings.total_price,
-      paid_at: tables.bookings.paid_at,
-      created_at: tables.bookings.created_at,
-      payment_method: tables.bookings.payment_method,
-      payment_status: tables.bookings.payment_status
-    })
-    .from(tables.bookings)
-    .where(and(timeCondition, branchCondition));
-
   if (oneMonth) {
-    const methods = { cash: 0, vietqr: 0 };
-    let total = 0;
-    for (const b of bookings) {
-      const price = Number(b.total_price || 0);
-      total += price;
-      addToMethodTotals(methods, b.payment_method, price);
-    }
-    return { total, count: bookings.length, revenueByMethod: methods };
+    return sumOrders(anyDb, tables, and(timeCondition, branchCondition));
   }
 
   // Array length 12. A paid order counts in the month it was paid, any other order in the month it was created.
+  // Summed per Vietnam month by the database; a row with a broken date is left out.
+  const instantSql = sql`case when lower(coalesce(${tables.bookings.payment_status}, '')) = 'paid'
+      then ${sqlRevenueInstant(tables.bookings)} else nullif(${tables.bookings.created_at}, '') end`;
+  const monthSql = sqlVnFormat('%Y-%m', instantSql);
+  const rows = await anyDb
+    .select({ month: monthSql, revenue: sqlMoneySum(tables.bookings.total_price) })
+    .from(tables.bookings)
+    .where(and(timeCondition, branchCondition))
+    .groupBy(monthSql);
   const months = Array(12)
     .fill(0)
     .map((_, i) => ({ month: i + 1, revenue: 0 }));
-  for (const b of bookings) {
-    const isPaid = String(b.payment_status || '').toLowerCase() === 'paid';
-    const instant = revenueInstant(isPaid ? b : { created_at: b.created_at });
-    if (!instant) continue; // one row with a broken date does not stop the report
-    const parts = vnYmd(instant);
-    if (parts.year === targetYear) months[parts.month - 1].revenue += Number(b.total_price || 0);
+  for (const row of rows) {
+    const [rowYear, rowMonth] = String(row.month || '').split('-').map(Number);
+    if (rowYear === targetYear && rowMonth >= 1 && rowMonth <= 12) months[rowMonth - 1].revenue += Number(row.revenue || 0);
   }
 
   return { year: targetYear, data: months };

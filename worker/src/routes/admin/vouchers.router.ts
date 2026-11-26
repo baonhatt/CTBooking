@@ -12,16 +12,23 @@ import {
   toggleVoucherStatusImpl,
   deleteVoucherImpl,
   restoreVoucherImpl,
-  listDeletedVouchersImpl
+  listDeletedVouchersImpl,
+  listVoucherPackageOptionsImpl
 } from '../../../../server/routes/admin/vouchers';
+import { clampPage } from '../../../../server/lib/paging';
+
+/** A branch id from the query, or null for none, "all" or a bad value. */
+function branchIdFromQuery(value: string | undefined): number | null {
+  const number = Number(value);
+  return value && value !== 'all' && Number.isInteger(number) && number > 0 ? number : null;
+}
 
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const vouchersRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
 vouchersRouter.get('/api/admin/vouchers', requireStaffAuth, requirePermission('vouchers', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 20);
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'));
     const q = String(c.req.query('q') || '');
     const scope = c.req.query('scope') || '';
     const is_active = c.req.query('is_active');
@@ -35,13 +42,44 @@ vouchersRouter.get('/api/admin/vouchers', requireStaffAuth, requirePermission('v
 
     const r = await listVouchersImpl(
       db,
-      { vouchers: schema.vouchers, voucher_redemption_logs: schema.voucher_redemption_logs },
-      { page, pageSize, q, scope, is_active, sale_staff_id, status, sort_by, sort_dir, restrictToBranchIds: restrictBranchIds }
+      { vouchers: schema.vouchers, voucher_redemption_logs: schema.voucher_redemption_logs, bookings: schema.bookings },
+      {
+        page,
+        pageSize,
+        q,
+        scope,
+        is_active,
+        sale_staff_id,
+        status,
+        sort_by,
+        sort_dir,
+        branch_id: branchIdFromQuery(c.req.query('branch_id')),
+        restrictToBranchIds: restrictBranchIds
+      }
     );
 
     return c.json(r, 200 as any);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500 as any);
+  }
+});
+
+// GET /api/admin/vouchers/package-options - ticket packages the voucher form can pick (before /:id, which would catch it)
+vouchersRouter.get('/api/admin/vouchers/package-options', requireStaffAuth, requirePermission('vouchers', 'view'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listVoucherPackageOptionsImpl(
+      db,
+      { ticket_packages: schema.ticket_packages },
+      {
+        type: String(c.req.query('type') || 'all'),
+        branch_id: branchIdFromQuery(c.req.query('branch_id')),
+        restrictToBranchIds: getRestrictBranchIds(c)
+      }
+    );
+    return c.json(r, 200 as any);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500 as any);
   }
 });
 
@@ -221,8 +259,7 @@ vouchersRouter.get(
   requirePermission('vouchers', 'view_deleted'),
   async (c) => {
     try {
-      const page = Number(c.req.query('page') || 1);
-      const pageSize = Number(c.req.query('pageSize') || 10);
+      const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
       const search = String(c.req.query('q') || c.req.query('search') || '');
       const scope = c.req.query('scope') || '';
       const restrictBranchIds = getRestrictBranchIds(c);
@@ -232,7 +269,15 @@ vouchersRouter.get(
       const r = await listDeletedVouchersImpl(
         db,
         { vouchers: schema.vouchers },
-        { page, pageSize, search, scope, restrictToBranchIds: restrictBranchIds }
+        {
+          page,
+          pageSize,
+          search,
+          scope,
+          is_active: c.req.query('is_active'),
+          branch_id: branchIdFromQuery(c.req.query('branch_id')),
+          restrictToBranchIds: restrictBranchIds
+        }
       );
 
       return c.json(r, 200 as any);

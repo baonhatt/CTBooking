@@ -29,12 +29,6 @@ export async function getTickets(options?: {
   }>(path, { signal: options?.signal });
 }
 
-export async function getActiveTickets(options?: { signal?: AbortSignal }) {
-  return request<{ items: any[] }>(`/api/tickets-active`, {
-    signal: options?.signal
-  });
-}
-
 export async function getTicketById(id: number) {
   return request<{ item: any }>(`/api/admin/tickets/${id}`);
 }

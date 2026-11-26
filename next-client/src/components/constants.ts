@@ -1,9 +1,9 @@
-export const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+\-\=\[\]{};':"\\|,.<>\/?]{6,}$/;
+export const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+\-\=\[\]{};':"\\|,.<>\/?]{8,72}$/;
 
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Shown under every "new password" field before the customer types
-export const PASSWORD_RULE_TEXT = 'Ít nhất 6 ký tự, gồm cả chữ và số';
+export const PASSWORD_RULE_TEXT = 'Ít nhất 8 ký tự, gồm cả chữ và số';
 
 // Login, register, OTP and forgot-password dialogs: a bottom sheet on a phone (it scrolls when the keyboard takes
 // room), the usual centered dialog from the sm breakpoint up

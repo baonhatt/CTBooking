@@ -21,12 +21,6 @@ export async function getToys(options?: {
   }>(path, { signal: options?.signal });
 }
 
-export async function getActiveToys(options?: { signal?: AbortSignal }) {
-  return request<{ items: any[] }>('/api/toys-active', {
-    signal: options?.signal
-  });
-}
-
 export async function getToyById(id: number) {
   return request<{ toy: any }>(`/api/admin/toys/${id}`);
 }

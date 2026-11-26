@@ -22,18 +22,4 @@ export async function getActiveTickets(branchId?: number, options?: { signal?: A
   return await res.json();
 }
 
-export async function getActiveToys(options?: { signal?: AbortSignal }) {
-  const res = await fetch(`${API}/api/toys?status=active`, {
-    next: { revalidate: 3600 },
-    headers: {
-      // Thêm headers để giúp SEO bot nhận diện request server-side
-      ...(typeof window === 'undefined' && {
-        'User-Agent': `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})`
-      })
-    }
-  });
-  if (!res.ok) {
-    return { items: [], total: 0 };
-  }
-  return await res.json();
-}
+// The toy list fetcher was removed with the public toy routes (TẠM ẨN ĐỒ CHƠI 20261110): see app/page.tsx.

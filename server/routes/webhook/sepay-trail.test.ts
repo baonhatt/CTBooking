@@ -37,6 +37,11 @@ function makeWebhookDb(booking: any) {
   return { db, inserts, updates };
 }
 
+/** SePay's transactionDate text (Vietnam time, "YYYY-MM-DD HH:mm:ss") for an ISO instant */
+function vnText(iso: string) {
+  return new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function pendingBooking(overrides: Record<string, any> = {}) {
   return {
     id: 55,
@@ -116,38 +121,99 @@ describe('SePay webhook: payment on time', () => {
   });
 });
 
-describe('SePay webhook: late payment', () => {
-  it('fails the order, keeps the bank reference and writes sepay_late_payment', async () => {
-    const { db, inserts, updates } = makeWebhookDb(pendingBooking({ created_at: minutesAgo(30) }));
+describe('SePay webhook: late payment (never confirmed automatically)', () => {
+  const paidCalls = () => (updatePaymentImpl as any).mock.calls.filter((call: any[]) => call[1].payment_status === 'paid');
+
+  it('after the 10 minutes: the order is expired, the bank reference kept, and it goes to staff', async () => {
+    const { db, inserts, updates } = makeWebhookDb(pendingBooking({ created_at: minutesAgo(11) }));
+
+    const result: any = await handleSePayWebhookImpl(db, webhookTables, transfer({ transferAmount: 999999999 }));
+
+    expect(result.message).toBe('Late payment - left for staff');
+    expect(paidCalls()).toHaveLength(0);
+    expect((updatePaymentImpl as any).mock.calls[0][1].payment_status).toBe('expired');
+    expect(updates.find((entry) => entry.table === bookingsTable)?.values).toEqual({ transaction_id: 'FT26313000123' });
+    expect(auditActions(inserts)).toEqual(['sepay_late_payment']);
+  });
+
+  it('the deadline is payment_expires_at when the order has one', async () => {
+    const overdue = pendingBooking({ created_at: minutesAgo(2), payment_expires_at: minutesAgo(1) });
+    const { db } = makeWebhookDb(overdue);
 
     const result: any = await handleSePayWebhookImpl(db, webhookTables, transfer());
 
-    expect(result.success).toBe(true);
-    expect((updatePaymentImpl as any).mock.calls[0][1].payment_status).toBe('failed');
-    expect(updates.find((entry) => entry.table === bookingsTable)?.values).toEqual({ transaction_id: 'FT26313000123' });
-    expect(auditActions(inserts)).toEqual(['sepay_late_payment']);
-    const line = inserts.find((entry) => entry.table === auditLogsTable)!.values;
-    expect(line.staffEmail).toBe('system');
-    expect(line.entityId).toBe('55');
-    expect(line.newValues).toContain('FT26313000123');
+    expect(result.message).toBe('Late payment - left for staff');
+    expect(paidCalls()).toHaveLength(0);
   });
 
-  it('is never paid by the webhook, whatever the amount', async () => {
-    const { db } = makeWebhookDb(pendingBooking({ created_at: minutesAgo(11) }));
+  it('an order the customer cancelled, or one that failed, is never paid, even inside the 10 minutes', async () => {
+    for (const paymentStatus of ['cancelled', 'failed']) {
+      vi.clearAllMocks();
+      const { db, inserts } = makeWebhookDb(pendingBooking({ payment_status: paymentStatus, created_at: minutesAgo(3) }));
 
-    await handleSePayWebhookImpl(db, webhookTables, transfer({ transferAmount: 999999999 }));
+      const result: any = await handleSePayWebhookImpl(db, webhookTables, transfer());
 
-    const statuses = (updatePaymentImpl as any).mock.calls.map((call: any[]) => call[1].payment_status);
-    expect(statuses).not.toContain('paid');
+      expect(result.message).toBe('Late payment - left for staff');
+      expect(updatePaymentImpl).not.toHaveBeenCalled();
+      expect(auditActions(inserts)).toEqual(['sepay_late_payment']);
+    }
   });
 
-  it('keeps the reference of an order that was already cancelled when the money came', async () => {
-    (updatePaymentImpl as any).mockResolvedValue({ status: 200, already_processed: true });
-    const { db, updates, inserts } = makeWebhookDb(pendingBooking({ payment_status: 'failed', created_at: minutesAgo(40) }));
+  it('an order the system closed at its deadline is paid when the bank made the transfer in time (no voucher)', async () => {
+    (updatePaymentImpl as any).mockResolvedValue({ status: 200 });
+    const booking = pendingBooking({ payment_status: 'expired', created_at: minutesAgo(12), payment_expires_at: minutesAgo(2) });
+    const { db } = makeWebhookDb(booking);
+
+    // The bank made the transfer 9 minutes after the order (in time); SePay reports it now, 12 minutes after
+    await handleSePayWebhookImpl(db, webhookTables, transfer({ transactionDate: vnText(minutesAgo(3)) }));
+
+    const paid = paidCalls()[0][1];
+    expect(paid).toMatchObject({ only_open_pending: true, allow_system_expired: true });
+    expect(paid.paid_in_time_at.toISOString().slice(0, 19)).toBe(minutesAgo(3).slice(0, 19));
+  });
+
+  it('...but not when it used a voucher, nor when the bank time is after the deadline', async () => {
+    for (const [overrides, bankTime] of [
+      [{ voucher_id: 4 }, minutesAgo(3)],
+      [{}, minutesAgo(1)]
+    ] as const) {
+      vi.clearAllMocks();
+      const booking = pendingBooking({ payment_status: 'expired', created_at: minutesAgo(12), payment_expires_at: minutesAgo(2), ...overrides });
+      const { db } = makeWebhookDb(booking);
+      const result: any = await handleSePayWebhookImpl(db, webhookTables, transfer({ transactionDate: vnText(bankTime) }));
+      expect(result.message).toBe('Late payment - left for staff');
+      expect(paidCalls()).toHaveLength(0);
+    }
+  });
+
+  it('a pending order is judged by the bank time: reported after the deadline but made in time is paid', async () => {
+    (updatePaymentImpl as any).mockResolvedValue({ status: 200 });
+    const { db } = makeWebhookDb(pendingBooking({ created_at: minutesAgo(11), payment_expires_at: minutesAgo(1) }));
+
+    await handleSePayWebhookImpl(db, webhookTables, transfer({ transactionDate: vnText(minutesAgo(2)) }));
+
+    expect(paidCalls()).toHaveLength(1);
+    expect(paidCalls()[0][1].allow_system_expired).toBe(false);
+  });
+
+  it('inside the 10 minutes the payment asks the update to require an open pending order', async () => {
+    (updatePaymentImpl as any).mockResolvedValue({ status: 200 });
+    const { db } = makeWebhookDb(pendingBooking({ created_at: minutesAgo(2) }));
 
     await handleSePayWebhookImpl(db, webhookTables, transfer());
 
-    expect(updates.some((entry) => entry.values.transaction_id === 'FT26313000123')).toBe(true);
+    expect(paidCalls()[0][1].only_open_pending).toBe(true);
+  });
+
+  it('losing the race with a cancel / expiry sends the money to staff', async () => {
+    (updatePaymentImpl as any)
+      .mockResolvedValueOnce({ status: 200, already_processed: true, booking: { payment_status: 'cancelled' } })
+      .mockResolvedValue({ status: 200 });
+    const { db, inserts } = makeWebhookDb(pendingBooking({ created_at: minutesAgo(2) }));
+
+    const result: any = await handleSePayWebhookImpl(db, webhookTables, transfer());
+
+    expect(result.message).toBe('Late payment - left for staff');
     expect(auditActions(inserts)).toEqual(['sepay_late_payment']);
   });
 });

@@ -34,6 +34,8 @@ export default function TechnologyBanner({
   }, [initialListItems]);
 
   const [hasMainVideoStarted, setHasMainVideoStarted] = useState(false);
+  // Phone: the intro shows 3 lines until "Xem thêm" is pressed (a bigger screen always shows all of it)
+  const [isIntroOpen, setIsIntroOpen] = useState(false);
   const videoRefs = useRef<HTMLVideoElement[]>([]);
   const carouselItemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const mainVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -248,9 +250,9 @@ export default function TechnologyBanner({
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.4 }}
-          className="text-center mb-8 sm:mb-12 max-w-3xl mx-auto space-y-3"
+          viewport={{ once: true, margin: '0px 0px 200px 0px' }}
+          transition={{ duration: 0.3 }}
+          className="mb-8 sm:mb-12 max-w-3xl space-y-3"
         >
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(59,130,246,0.2)]">
             <Sparkles className="w-4 h-4 text-blue-400" />
@@ -264,25 +266,38 @@ export default function TechnologyBanner({
               cùng Vũ Trụ Đa Chiều 8K
             </span>
           </h2>
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+          <p
+            className={`text-slate-300 text-sm sm:text-base leading-relaxed sm:line-clamp-none ${
+              isIntroOpen ? '' : 'line-clamp-3'
+            }`}
+          >
             Chào mừng bạn đến với Huyễn Cảnh Không Gian, nơi những giới hạn về vật lý bị xóa nhòa để nhường chỗ cho
             những trải nghiệm thị giác đỉnh cao. Không đơn thuần là một phòng chiếu phim, đây là "cánh cửa thần kỳ" đưa
             bạn bước vào những chiều không gian mà thực tại chưa bao giờ chạm tới.
           </p>
+          {!isIntroOpen && (
+            <button
+              type="button"
+              onClick={() => setIsIntroOpen(true)}
+              className="sm:hidden min-h-[44px] text-sm font-semibold text-cyan-300 hover:text-cyan-200"
+            >
+              Xem thêm
+            </button>
+          )}
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          viewport={{ once: true, margin: '0px 0px 200px 0px' }}
+          transition={{ duration: 0.3 }}
           className="max-w-6xl mx-auto mb-8 sm:mb-12"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center gap-8">
             <div className="w-full md:basis-5/12 lg:basis-5/12 xl:max-w-[480px]">
               <div
                 ref={mainVideoContainerRef}
-                className="relative w-full aspect-[9/13] rounded-3xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl group cursor-pointer"
+                className="relative w-full aspect-[4/5] sm:aspect-[9/13] rounded-3xl overflow-hidden border border-white/10 bg-slate-900 shadow-2xl group cursor-pointer"
                 onClick={!hasMainVideoStarted ? toggleMainVideo : undefined}
               >
                 <AnimatePresence>
@@ -387,7 +402,7 @@ export default function TechnologyBanner({
             </div>
             <div className="w-full md:basis-7/12 lg:basis-7/12 space-y-6">
               <h3 className="text-2xl md:text-3xl font-bold text-white">Tại sao bạn không nên bỏ lỡ?</h3>
-              <ul className="space-y-4">
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-1 sm:gap-0 sm:space-y-4">
                 {[
                   {
                     icon: Monitor,
@@ -396,7 +411,7 @@ export default function TechnologyBanner({
                   },
                   {
                     icon: Sparkles,
-                    title: 'Siêu định dạng 8K+8K',
+                    title: 'Siêu định dạng 8K+',
                     text: 'Thước phim CG siêu phân giải, chân thực đến khó tin, không cần đeo thiết bị hỗ trợ.'
                   },
                   {
@@ -410,13 +425,16 @@ export default function TechnologyBanner({
                     text: 'Studio hoàn hảo để có những thước phim TikTok và bức ảnh nghệ thuật đậm phong cách riêng.'
                   }
                 ].map(({ icon: Icon, title, text }) => (
-                  <li key={title} className="flex items-start gap-3">
+                  <li
+                    key={title}
+                    className="flex flex-col items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:flex-row sm:gap-3 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
+                  >
                     <span className="shrink-0 w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
                       <Icon className="w-5 h-5 text-cyan-300" />
                     </span>
                     <div>
-                      <p className="text-white font-semibold">{title}</p>
-                      <p className="text-sm text-gray-300 leading-relaxed">{text}</p>
+                      <p className="text-white font-semibold text-sm sm:text-base leading-snug">{title}</p>
+                      <p className="hidden sm:block text-sm text-gray-300 leading-relaxed">{text}</p>
                     </div>
                   </li>
                 ))}
@@ -428,11 +446,11 @@ export default function TechnologyBanner({
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+          viewport={{ once: true, margin: '0px 0px 200px 0px' }}
+          transition={{ duration: 0.3 }}
         >
-          <div className="flex flex-col items-center md:flex-row md:items-end md:justify-between gap-4 mb-6 md:mb-11">
-            <h3 className="text-3xl md:text-3xl font-bold text-white text-center md:text-left">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6 md:mb-11">
+            <h3 className="text-2xl md:text-3xl font-bold text-white">
               Khám phá không gian Cinesphere
             </h3>
             {videoPreviewsMerged.length > 1 && (
@@ -474,7 +492,7 @@ export default function TechnologyBanner({
                       <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
+                        viewport={{ once: true, margin: '0px 0px 200px 0px' }}
                         transition={{ duration: 0.3 }}
                         className="relative w-full aspect-[10/16] rounded-2xl overflow-hidden border border-white/10 bg-black/20 group cursor-pointer shadow-lg"
                       >

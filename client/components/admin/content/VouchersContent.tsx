@@ -1940,46 +1940,10 @@ export default function VouchersContent(props: Props) {
                                         ? (selectedVoucher.recent_redemptions as any[])
                                         : [];
 
-                                    const displayNote = (() => {
-                                        if (selectedVoucher.note) return selectedVoucher.note;
-                                        if (selectedVoucher.description) {
-                                            try {
-                                                const trimmed = selectedVoucher.description.trim();
-                                                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                                                    const parsed = JSON.parse(trimmed);
-                                                    return parsed.note || parsed.text || '';
-                                                }
-                                            } catch {}
-                                            return selectedVoucher.description;
-                                        }
-                                        return '';
-                                    })();
-
-                                    const displaySaleName = selectedVoucher.sale_name || (() => {
-                                        if (selectedVoucher.description) {
-                                            try {
-                                                const trimmed = selectedVoucher.description.trim();
-                                                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                                                    const parsed = JSON.parse(trimmed);
-                                                    return parsed.sale_name || null;
-                                                }
-                                            } catch {}
-                                        }
-                                        return null;
-                                    })();
-
-                                    const displaySaleEmail = selectedVoucher.sale_email || (() => {
-                                        if (selectedVoucher.description) {
-                                            try {
-                                                const trimmed = selectedVoucher.description.trim();
-                                                if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                                                    const parsed = JSON.parse(trimmed);
-                                                    return parsed.sale_email || null;
-                                                }
-                                            } catch {}
-                                        }
-                                        return null;
-                                    })();
+                                    // The server sends the note and the Sales person already parsed out of the stored description
+                                    const displayNote = selectedVoucher.note || '';
+                                    const displaySaleName = selectedVoucher.sale_name || null;
+                                    const displaySaleEmail = selectedVoucher.sale_email || null;
 
                                     return (
                                         <>

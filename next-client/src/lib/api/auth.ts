@@ -24,10 +24,14 @@ export async function registerApi(body: {
   phone?: string;
   turnstileToken?: string;
 }) {
-  return request<{ status: string; message: string; user: any }>('/api/register', {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
+  // Step 1 of registration: no account yet, a code goes to the email (see server/routes/user/register-otp.ts)
+  return request<{ status: string; message: string; requires_otp?: boolean; otp_challenge?: string; email?: string; user?: any }>(
+    '/api/register',
+    {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }
+  );
 }
 
 // Whether an email can still be registered (asked on the first step of the register form)

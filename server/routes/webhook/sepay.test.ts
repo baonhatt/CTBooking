@@ -56,4 +56,36 @@ describe('SePay Webhook Logic (Auth removed to route)', () => {
     expect(result.message).toBe('Insufficient amount');
     expect(updatePaymentImpl).not.toHaveBeenCalled(); // Critical assertion retained
   });
+
+  // A booking row as the webhook reads it; created now, so the payment window is still open
+  const bookingDb = (paymentStatus: string) => ({
+    query: {
+      bookings: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 1,
+          pay_txt_code: 'CS123456789012',
+          total_price: 100000,
+          user_id: 1,
+          payment_status: paymentStatus,
+          created_at: new Date().toISOString()
+        })
+      }
+    }
+  });
+
+  it('a missing or non-numeric amount is never enough to mark the order paid', async () => {
+    for (const transferAmount of [undefined, 'abc', '']) {
+      const body = { content: 'Thanh toan CS123456789012', transferAmount };
+      const result = await handleSePayWebhookImpl(bookingDb('pending'), { bookings: {} } as any, body);
+      expect(result.message).toBe('Insufficient amount');
+    }
+    expect(updatePaymentImpl).not.toHaveBeenCalled();
+  });
+
+  it('enough money for a booking that was cancelled is not paid: it goes to staff', async () => {
+    const body = { content: 'Thanh toan CS123456789012', transferAmount: 100000 };
+    const result = await handleSePayWebhookImpl(bookingDb('cancelled'), { bookings: {} } as any, body);
+    expect(result.message).toBe('Late payment - left for staff');
+    expect(updatePaymentImpl).not.toHaveBeenCalled();
+  });
 });

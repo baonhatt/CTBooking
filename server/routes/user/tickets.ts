@@ -1,6 +1,16 @@
 import { eq, asc, inArray, and, isNull, sql } from 'drizzle-orm';
 import { enrichItemsWithParsedBranchIds, sqlBranchIdsMatchFilter, matchesBranchFilter } from '../../lib/branch-ids';
 
+/** The movie columns a package carries to the customer screens (title and poster, and the branches for filtering). */
+const MOVIE_COLUMNS = {
+  id: true,
+  title: true,
+  cover_image: true,
+  duration_min: true,
+  branch_id: true,
+  branch_ids: true
+} as const;
+
 export async function listActiveTicketPackages(
   anyDb: any,
   tables: { ticket_packages: any; movies: any },
@@ -21,6 +31,20 @@ export async function listActiveTicketPackages(
 
   const items = await anyDb.query.ticket_packages.findMany({
     where: whereCondition,
+    // What the customer screens show, plus what the logic below needs (combo, branches, is_member_only for the route)
+    columns: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+      features: true,
+      type: true,
+      combo: true,
+      display_order: true,
+      is_member_only: true,
+      branch_id: true,
+      branch_ids: true
+    },
     orderBy: [asc(tables.ticket_packages.display_order), asc(tables.ticket_packages.price)]
   });
 
@@ -55,6 +79,7 @@ export async function listActiveTicketPackages(
         isNull(tables.movies.deleted_at),
         sqlBranchIdsMatchFilter(tables.movies.branch_ids, tables.movies.branch_id, branch_id)
       ),
+      columns: MOVIE_COLUMNS,
       orderBy: [asc(tables.movies.id)]
     });
     branchActiveMovies = branchMoviesFromDb.map((movie: any) => ({
@@ -81,7 +106,8 @@ export async function listActiveTicketPackages(
         inArray(tables.movies.id, missingMovieIds),
         eq(tables.movies.is_active, true),
         isNull(tables.movies.deleted_at)
-      )
+      ),
+      columns: MOVIE_COLUMNS,
     });
 
     extraMovies.forEach((movie: any) => {

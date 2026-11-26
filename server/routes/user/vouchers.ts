@@ -1,7 +1,10 @@
 import { eq, and, or, count, isNull, sql, inArray } from 'drizzle-orm';
+import { matchesBranchFilter } from '../../lib/branch-ids';
 import type { VoucherValidateResponse, VRPackageItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
 import { parseVoucherMetadata } from '../admin/vouchers';
+import { isFullDiscountVoucher, isSuperAdminStaff } from '../../lib/free-voucher';
+import { staffs as staffsTable } from '../../../shared/schema';
 
 function parseNullableJsonArray(val: any): number[] {
   if (val === null || val === undefined) return [];
@@ -15,6 +18,14 @@ function parseNullableJsonArray(val: any): number[] {
     }
   }
   return [];
+}
+
+/**
+ * Whether a ticket / VR package is sold at a branch, with the same rule as the package lists shown to customers
+ * (matchesBranchFilter): branch_ids lists the branches, no list means every branch.
+ */
+export function packageServesBranch(pkg: { branch_ids?: any; branch_id?: number | null }, branchId: number): boolean {
+  return matchesBranchFilter(pkg?.branch_ids ?? null, pkg?.branch_id ?? null, branchId);
 }
 
 export function matchesBranch(branchIdsJson: any, targetBranchId?: number): boolean {
@@ -142,6 +153,26 @@ export async function validateVoucherForVRImpl(
       perUserCount = perEmailCountRes?.count || 0;
     }
 
+    // Orders still waiting for payment (pending, inside their 10 minutes) also hold a use. Without this a customer could
+    // open several unpaid orders with a 1-use-per-customer code and pay them all.
+    if (tables.bookings && (user_id || (email && email.trim()))) {
+      const customerFilter = user_id
+        ? eq(tables.bookings.user_id, user_id)
+        : sql`LOWER(${tables.bookings.email}) = LOWER(${String(email).trim()})`;
+      const [pendingRes] = await anyDb
+        .select({ count: count() })
+        .from(tables.bookings)
+        .where(
+          and(
+            eq(tables.bookings.voucher_id, voucher.id),
+            sql`lower(${tables.bookings.payment_status}) = 'pending'`,
+            sql`${tables.bookings.payment_expires_at} > ${formatDateForDb(new Date())}`,
+            customerFilter
+          )
+        );
+      perUserCount += Number(pendingRes?.count || 0);
+    }
+
     if (perUserCount >= Number(voucher.per_user_limit)) {
       return {
         valid: false,
@@ -255,7 +286,9 @@ export async function validateVoucherForVRImpl(
   //   - scope=movie → only movie ticket from applicable list counts
   //   - scope=all → both VR and movie from applicable list count
   const meta = parseVoucherMetadata(voucher.description);
-  let dynamicDescription = meta.note || voucher.description || '';
+  // Only the staff note is shown to the customer. The raw description is JSON that also holds the Sales person's id
+  // and email, so it is never used as a fallback (parseVoucherMetadata already returns a plain-text description as note).
+  let dynamicDescription = meta.note || '';
   const appliedPackageIds: number[] = [];
   
   if (applicable.length > 0) {
@@ -339,6 +372,21 @@ export async function validateVoucherForVRImpl(
     if (maxDisc > 0 && discount_amount > maxDisc) discount_amount = maxDisc;
   }
   if (discount_amount > order_total) discount_amount = order_total;
+
+  // 10. 100% VOUCHERS (test vouchers): usable only while their Sales person is a Super Admin, and the only way an
+  // order may become 0đ. Any other voucher that would take the whole price off is refused.
+  const isFullDiscount = isFullDiscountVoucher(voucher);
+  const fullDiscountAllowed = isFullDiscount && (await isSuperAdminStaff(anyDb, staffsTable, meta.sale_staff_id));
+  if (isFullDiscount && !fullDiscountAllowed) {
+    return { valid: false, message: 'Mã giảm giá không hợp lệ', error_code: 'VOUCHER_INACTIVE' };
+  }
+  if (order_total > 0 && discount_amount >= order_total && !fullDiscountAllowed) {
+    return {
+      valid: false,
+      message: 'Mã giảm giá này không dùng được vì giảm hết giá trị đơn hàng',
+      error_code: 'VOUCHER_MIN_ORDER_NOT_REACHED'
+    };
+  }
 
   return {
     valid: true,

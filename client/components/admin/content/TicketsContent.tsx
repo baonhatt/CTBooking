@@ -344,7 +344,7 @@ export default function TicketsContent(props: Props) {
     const searchText = movieSearch.trim();
     const timer = setTimeout(
       () => {
-        getMoviesAdmin({ status: 'active', pageSize: 100, q: searchText })
+        getMoviesAdmin({ status: 'active', pageSize: 100, q: searchText, picker: true })
           .then((res) => {
             setMovies(res.items);
             setMovieTotal(Number(res.total ?? res.items.length));
@@ -489,14 +489,6 @@ export default function TicketsContent(props: Props) {
       if (minPlayers !== undefined && maxPlayers !== undefined && minPlayers > maxPlayers) {
         errors.max_players = 'Số người tối đa phải lớn hơn hoặc bằng số người tối thiểu';
       }
-    } else {
-      const minGroup = parse_optional_number(editData?.min_group_size);
-      const maxGroup = parse_optional_number(editData?.max_group_size);
-      if (minGroup !== undefined && minGroup < 1) errors.min_group_size = 'Tối thiểu 1 người';
-      if (maxGroup !== undefined && maxGroup < 1) errors.max_group_size = 'Tối thiểu 1 người';
-      if (minGroup !== undefined && maxGroup !== undefined && minGroup > maxGroup) {
-        errors.max_group_size = 'Nhóm tối đa phải lớn hơn hoặc bằng nhóm tối thiểu';
-      }
     }
     setTicketErrors(errors);
     return Object.keys(errors).length === 0;
@@ -548,8 +540,6 @@ export default function TicketsContent(props: Props) {
         features,
         type: editData.type || 'movie',
         combo: validCombo,
-        min_group_size: parse_optional_number(editData.min_group_size),
-        max_group_size: parse_optional_number(editData.max_group_size),
         is_member_only: !!editData.is_member_only,
         is_active: editData.is_active !== undefined ? !!editData.is_active : true,
         display_order: editData.display_order ? Number(editData.display_order) : 0,
@@ -1111,38 +1101,7 @@ export default function TicketsContent(props: Props) {
                         />
                       </FormField>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField label="Nhóm tối thiểu (người)" htmlFor="fmi_ticket_min_group_size" error={ticketErrors.min_group_size}>
-                        <Input
-                          id="fmi_ticket_min_group_size"
-                          type="number"
-                          min={1}
-                          placeholder="Vd: 2"
-                          value={editData?.min_group_size ?? ''}
-                          onChange={(e) => {
-                            setEditData({ ...editData, min_group_size: parse_optional_number(e.target.value) });
-                            clearTicketError('min_group_size');
-                          }}
-                          className={`${ADMIN_INPUT} ${ticketErrors.min_group_size ? 'border-red-500' : ''}`}
-                        />
-                      </FormField>
-                      <FormField label="Nhóm tối đa (người)" htmlFor="fmi_ticket_max_group_size" error={ticketErrors.max_group_size}>
-                        <Input
-                          id="fmi_ticket_max_group_size"
-                          type="number"
-                          min={1}
-                          placeholder="Vd: 6"
-                          value={editData?.max_group_size ?? ''}
-                          onChange={(e) => {
-                            setEditData({ ...editData, max_group_size: parse_optional_number(e.target.value) });
-                            clearTicketError('max_group_size');
-                          }}
-                          className={`${ADMIN_INPUT} ${ticketErrors.max_group_size ? 'border-red-500' : ''}`}
-                        />
-                      </FormField>
-                    </div>
-                  )}
+                  ) : null}
 
                   <FormField label="Mô tả tóm tắt" htmlFor="fmi_ticket_description">
                     <textarea
@@ -1637,20 +1596,7 @@ export default function TicketsContent(props: Props) {
                             </div>
                           </div>
                         </>
-                      ) : (
-                        <>
-                          <div className="space-y-1">
-                            <Label className="text-[11px] font-bold uppercase text-gray-400 block">
-                              Nhóm tối thiểu
-                            </Label>
-                            <div className="text-xs">{selectedTicket.min_group_size ?? EMPTY_VALUE}</div>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[11px] font-bold uppercase text-gray-400 block">Nhóm tối đa</Label>
-                            <div className="text-xs">{selectedTicket.max_group_size ?? EMPTY_VALUE}</div>
-                          </div>
-                        </>
-                      )}
+                      ) : null}
                     </div>
                   </CardContent>
                 </div>

@@ -14,24 +14,22 @@ export async function listStaffImpl(
   const { page = 1, pageSize = 20, q = '', includeInactive = false, roleId, branchId, restrictToBranchIds } = params;
   const offset = (page - 1) * pageSize;
 
+  // Only what the staff screen, the audit-log filter and the voucher form read (no avatar: it can be a long data URL).
+  // The role filter is a sub-query, so a staff member with several roles is still one row.
   let query = db
     .select({
       id: staffs.id,
       email: staffs.email,
       fullname: staffs.fullname,
       phone: staffs.phone,
-      avatar: staffs.avatar,
       isSuperAdmin: staffs.isSuperAdmin,
       isActive: staffs.isActive,
       forcePasswordChange: staffs.forcePasswordChange,
       lastLoginAt: staffs.lastLoginAt,
       createdAt: staffs.createdAt,
-      updatedAt: staffs.updatedAt,
-      roleCount: sql<number>`count(${staffRoles.roleId})`
+      updatedAt: staffs.updatedAt
     })
     .from(staffs)
-    .leftJoin(staffRoles, eq(staffs.id, staffRoles.staffId))
-    .groupBy(staffs.id)
     .orderBy(desc(staffs.createdAt))
     .limit(pageSize)
     .offset(offset);
@@ -48,7 +46,7 @@ export async function listStaffImpl(
   }
 
   if (roleId) {
-    conditions.push(eq(staffRoles.roleId, roleId));
+    conditions.push(inArray(staffs.id, db.select({ staffId: staffRoles.staffId }).from(staffRoles).where(eq(staffRoles.roleId, roleId))));
   }
 
   if (branchId) {
@@ -80,7 +78,7 @@ export async function listStaffImpl(
   const staffList = await query;
 
   const staffIds = staffList.map((s: any) => s.id);
-  const staffWithDetails = staffList.map((s: any) => ({ ...s, roleIds: [], roles: [], branchIds: [], branchNames: [], branches: [] }));
+  const staffWithDetails = staffList.map((s: any) => ({ ...s, roleIds: [], roles: [], branchIds: [], branchNames: [] }));
 
   if (staffIds.length > 0) {
     const allRoles = await db
@@ -113,14 +111,10 @@ export async function listStaffImpl(
       s.roles = r.map((x: any) => x.roleName);
       s.branchIds = b.map((x: any) => x.branchId);
       s.branchNames = b.map((x: any) => x.branchName);
-      s.branches = b.map((x: any) => ({ id: x.branchId, name: x.branchName }));
     });
   }
 
-  let countQuery = db
-    .select({ count: count(sql`DISTINCT ${staffs.id}`) })
-    .from(staffs)
-    .leftJoin(staffRoles, eq(staffs.id, staffRoles.staffId));
+  let countQuery = db.select({ count: count() }).from(staffs);
 
   if (conditions.length > 0) {
     countQuery = countQuery.where(and(...conditions));
@@ -176,14 +170,14 @@ export async function getStaffByIdImpl(db: any, tables: any, id: number, caller?
   let updateLog: any;
   if (auditLogs) {
     [createLog] = await db
-      .select()
+      .select({ staffFullname: auditLogs.staffFullname })
       .from(auditLogs)
       .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'create')))
       .orderBy(auditLogs.createdAt)
       .limit(1);
 
     [updateLog] = await db
-      .select()
+      .select({ staffFullname: auditLogs.staffFullname })
       .from(auditLogs)
       .where(and(eq(auditLogs.entityType, 'staff'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'update')))
       .orderBy(desc(auditLogs.createdAt))
@@ -247,16 +241,19 @@ export async function createStaffImpl(
     };
   }
 
+  // Every staff member works for at least one branch. No branch never means "all branches" (that is the Super Admin).
+  if (!isBranchIdList(branchIds) || branchIds.length === 0) {
+    return { status: 'error', message: 'Vui lòng chọn ít nhất một chi nhánh cho nhân viên' };
+  }
+
   if (!callerIsSuperAdmin) {
     if (roleIds.length > 0) {
       return { status: 'error', message: 'Chỉ Super Admin mới được gán role cho nhân viên' };
     }
 
-    if (branchIds.length > 0) {
-      const invalidBranch = branchIds.some((branchId) => !callerBranchIds.includes(branchId));
-      if (invalidBranch) {
-        return { status: 'error', message: 'Không được gán nhân viên cho chi nhánh ngoài phạm vi quản lý' };
-      }
+    const invalidBranch = branchIds.some((branchId) => !callerBranchIds.includes(branchId));
+    if (invalidBranch) {
+      return { status: 'error', message: 'Không được gán nhân viên cho chi nhánh ngoài phạm vi quản lý' };
     }
   }
 
@@ -357,6 +354,11 @@ export async function createStaffImpl(
   };
 }
 
+/** True for an array of positive whole numbers (branch ids sent by the form). */
+function isBranchIdList(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((branchId) => Number.isInteger(branchId) && branchId > 0);
+}
+
 const OUT_OF_SCOPE_MESSAGE =
   'Bạn chỉ được thao tác trên nhân viên làm việc duy nhất tại chi nhánh của mình. Nhân viên thuộc nhiều chi nhánh chỉ Super Admin được thao tác.';
 
@@ -432,6 +434,12 @@ export async function updateStaffImpl(
         return { status: 'error', message: 'Không được gán nhân viên cho chi nhánh ngoài phạm vi quản lý' };
       }
     }
+  }
+
+  // The branch list may change but never become empty, unless the person is being made Super Admin
+  const becomesSuperAdmin = callerIsSuperAdmin && Boolean((body as any).isSuperAdmin);
+  if (branchIds !== undefined && !becomesSuperAdmin && (!isBranchIdList(branchIds) || branchIds.length === 0)) {
+    return { status: 'error', message: 'Vui lòng chọn ít nhất một chi nhánh cho nhân viên' };
   }
 
   if (isActive === false && caller?.id === id) {
@@ -652,9 +660,10 @@ export async function restoreStaffImpl(
 export async function listDeletedStaffImpl(
   db: any,
   tables: any,
-  options: { page?: number; pageSize?: number; search?: string; sort?: string; dir?: string } = {}
+  options: { page?: number; pageSize?: number; search?: string; sort?: string; dir?: string } = {},
+  restrictToBranchIds: number[] | null = null
 ) {
-  const { staffs } = tables;
+  const { staffs, staffBranches, staffRoles, roles } = tables;
   const { page = 1, pageSize = 10, search = '', sort, dir } = options;
 
   const conditions = [];
@@ -662,6 +671,19 @@ export async function listDeletedStaffImpl(
     conditions.push(or(like(staffs.fullname, `%${search}%`), like(staffs.email, `%${search}%`)));
   }
   conditions.push(isNotNull(staffs.deletedAt));
+
+  // Same scope as the normal staff list: no Super Admins, only staff of the caller's branches (null = Super Admin)
+  if (restrictToBranchIds && restrictToBranchIds.length === 0) {
+    conditions.push(sql`1 = 0`);
+  } else if (restrictToBranchIds) {
+    conditions.push(eq(staffs.isSuperAdmin, false));
+    conditions.push(
+      inArray(
+        staffs.id,
+        db.select({ staffId: staffBranches.staffId }).from(staffBranches).where(inArray(staffBranches.branchId, restrictToBranchIds))
+      )
+    );
+  }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -673,9 +695,8 @@ export async function listDeletedStaffImpl(
       email: staffs.email,
       fullname: staffs.fullname,
       phone: staffs.phone,
-      isSuperAdmin: staffs.isSuperAdmin,
-      deletedAt: staffs.deletedAt,
-      deleted_by_staff_id: staffs.deleted_by_staff_id,
+      // The names the "deleted staff" screen reads
+      deleted_at: staffs.deletedAt,
       deleted_by_staff_name: staffsAlias.fullname
     })
     .from(staffs)
@@ -689,7 +710,22 @@ export async function listDeletedStaffImpl(
         : dir === 'asc' ? asc(staffs.deletedAt) : desc(staffs.deletedAt)
     );
 
-  const items = await query;
+  const rows = await query;
+
+  // The role names of each staff member on the page, as one text ("Thu ngân, Quản lý")
+  const roleNamesByStaff = new Map<number, string[]>();
+  const staffIds = rows.map((row: any) => row.id);
+  if (staffRoles && roles && staffIds.length > 0) {
+    const roleRows = await db
+      .select({ staffId: staffRoles.staffId, roleName: roles.name })
+      .from(staffRoles)
+      .innerJoin(roles, eq(staffRoles.roleId, roles.id))
+      .where(inArray(staffRoles.staffId, staffIds));
+    for (const roleRow of roleRows) {
+      roleNamesByStaff.set(roleRow.staffId, [...(roleNamesByStaff.get(roleRow.staffId) || []), roleRow.roleName]);
+    }
+  }
+  const items = rows.map((row: any) => ({ ...row, role: (roleNamesByStaff.get(row.id) || []).join(', ') || null }));
 
   const [countResult] = await db.select({ count: count() }).from(staffs).where(whereClause);
 

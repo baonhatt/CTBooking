@@ -1,3 +1,4 @@
+import { sqlBranchIdsStaffAccessFilter } from '../../lib/branch-ids';
 import { eq, desc, asc, and, or, like, sql, inArray } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
@@ -58,6 +59,20 @@ export async function loadPostStaffNames(anyDb: any, tables: { auditLogs: any },
   const names = new Map<number, { created_by_staff_name: string | null; updated_by_staff_name: string | null }>();
   if (postIds.length === 0) return names;
 
+  const postLogs = and(
+    eq(tables.auditLogs.entityType, 'post'),
+    inArray(tables.auditLogs.entityId, postIds.map(String)),
+    inArray(tables.auditLogs.action, ['create', 'update'])
+  );
+  // At most two rows per post: its first "create" and its last "update" (a post edited often has many update rows)
+  const firstCreateAndLastUpdate = anyDb
+    .select({
+      id: sql`CASE WHEN ${tables.auditLogs.action} = 'create' THEN MIN(${tables.auditLogs.id}) ELSE MAX(${tables.auditLogs.id}) END`
+    })
+    .from(tables.auditLogs)
+    .where(postLogs)
+    .groupBy(tables.auditLogs.entityId, tables.auditLogs.action);
+
   const logs = await anyDb
     .select({
       entityId: tables.auditLogs.entityId,
@@ -65,13 +80,7 @@ export async function loadPostStaffNames(anyDb: any, tables: { auditLogs: any },
       staffFullname: tables.auditLogs.staffFullname
     })
     .from(tables.auditLogs)
-    .where(
-      and(
-        eq(tables.auditLogs.entityType, 'post'),
-        inArray(tables.auditLogs.entityId, postIds.map(String)),
-        inArray(tables.auditLogs.action, ['create', 'update'])
-      )
-    )
+    .where(inArray(tables.auditLogs.id, firstCreateAndLastUpdate))
     .orderBy(asc(tables.auditLogs.createdAt));
 
   for (const log of logs) {
@@ -85,6 +94,22 @@ export async function loadPostStaffNames(anyDb: any, tables: { auditLogs: any },
   return names;
 }
 
+/** The columns of the admin post list (PostManagement): no content, no SEO fields, no author id. */
+export const POST_LIST_COLUMNS = {
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  featured_image: true,
+  status: true,
+  is_featured: true,
+  view_count: true,
+  published_at: true,
+  created_at: true,
+  updated_at: true,
+  branch_ids: true
+} as const;
+
 export async function listPostsImpl(
   anyDb: any,
   tables: { posts: any; auditLogs: any },
@@ -95,9 +120,11 @@ export async function listPostsImpl(
     status?: string;
     // Adds created_by_staff_name / updated_by_staff_name to each item (admin list only)
     withStaffNames?: boolean;
+    /** Admin list for branch staff: posts for all branches or for one of theirs (null = Super Admin, every post) */
+    restrictToBranchIds?: number[] | null;
   } = {}
 ) {
-  const { page = 1, pageSize = 10, q, status, withStaffNames = false } = options;
+  const { page = 1, pageSize = 10, q, status, withStaffNames = false, restrictToBranchIds = null } = options;
 
   let whereCondition: any = undefined;
   const conditions: any[] = [];
@@ -108,6 +135,10 @@ export async function listPostsImpl(
 
   if (status && status !== 'all') {
     conditions.push(eq(tables.posts.status, status));
+  }
+
+  if (restrictToBranchIds) {
+    conditions.push(sqlBranchIdsStaffAccessFilter(tables.posts.branch_ids, restrictToBranchIds));
   }
 
   if (conditions.length > 0) {
@@ -122,6 +153,8 @@ export async function listPostsImpl(
 
   const items = await anyDb.query.posts.findMany({
     where: whereCondition,
+    // The list screen shows no article text and no SEO fields: those are read when one post is opened
+    columns: POST_LIST_COLUMNS,
     orderBy: [
       // Sort by status priority: published (1) > draft (2) > archived (3)
       sql`CASE 
@@ -159,32 +192,32 @@ export async function listPostsImpl(
   };
 }
 
+/** The post a URL names: a plain id (123), a slug ending in the id (tieu-de-bai-viet-123), or a plain slug. */
+export function postIdentifierCondition(tables: { posts: any }, identifier: number | string) {
+  const rawId = Number(identifier);
+  if (!isNaN(rawId)) {
+    // Trường hợp là numbers thuần (VD: 123)
+    return eq(tables.posts.id, rawId);
+  }
+  // Trường hợp là string (slug hoặc slug-id)
+  const strId = String(identifier);
+  const parts = strId.split('-');
+  const potentialId = Number(parts[parts.length - 1]);
+  if (parts.length > 1 && !isNaN(potentialId)) {
+    // Định dạng slug-id (VD: tieu-de-bai-viet-123)
+    return eq(tables.posts.id, potentialId);
+  }
+  // Định dạng slug thuần (VD: tieu-de-bai-viet)
+  return eq(tables.posts.slug, strId);
+}
+
 export async function getPostImpl(
   anyDb: any,
   tables: { posts: any; auditLogs: any },
   identifier: number | string,
   publicOnly: boolean = false
 ) {
-  let condition;
-  const rawId = Number(identifier);
-
-  if (!isNaN(rawId)) {
-    // Trường hợp là numbers thuần (VD: 123)
-    condition = eq(tables.posts.id, rawId);
-  } else {
-    // Trường hợp là string (slug hoặc slug-id)
-    const strId = String(identifier);
-    const parts = strId.split('-');
-    const potentialId = Number(parts[parts.length - 1]);
-
-    if (parts.length > 1 && !isNaN(potentialId)) {
-      // Định dạng slug-id (VD: tieu-de-bai-viet-123)
-      condition = eq(tables.posts.id, potentialId);
-    } else {
-      // Định dạng slug thuần (VD: tieu-de-bai-viet)
-      condition = eq(tables.posts.slug, strId);
-    }
-  }
+  let condition: any = postIdentifierCondition(tables, identifier);
 
   if (publicOnly) {
     condition = and(condition, eq(tables.posts.status, 'published'));

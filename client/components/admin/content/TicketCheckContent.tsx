@@ -101,7 +101,6 @@ interface TicketInfo {
   voucher_code_snapshot?: string | null;
   voucher_details?: {
     scope?: string | null;
-    description?: string | null;
     applicable_ids?: unknown;
   } | null;
   created_at: string;
@@ -110,17 +109,13 @@ interface TicketInfo {
   checked_in_at: string | null;
   checked_in_by_staff_name?: string | null;
   payment_method: string | null;
-  userName: string;
   is_used: boolean;
   valid: boolean;
   can_use: boolean;
   pay_txt_code?: string;
   /** The bank's reference for the transfer, when the bank reported one for this order */
   transaction_id?: string | null;
-  validity_days: number | null;
   expired: boolean;
-  movie_title?: string;
-  movie_duration?: string;
   ticket_package_name?: string;
   booking_type?: 'movie' | 'vr' | 'combo_vr' | string | null;
   vr_items?: VRItem[];

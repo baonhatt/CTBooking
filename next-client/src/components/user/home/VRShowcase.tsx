@@ -20,8 +20,7 @@ import {
   ChevronRight,
   Plus,
   Minus,
-  CheckCircle2,
-  Info
+  CheckCircle2
 } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
 import { useQuery } from '@tanstack/react-query';
@@ -43,6 +42,19 @@ const safetyGuidelines = [
   'Hãy báo ngay cho trợ tá nếu bạn cảm thấy chóng mặt, buồn nôn trong quá trình trải nghiệm.',
   'Luôn tuân thủ giới hạn khu vực chơi để tránh va chạm vật lý ngoài đời thực.'
 ];
+
+// Shown when a package has no cover image yet (same picture the card already used when an image failed to load)
+const VR_PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?auto=format&fit=crop&w=800&q=80';
+
+// "2 người" / "1-4 người" from the admin's numbers; when they are empty, from the name ("... (2 NGƯỜI)").
+// Returns '' when neither says it, so the badge is hidden instead of showing a wrong number.
+function playersLabel(pkg: any): string {
+  const fewest = Number(pkg.min_players) || Number(pkg.max_players);
+  const most = Number(pkg.max_players) || fewest;
+  if (fewest > 0) return fewest === most ? `${fewest} người` : `${fewest}-${most} người`;
+  const fromName = String(pkg.name || '').match(/(\d+)\s*NGƯỜI/i);
+  return fromName ? `${fromName[1]} người` : '';
+}
 
 export default function VRShowcase({
   initialPackages = [],
@@ -159,9 +171,9 @@ export default function VRShowcase({
       <div className="absolute right-10 bottom-10 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,_rgba(192,38,211,0.16)_0%,_transparent_70%)] pointer-events-none" />
       <div className="absolute -left-20 bottom-1/3 w-[450px] h-[450px] rounded-full bg-[radial-gradient(circle,_rgba(6,182,212,0.15)_0%,_transparent_70%)] pointer-events-none" />
 
-      <div className="container mx-auto px-3 sm:px-4 relative z-10">
+      <div className="container mx-auto px-4 relative z-10">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-3">
+        <div className="max-w-3xl mb-6 sm:mb-12 space-y-2 sm:space-y-3">
           <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs sm:text-xs font-bold uppercase tracking-widest backdrop-blur-md shadow-[0_0_20px_rgba(168,85,247,0.2)]">
             <Gamepad2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 animate-pulse" />
             <span>Thực Tế Ảo 8K / 9D Siêu Thực</span>
@@ -175,7 +187,7 @@ export default function VRShowcase({
             Đỉnh Cao
           </h2>
 
-          <p className="text-slate-300 text-xs sm:text-base leading-relaxed max-w-2xl mx-auto">
+          <p className="text-slate-300 text-xs sm:text-base leading-relaxed max-w-2xl">
             Đắm chìm trong các tựa game và phim nhập vai tương tác 360°. Trang bị kính thực tế ảo Ultra HD, áo xúc giác
             Haptic Vest cảm nhận va chạm sống động.
           </p>
@@ -183,10 +195,10 @@ export default function VRShowcase({
 
         {/* VR Package Grid (2 columns on mobile, 3 on desktop) */
         filteredPackages.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-2.5 sm:gap-6 max-w-7xl mx-auto">
+          <div className="flex flex-wrap gap-2.5 sm:gap-6">
             {filteredPackages.map((pkg: any) => {
-              const imageUrl = resolveImageUrl(pkg.cover_image);
-              const hasImage = Boolean(pkg.cover_image);
+              const imageUrl = pkg.cover_image ? resolveImageUrl(pkg.cover_image) : VR_PLACEHOLDER_IMAGE;
+              const players = playersLabel(pkg);
 
               return (
                 <Card
@@ -194,9 +206,13 @@ export default function VRShowcase({
                   className="bg-slate-900/80 border border-white/10 backdrop-blur-md overflow-hidden hover:border-purple-500/50 hover:shadow-[0_0_35px_rgba(168,85,247,0.25)] transition-all duration-300 group flex flex-col rounded-xl sm:rounded-2xl w-[calc(50%-0.3125rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc(33.333%-1rem)] xl:w-[calc(25%-1.125rem)]"
                 >
                   {/* Package Cover Image Header */}
-                  <div className="relative aspect-[4/5] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
-                    {hasImage ? (
-                      <>
+                  <button
+                    type="button"
+                    onClick={() => openDetailModal(pkg)}
+                    aria-label={`Xem chi tiết ${pkg.name}`}
+                    className="relative aspect-[4/5] w-full overflow-hidden bg-slate-950 flex items-center justify-center cursor-pointer"
+                  >
+                    <>
                         <div
                           className="absolute inset-0 bg-cover bg-center opacity-40 blur-xl scale-110 pointer-events-none transition-transform duration-500 group-hover:scale-125"
                           style={{ backgroundImage: `url(${optimizeCloudinaryUrl(imageUrl, 600)})` }}
@@ -211,17 +227,7 @@ export default function VRShowcase({
                               'https://images.unsplash.com/photo-1593508512255-86ab42a8e620?auto=format&fit=crop&w=800&q=80';
                           }}
                         />
-                      </>
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-950/70 via-slate-900 to-fuchsia-950/70 flex flex-col items-center justify-center gap-1 sm:gap-2 p-2 sm:p-4 text-center">
-                        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-300">
-                          <Gamepad2 className="w-6 h-6 sm:w-9 sm:h-9" />
-                        </div>
-                        <span className="text-xs sm:text-xs font-bold text-slate-400 uppercase tracking-widest">
-                          Cinesphere VR
-                        </span>
-                      </div>
-                    )}
+                    </>
 
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent pointer-events-none" />
 
@@ -237,30 +243,27 @@ export default function VRShowcase({
                       <Clock className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-purple-400" /> {pkg.duration_min || 30}p
                     </span>
 
-                    {/* Player capacity badge: only when the admin entered a number (the name often says it already) */}
-                    {(Number(pkg.min_players) > 0 || Number(pkg.max_players) > 0) && (
+                    {/* Player badge: from the admin's numbers, else from the name; hidden when neither says it */}
+                    {players && (
                       <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 flex items-center gap-1 text-xs text-slate-300 font-medium bg-slate-950/80 backdrop-blur-md py-0.5 px-1.5 sm:py-1 sm:px-2 rounded sm:rounded-lg border border-white/10">
-                        <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400" />{' '}
-                        {(() => {
-                          // One missing number follows the other; a range shows only when the two really differ
-                          const fewest = Number(pkg.min_players) || Number(pkg.max_players);
-                          const most = Number(pkg.max_players) || fewest;
-                          return fewest === most ? `${fewest} người` : `${fewest}-${most} người`;
-                        })()}
+                        <Users className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400" /> {players}
                       </span>
                     )}
-                  </div>
+                  </button>
 
                   {/* Body Content */}
                   <div className="p-3 sm:p-5 flex-1 flex flex-col justify-between space-y-2.5 sm:space-y-4">
                     <div className="space-y-1.5 sm:space-y-3">
-                      <h3 className="font-extrabold text-white text-sm sm:text-base tracking-tight line-clamp-2 group-hover:text-purple-300 transition-colors">
-                        {pkg.name}
+                      <h3 className="font-extrabold text-white text-sm sm:text-base tracking-tight line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem] group-hover:text-purple-300 transition-colors">
+                        <button type="button" onClick={() => openDetailModal(pkg)} className="text-left cursor-pointer">
+                          {pkg.name}
+                        </button>
                       </h3>
 
-                      {pkg.description && (
-                        <p className="text-slate-400 text-xs leading-relaxed line-clamp-2">{pkg.description}</p>
-                      )}
+                      {/* Two lines are kept for the description even when empty, so cards in a row stay the same height */}
+                      <p className="text-slate-400 text-xs leading-relaxed line-clamp-2 min-h-[2rem] hidden sm:block">
+                        {pkg.description || ''}
+                      </p>
 
                       {/* Feature Highlights (Desktop only to save mobile space) */}
                       <div className="space-y-1 pt-1 hidden sm:block">
@@ -286,41 +289,27 @@ export default function VRShowcase({
                         </span>
                       </div>
 
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => handleBookNow(pkg, 1)}
-                        className="w-full bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:to-purple-600 text-white text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl h-11 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
-                      >
-                        <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
-                        ĐẶT NGAY
-                      </Button>
-
-                      <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openDetailModal(pkg)}
-                          className="w-full bg-white/[0.05] hover:bg-white/[0.12] text-slate-300 hover:text-white border-white/10 text-xs font-semibold rounded-lg sm:rounded-xl h-11 transition-all px-1 flex items-center justify-center"
-                          title="Chi tiết"
-                          aria-label={`Chi tiết ${pkg.name}`}
-                        >
-                          <Info className="w-3.5 h-3.5 sm:mr-1 text-purple-400" />
-                          <span className="hidden sm:inline">Chi tiết</span>
-                        </Button>
-
+                      {/* Same pair as the movie package cards: cart icon + book (details open from the image or the name) */}
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => handleAddToCart(pkg, 1)}
-                          className="w-full bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/20 text-xs font-semibold rounded-lg sm:rounded-xl h-11 transition-all px-1 flex items-center justify-center"
-                          title="Thêm vào giỏ"
+                          className="h-11 w-11 px-0 shrink-0 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/20 rounded-lg sm:rounded-xl transition-all"
+                          title="Thêm vào giỏ hàng"
                           aria-label={`Thêm ${pkg.name} vào giỏ hàng`}
                         >
-                          <ShoppingCart className="w-3.5 h-3.5 sm:mr-1" />
-                          <span className="hidden sm:inline">Thêm giỏ</span>
+                          <ShoppingCart className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleBookNow(pkg, 1)}
+                          className="flex-1 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-pink-600 hover:to-purple-600 text-white text-xs sm:text-sm font-bold rounded-lg sm:rounded-xl h-11 shadow-[0_0_15px_rgba(168,85,247,0.3)] hover:scale-[1.02] active:scale-95 transition-all"
+                        >
+                          <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5" />
+                          ĐẶT NGAY
                         </Button>
                       </div>
                     </div>

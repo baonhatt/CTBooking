@@ -3,7 +3,7 @@ import { Hono, Context } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 import {
   isLocal,
@@ -34,7 +34,19 @@ import {
 
 import { sendMail } from '../../../server/routes/mail-service';
 import { resolveOrderTokenSecret, makeOrderToken } from '../../../server/lib/order-token';
+import {
+  makeOtpChallenge,
+  readOtpChallenge,
+  makeRegisterChallenge,
+  readRegisterChallenge
+} from '../../../server/lib/otp-challenge';
+import {
+  startRegistrationImpl,
+  verifyRegistrationImpl,
+  resendRegistrationImpl
+} from '../../../server/routes/user/register-otp';
 import { clampPage } from '../../../server/lib/paging';
+import { isStrongPassword, PASSWORD_RULE_MESSAGE } from '../../../server/lib/password-rule';
 
 type Variables = {
   accountId?: number;
@@ -100,12 +112,14 @@ userRouter.post('/api/login', async (c) => {
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
     if (status === 200 && (r as any).requires_otp) {
+      // The OTP step gets a signed, short-lived challenge instead of the raw account id (see otp-challenge.ts)
+      const otpChallenge = await makeOtpChallenge(resolveOrderTokenSecret(c.env, c.req.url), (r as any).temp_account_id);
       return c.json(
         {
           status: 'success',
           requires_otp: true,
           message: (r as any).message,
-          temp_account_id: (r as any).temp_account_id,
+          otp_challenge: otpChallenge,
           email: (r as any).email
         },
         200
@@ -145,18 +159,106 @@ userRouter.post('/api/login', async (c) => {
   }
 });
 
+// Tables used by the three registration routes (register-otp.ts)
+const registrationTables = {
+  accounts: schema.accounts,
+  users: schema.users,
+  tokens: schema.tokens,
+  email_logs: schema.email_logs,
+  register_pending: schema.register_pending
+};
+
+// REGISTRATION STEP 2: the code from the email creates the account and signs the customer in
+userRouter.post('/api/register/verify', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body = await c.req.json().catch(() => ({}));
+    const challenge = await readRegisterChallenge(resolveOrderTokenSecret(c.env, c.req.url), (body as any)?.otp_challenge);
+    if (!challenge) {
+      return c.json({ status: 'error', message: 'Phiên đăng ký đã hết hạn, vui lòng đăng ký lại' }, 401);
+    }
+    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
+    const r: any = await verifyRegistrationImpl(
+      db,
+      registrationTables,
+      c.env.SETTINGS_KV,
+      { email: challenge.email, registration_id: challenge.registrationId, otp: String((body as any)?.otp || '') },
+      generateSessionToken,
+      calculateSessionExpiry,
+      getMailer(c),
+      (data: { customerName: string; email: string }) => getWelcomeEmailTemplate(appBaseUrl, data),
+      { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
+    );
+    const status = typeof r.status === 'number' ? r.status : 200;
+    if (status !== 200) {
+      return c.json({ status: 'error', message: r.message }, status as any);
+    }
+    const cookieOptions = isLocal(c.req.url)
+      ? 'Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000'
+      : 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000';
+    c.header('Set-Cookie', `session_token=${r.token}; ${cookieOptions}`);
+    return c.json({ status: 'success', message: r.message, user: r.user, token: r.token }, 200);
+  } catch (err: any) {
+    logSystemError('register-verify', err);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
+// REGISTRATION: mail a new code (CAPTCHA like the other mail-sending routes)
+userRouter.post('/api/register/resend', async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body = await c.req.json().catch(() => ({}));
+    const turnstileCheck = await verifyTurnstile(
+      c.env,
+      (body as any)?.turnstileToken,
+      c.req.url,
+      c.req.header('CF-Connecting-IP')
+    );
+    if (!turnstileCheck.ok) {
+      return c.json({ status: 'error', message: turnstileCheck.message }, turnstileCheck.status);
+    }
+    const challenge = await readRegisterChallenge(resolveOrderTokenSecret(c.env, c.req.url), (body as any)?.otp_challenge);
+    if (!challenge) {
+      return c.json({ status: 'error', message: 'Phiên đăng ký đã hết hạn, vui lòng đăng ký lại' }, 401);
+    }
+    const r: any = await resendRegistrationImpl(
+      db,
+      registrationTables,
+      c.env.SETTINGS_KV,
+      { email: challenge.email, registration_id: challenge.registrationId },
+      getMailer(c),
+      { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
+    );
+    const status = typeof r.status === 'number' ? r.status : 200;
+    return c.json({ ...r, status: status >= 400 ? 'error' : 'success' }, status as any);
+  } catch (err: any) {
+    logSystemError('register-resend', err);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
+// Shown when the OTP challenge is missing, forged or older than OTP_CHALLENGE_LIFETIME_MS
+const OTP_CHALLENGE_EXPIRED_MESSAGE = 'Phiên xác thực đã hết hạn, vui lòng đăng nhập lại';
+
 userRouter.post('/api/validate-otp', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
     const body = await c.req.json().catch(() => ({}));
 
+    // The account comes only from the signed challenge issued at login, never from an id in the body
+    const accountId = await readOtpChallenge(resolveOrderTokenSecret(c.env, c.req.url), (body as any)?.otp_challenge);
+    if (!accountId) {
+      return c.json({ status: 'error', message: OTP_CHALLENGE_EXPIRED_MESSAGE }, 401);
+    }
+
     const r = await validateOTPImpl(
       db,
 
       { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
 
-      { ...body, days: 30 },
+      { temp_account_id: accountId, otp: String((body as any)?.otp || ''), days: 30 },
 
       generateSessionToken,
 
@@ -217,6 +319,12 @@ userRouter.post('/api/resend-otp', async (c) => {
       return c.json({ status: 'error', message: turnstileCheck.message }, turnstileCheck.status);
     }
 
+    // The account comes only from the signed challenge issued at login; the code goes to that account's own email
+    const accountId = await readOtpChallenge(resolveOrderTokenSecret(c.env, c.req.url), (body as any)?.otp_challenge);
+    if (!accountId) {
+      return c.json({ status: 'error', message: OTP_CHALLENGE_EXPIRED_MESSAGE }, 401);
+    }
+
     const mailer = getMailer(c);
 
     const r = await resendOTPImpl(
@@ -224,7 +332,7 @@ userRouter.post('/api/resend-otp', async (c) => {
 
       { accounts: schema.accounts, users: schema.users, tokens: schema.tokens, email_logs: schema.email_logs },
 
-      body,
+      { temp_account_id: accountId },
 
       c.env.SETTINGS_KV,
 
@@ -249,7 +357,7 @@ userRouter.post('/api/resend-otp', async (c) => {
 
 const registerSchema = z.object({
   email: z.string().email('Email không hợp lệ').max(254, 'Email quá dài'),
-  password: z.string().min(1, 'Mật khẩu không được để trống'),
+  password: z.string().refine((value) => isStrongPassword(value), PASSWORD_RULE_MESSAGE),
   name: z
     .string()
     .trim()
@@ -325,51 +433,37 @@ userRouter.post('/api/register', async (c) => {
       return c.json({ status: 'error', message: turnstileCheck.message }, turnstileCheck.status);
     }
 
-    const mailer = getMailer(c);
-
-    const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
-
-    const renderWelcome = (data: { customerName: string; email: string }) => getWelcomeEmailTemplate(appBaseUrl, data);
-
-    const r = await registerImpl(
+    // Step 1 of 2: no account yet. The form is kept and a code is mailed; /api/register/verify creates the account.
+    // (Before, the account was created at once without proving the email belongs to the person registering.)
+    const r: any = await startRegistrationImpl(
       db,
-
-      { accounts: schema.accounts, users: schema.users, email_logs: schema.email_logs },
-
+      registrationTables,
+      c.env.SETTINGS_KV,
       parsed.data as any,
-
-      mailer,
-
-      renderWelcome,
-
-      c.executionCtx
+      getMailer(c),
+      { waitUntil: (promise) => c.executionCtx.waitUntil(promise) }
     );
 
-    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
-
+    const status = typeof r.status === 'number' ? r.status : 200;
+    if (status !== 200) {
+      return c.json({ status: 'error', message: r.message, seconds_remaining: r.seconds_remaining }, status as any);
+    }
     const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
+      status: 'success',
+      requires_otp: true,
+      message: r.message,
+      email: r.email,
+      otp_challenge: await makeRegisterChallenge(resolveOrderTokenSecret(c.env, c.req.url), r.email, r.registration_id)
     };
 
     return c.json(payload, status);
   } catch (err: any) {
     const body = await c.req.json().catch(() => ({}));
 
-    logSystemError('register', err, body);
+    // The details go to the system log only, never to the browser (they could show database or code internals)
+    logSystemError('register', err, { email: (body as any)?.email });
 
-    const status = err?.status || 500;
-
-    return c.json(
-      {
-        message: err?.message || 'Lỗi máy chủ nội bộ',
-        error: String(err),
-        cause: err?.cause ? String(err.cause) : undefined,
-        stack: err?.stack || null
-      },
-      status
-    );
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 
@@ -451,7 +545,7 @@ userRouter.post('/api/forget-password', async (c) => {
   } catch (err: any) {
     logSystemError('forget-password', err, body);
 
-    return c.json({ message: 'Lỗi máy chủ nội bộ', error: String(err?.message || err) }, 500);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
 
@@ -502,10 +596,12 @@ userRouter.post('/api/logout', async (c) => {
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const token = c.req.header('cookie')?.match(/session_token=([^;]+)/)?.[1];
+    // Same sources as requireAuth: the cookie, or the Bearer header the site sends. Both end the session in the database.
+    const bearer = c.req.header('Authorization')?.replace('Bearer ', '').trim();
+    const token = c.req.header('cookie')?.match(/session_token=([^;]+)/)?.[1] || bearer;
 
     if (token) {
-      await db.delete(schema.tokens).where(eq(schema.tokens.token, token));
+      await db.delete(schema.tokens).where(and(eq(schema.tokens.token, token), eq(schema.tokens.type, 'session')));
     }
 
     const isLocalEnv = isLocal(c.req.url);
@@ -527,17 +623,20 @@ userRouter.get('/api/user/profile', requireAuth, async (c) => {
     const accountId = c.get('accountId');
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await getUserProfileByAccountIdImpl(db, { accounts: schema.accounts, users: schema.users }, accountId);
+    const r: any = await getUserProfileByAccountIdImpl(db, { accounts: schema.accounts, users: schema.users }, accountId);
 
-    const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
+    const status = typeof r.status === 'number' ? r.status : 200;
+    if (status >= 400) return c.json({ status: 'error', message: r.message }, status as any);
 
-    const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
-    };
-
-    return c.json(payload as any, status as any);
+    // Only what the account page fills its form with (no ids, account flags or audit dates)
+    return c.json({
+      status: 'success',
+      fullname: r.fullname,
+      phone: r.phone,
+      email: r.email,
+      gender: r.gender,
+      dob: r.dob
+    });
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -560,13 +659,9 @@ userRouter.post('/api/user/profile', requireAuth, async (c) => {
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
-    const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
-    };
-
-    return c.json(payload as any, status);
+    // The account page shows its own form values after saving, so the saved row is not sent back
+    if (status >= 400) return c.json({ status: 'error', message: (r as any).message }, status as any);
+    return c.json({ status: 'success', message: 'Cập nhật thông tin thành công' });
   } catch {
     return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
   }
@@ -630,11 +725,9 @@ userRouter.get('/api/user/transactions', requireAuth, async (c) => {
       {
         accounts: schema.accounts,
 
+        branches: schema.branches,
+
         bookings: schema.bookings,
-
-        movies: schema.movies,
-
-        ticket_packages: schema.ticket_packages,
 
         booking_vr_items: schema.booking_vr_items,
 

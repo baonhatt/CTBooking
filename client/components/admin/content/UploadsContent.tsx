@@ -11,7 +11,7 @@ import {
   updateSiteMediaApi,
   deleteSiteMediaApi
 } from '@/lib/api/uploads';
-import { getBranches } from '@/lib/api/branches';
+import { getAdminBranchOptions } from '@/lib/api/branches';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
 import { formatVnDateTime } from '@/lib/format';
 import { formatDistanceToNow } from 'date-fns';
@@ -118,8 +118,9 @@ export default function UploadsContent() {
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
 
   useEffect(() => {
-    getBranches({ pageSize: 100, includeInactive: true })
-      .then((res) => setBranches((res.items || []).map((branch: any) => ({ id: branch.id, name: branch.name }))))
+    // The light options list (id and name), not the branch list with its statistics
+    getAdminBranchOptions({ includeInactive: true })
+      .then((res) => setBranches((res.items || []).map((branch) => ({ id: branch.id, name: branch.name }))))
       .catch(() => {
         // Without the names the badge falls back to the branch count, so the library still works
       });

@@ -59,8 +59,6 @@ import {
 interface Tx {
   id: string;
   booking_code?: string;
-  userId?: number | null;
-  transactionId: string;
   email: string;
   phone?: string;
   userName: string;
@@ -77,16 +75,11 @@ interface Tx {
   updatedAt?: Date | null;
   expired: boolean;
   branch_id?: number | null;
-  created_by_staff_name?: string;
-  updated_by_staff_name?: string;
   booking_type?: 'movie' | 'vr' | string;
-  voucher_id?: number | null;
   voucher_code?: string | null;
   voucher_discount_amount?: number;
-  sale_staff_id?: number | null;
   sale_name?: string | null;
   sale_email?: string | null;
-  payment_expires_at?: string | null;
 }
 
 // Helper Countdown Component cho Transaction Modal
@@ -1302,7 +1295,7 @@ export default function TransactionsContent({
                         <div className="bg-slate-100 text-slate-600 px-3 py-2 rounded border border-slate-200 text-[12px] font-mono">
                           <CopyableText
                             text={
-                              txDetails.booking_details?.pay_txt_code || txDetails.booking_details?.transaction_id || ''
+                              txDetails.booking_details?.pay_txt_code || txDetails.payment_info?.transaction_id || ''
                             }
                             label="nội dung đối soát"
                           />

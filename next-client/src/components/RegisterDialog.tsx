@@ -11,12 +11,12 @@ import {
   PasswordChecklist,
   TurnstileBox
 } from '@/components/auth/AuthParts';
-import { toast } from 'sonner';
 import { ArrowLeft, Lock, Mail, User } from 'lucide-react';
 import { PASSWORD_PATTERN, EMAIL_PATTERN, PASSWORD_RULE_TEXT } from '@/components/constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { setCookie } from '@/lib/cookies';
 import { useTurnstile } from '@/hooks/useTurnstile';
+import { OTPDialog } from './OTPDialog';
 
 interface RegisterDialogProps {
   isOpen: boolean;
@@ -48,6 +48,8 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
   const [confirmError, setConfirmError] = useState('');
   const [termsError, setTermsError] = useState('');
   const [submitError, setSubmitError] = useState('');
+  // Signed ticket for the email-code step (the account is created only after the right code)
+  const [otpChallenge, setOtpChallenge] = useState<string | null>(null);
 
   // True while the email is being checked against the registered accounts
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
@@ -80,7 +82,7 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
   const validateAccountStep = () => {
     const emailMessage = EMAIL_PATTERN.test(email) ? '' : 'Vui lòng nhập email hợp lệ';
     const nameMessage = name.trim() ? '' : 'Vui lòng nhập họ và tên';
-    const passwordMessage = PASSWORD_PATTERN.test(password) ? '' : 'Mật khẩu ít nhất 6 ký tự, gồm chữ và số';
+    const passwordMessage = PASSWORD_PATTERN.test(password) ? '' : `Mật khẩu: ${PASSWORD_RULE_TEXT.toLowerCase()}`;
     const confirmMessage = password === confirmPassword ? '' : 'Mật khẩu nhập lại không khớp';
     setEmailError(emailMessage);
     setNameError(nameMessage);
@@ -152,25 +154,9 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
       setIsLoading(true);
       const data = await auth.register(email, password, name, turnstile.token);
 
-      if (data?.status === 'success') {
-        try {
-          const derivedName = data.user.username || (data.user.email || '').split('@')[0];
-          const profile = {
-            email: data.user.email,
-            name: derivedName,
-            phone: (data.user as any)?.phone || ''
-          };
-          setCookie('userProfile', JSON.stringify(profile), 86400);
-          localStorage.setItem('userProfile', JSON.stringify(profile));
-        } catch {}
-
-        setUserName(data.user.username);
-        window.dispatchEvent(new Event('user-auth-changed'));
-        toast.success('Đăng ký thành công', { description: data.user.email });
-
-        // Open the login dialog with the email filled in
-        onOpenChange(false);
-        onLogin(email);
+      if (data?.status === 'success' && data.otp_challenge) {
+        // Step 2: the code mailed to the email (OTPDialog below)
+        setOtpChallenge(data.otp_challenge);
       }
     } catch (err: any) {
       const msg = String(err?.message || 'Đăng ký thất bại');
@@ -187,9 +173,25 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
     }
   };
 
+  // The right email code creates the account and signs the customer in (same storage as a normal login)
+  const finishRegistration = (user: any, token: string) => {
+    try {
+      setCookie('userToken', token, 86400);
+      localStorage.setItem('userToken', token);
+      const profile = { email: user.email, name: user.username || (user.email || '').split('@')[0], phone: user.phone || '' };
+      setCookie('userProfile', JSON.stringify(profile), 86400);
+      localStorage.setItem('userProfile', JSON.stringify(profile));
+    } catch {}
+    setUserName(user.username);
+    window.dispatchEvent(new Event('user-auth-changed'));
+    setOtpChallenge(null);
+    onOpenChange(false);
+  };
+
   return (
+    <>
     <AuthDialogShell
-      isOpen={isOpen}
+      isOpen={isOpen && !otpChallenge}
       onOpenChange={onOpenChange}
       title="Đăng Ký Tài Khoản"
       description="Đăng ký tài khoản để trải nghiệm đặt vé phim đa chiều tại Cinesphere."
@@ -345,6 +347,22 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
         </div>
       </form>
     </AuthDialogShell>
+
+    {otpChallenge && (
+      <OTPDialog
+        purpose="register"
+        isOpen={isOpen && !!otpChallenge}
+        onOpenChange={(open) => {
+          // Closing the code step goes back to the form (nothing was created)
+          if (!open) setOtpChallenge(null);
+        }}
+        otpChallenge={otpChallenge}
+        email={email}
+        onSuccess={finishRegistration}
+        auth={auth}
+      />
+    )}
+    </>
   );
 }
 

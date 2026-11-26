@@ -9,7 +9,19 @@ import { hasCloudinary, parseMediaUrl, pingIndexNow, cloudinarySignedParams } fr
 
 const getD1Tables = (schema: any) => ({ bookings: schema.bookings, users: schema.users, accounts: schema.accounts, movies: schema.movies, ticket_packages: schema.ticket_packages, email_logs: schema.email_logs, branches: schema.branches, showtimes: schema.showtimes });
 
-import { createSiteMediaImpl, updateSiteMediaImpl, deleteSiteMediaImpl, listSiteMediaImpl } from '../../../../server/routes/admin/site-media';
+import {
+  createSiteMediaImpl,
+  updateSiteMediaImpl,
+  deleteSiteMediaImpl,
+  listSiteMediaImpl,
+  findSiteMediaBranchIdsImpl,
+  staffCanModifySiteMedia,
+  isAllowedUploadFolder,
+  CLOUDINARY_UPLOAD_SUBFOLDERS
+} from '../../../../server/routes/admin/site-media';
+
+const GLOBAL_MEDIA_MESSAGE = 'Chỉ Super Admin được thay đổi media dùng chung cho tất cả chi nhánh';
+const OTHER_BRANCH_MEDIA_MESSAGE = 'Bạn không có quyền với media của chi nhánh khác';
 import { expireStaleBookingsImpl } from '../../../../server/routes/scheduled/booking-expiry';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const sitemediaRouter = new Hono<{ Bindings: any; Variables: Variables }>();
@@ -56,6 +68,9 @@ sitemediaRouter.post('/api/admin/cloudinary/sign', requireStaffAuth, requirePerm
     const resourceType = String(body?.resource_type || '');
 
     if (!folder || !resourceType) return c.json({ message: 'Thiếu tham số cần thiết' }, 400);
+
+    // Only the folders the admin screens upload into: a signature allows overwriting any file of the signed folder
+    if (!isAllowedUploadFolder(folder, resourceType)) return c.json({ message: 'Thư mục tải lên không hợp lệ' }, 400);
 
     const timestamp = Math.floor(Date.now() / 1000);
 
@@ -121,7 +136,11 @@ sitemediaRouter.post('/api/admin/uploads/video', requireStaffAuth, requirePermis
       let folder = String(env.CLOUDINARY_UPLOAD_FOLDER || 'ctbooking/videos');
 
       if (folderParam) {
-        const safeFolder = String(folderParam).replace(/[^a-zA-Z0-9._-]/g, '_');
+        // Only the folders the admin screens use (uploads overwrite a file of the same name in the folder)
+        const safeFolder = String(folderParam);
+        if (!CLOUDINARY_UPLOAD_SUBFOLDERS.includes(safeFolder)) {
+          return c.json({ message: 'Thư mục tải lên không hợp lệ' }, 400);
+        }
 
         folder = `ctbooking/videos/${safeFolder}`;
       }
@@ -242,6 +261,11 @@ sitemediaRouter.post('/api/admin/site-media', requireStaffAuth, requirePermissio
 
     const body = await c.req.json().catch(() => ({}));
 
+    // A new media row is for all branches (the form has no branch choice), which only the Super Admin may add
+    if (!staffCanModifySiteMedia(null, getRestrictBranchIds(c))) {
+      return c.json({ status: 'error', message: GLOBAL_MEDIA_MESSAGE }, 403);
+    }
+
     const staffId = c.get('staffId');
     const staffEmail = c.get('staffEmail');
     const staffFullname = c.get('staffFullname');
@@ -265,7 +289,13 @@ sitemediaRouter.put('/api/admin/site-media', requireStaffAuth, requirePermission
   try {
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const body = await c.req.json().catch(() => ({}));
+    const body: any = await c.req.json().catch(() => ({}));
+
+    const existing = await findSiteMediaBranchIdsImpl(db, { site_media: schema.site_media }, Number(body?.id));
+    if (!existing) return c.json({ status: 'error', message: 'Không tìm thấy media' }, 404);
+    if (!staffCanModifySiteMedia(existing.branch_ids, getRestrictBranchIds(c))) {
+      return c.json({ status: 'error', message: existing.branch_ids === null ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE }, 403);
+    }
 
     const staffId = c.get('staffId');
     const staffEmail = c.get('staffEmail');
@@ -299,6 +329,15 @@ sitemediaRouter.delete('/api/admin/site-media/:id', requireStaffAuth, requirePer
     const id = Number(c.req.param('id'));
 
     const db = drizzle(c.env.cinema_db, { schema });
+
+    const existing = await findSiteMediaBranchIdsImpl(db, { site_media: schema.site_media }, id);
+    if (!existing) return c.json({ ok: false, status: 'error', message: 'Không tìm thấy media' }, 404);
+    if (!staffCanModifySiteMedia(existing.branch_ids, getRestrictBranchIds(c))) {
+      return c.json(
+        { ok: false, status: 'error', message: existing.branch_ids === null ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE },
+        403
+      );
+    }
 
     const staffId = c.get('staffId');
     const staffEmail = c.get('staffEmail');
@@ -362,10 +401,11 @@ sitemediaRouter.delete('/api/admin/site-media/:id', requireStaffAuth, requirePer
 
     const status = (r as any)?.ok ? 200 : 404;
 
+    // The screen reads only ok (and the message on failure), never the deleted row
     const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
+      ok: Boolean((r as any)?.ok),
+      status: status >= 400 ? 'error' : 'success',
+      ...((r as any)?.message ? { message: (r as any).message } : {})
     };
 
     return c.json(payload as any, status);
@@ -386,7 +426,11 @@ sitemediaRouter.get('/api/admin/site-media', requireStaffAuth, requirePermission
     const active = String(c.req.query('active') || '');
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listSiteMediaImpl(db, { site_media: schema.site_media }, { section, type, active });
+    const r = await listSiteMediaImpl(
+      db,
+      { site_media: schema.site_media },
+      { section, type, active, restrictToBranchIds: getRestrictBranchIds(c) }
+    );
     return c.json(r, 200);
   } catch (err: any) {
     return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);

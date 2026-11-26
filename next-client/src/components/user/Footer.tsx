@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Phone, Mail, Facebook, Building2, Navigation } from 'lucide-react';
+import { MapPin, Phone, Mail, Facebook, Building2, Navigation, ChevronDown } from 'lucide-react';
 import { useBranch } from '@/hooks/useBranch';
+import { getVNYear } from '@/lib/utils';
 
 export default function Footer() {
   const [loadMap, setLoadMap] = useState(false);
+  // Phone: the map and the company details are folded until their heading is pressed (always open from sm up)
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { selectedBranch } = useBranch();
 
@@ -217,11 +221,22 @@ export default function Footer() {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <h4 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                VỊ TRÍ RẠP
-              </span>
+            <h4 className="text-xl font-bold text-white mb-3 sm:mb-6">
+              <button
+                type="button"
+                onClick={() => setIsMapOpen((open) => !open)}
+                aria-expanded={isMapOpen}
+                className="flex w-full min-h-[44px] items-center justify-between gap-2 text-left sm:min-h-0 sm:pointer-events-none sm:cursor-default"
+              >
+                <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  VỊ TRÍ RẠP
+                </span>
+                <ChevronDown
+                  className={`h-5 w-5 text-cyan-300 transition-transform sm:hidden ${isMapOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
             </h4>
+            <div className={isMapOpen ? '' : 'hidden sm:block'}>
             <div
               ref={mapContainerRef}
               className="relative w-full h-64 rounded-lg overflow-hidden border border-white/20 shadow-lg bg-white/5"
@@ -255,6 +270,7 @@ export default function Footer() {
               <Navigation className="h-4 w-4" />
               Chỉ đường tới rạp
             </a>
+            </div>
           </motion.div>
 
           {/* Company Info */}
@@ -264,12 +280,22 @@ export default function Footer() {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.3 }}
           >
-            <h4 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
-                THÔNG TIN CÔNG TY
-              </span>
+            <h4 className="text-xl font-bold text-white mb-3 sm:mb-6">
+              <button
+                type="button"
+                onClick={() => setIsCompanyOpen((open) => !open)}
+                aria-expanded={isCompanyOpen}
+                className="flex w-full min-h-[44px] items-center justify-between gap-2 text-left sm:min-h-0 sm:pointer-events-none sm:cursor-default"
+              >
+                <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  THÔNG TIN CÔNG TY
+                </span>
+                <ChevronDown
+                  className={`h-5 w-5 text-cyan-300 transition-transform sm:hidden ${isCompanyOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
             </h4>
-            <div className="space-y-3 text-gray-300 text-sm">
+            <div className={`space-y-3 text-gray-300 text-sm ${isCompanyOpen ? '' : 'hidden sm:block'}`}>
               {/* Render dynamic extra info if value exists */}
               {branchSettings.extra_info
                 ?.filter((info: any) => info.value && info.value.trim() !== '')
@@ -305,7 +331,7 @@ export default function Footer() {
 
         <div className="border-t border-white/10 pt-8 text-center">
           <p className="text-gray-400 text-sm">
-            © {new Date().getFullYear()} {'CINESPHERE'}. Tất cả quyền được bảo lưu.
+            © {getVNYear()} {'CINESPHERE'}. Tất cả quyền được bảo lưu.
           </p>
         </div>
       </div>

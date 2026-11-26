@@ -1,21 +1,13 @@
+/** One movie of the film popup (GET /api/movies-detail/:id): an active movie, only the fields the popup shows. */
 export interface MovieDetail {
   id: number;
   title: string;
-  description: string;
+  description: string | null;
   cover_image: string | null;
   genres: any[];
-  rating: number;
-  duration_min: number;
-  price: number;
-  is_active: boolean;
+  rating: number | null;
+  duration_min: number | null;
   release_date: string | null;
-  created_at: string;
-  updated_at: string;
-  stats: {
-    totalTicketsSold: number;
-    totalRevenue: number;
-    successfulBookings: number;
-  };
 }
 
 class MovieStore {

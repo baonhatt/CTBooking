@@ -30,7 +30,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from '@/components/ui/alert-dialog';
-import { ShoppingCart, User } from 'lucide-react';
+import { ShoppingCart, LogIn } from 'lucide-react';
+import AccountAvatar from '@/components/user/header/AccountAvatar';
 import { scrollToElementId } from '@/lib/scroll';
 import { useHeaderEvents } from '@/hooks/useHeaderEvents';
 import BranchSelector from '@/components/user/header/BranchSelector';
@@ -329,15 +330,28 @@ export default function Header({
                         )}
                     </button>
 
-                    {/* Phone: one round button, to the account when signed in, else to the login dialog */}
-                    <button
-                        type="button"
-                        onClick={isLoggedIn ? () => router.push('/account') : openLogin}
-                        aria-label={isLoggedIn ? 'Tài khoản của tôi' : 'Đăng nhập'}
-                        className="sm:hidden relative flex h-8 w-8 items-center justify-center rounded-full border border-cyan-400/30 bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.3)] before:absolute before:-inset-1.5 before:content-[''] touch-manipulation select-none active:scale-95"
-                    >
-                        <User className="h-4 w-4" />
-                    </button>
+                    {/* Phone: signed in = the name's first letter on a filled circle with a green dot (to the account);
+                        signed out = an outlined "log in" button. The two never look alike. */}
+                    {isLoggedIn ? (
+                        <button
+                            type="button"
+                            onClick={() => router.push('/account')}
+                            aria-label={`Tài khoản của ${userName || 'bạn'}`}
+                            className="sm:hidden relative flex items-center justify-center before:absolute before:-inset-1.5 before:content-[''] touch-manipulation select-none active:scale-95"
+                        >
+                            <AccountAvatar userName={userName} size="sm" />
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={openLogin}
+                            aria-label="Đăng nhập"
+                            className="sm:hidden relative flex h-8 min-w-8 items-center justify-center gap-1 rounded-full border border-cyan-400/50 bg-transparent px-2 text-xs font-bold text-cyan-200 before:absolute before:-inset-1.5 before:content-[''] touch-manipulation select-none active:scale-95"
+                        >
+                            <LogIn className="h-3.5 w-3.5" />
+                            <span className="hidden min-[420px]:inline">Đăng nhập</span>
+                        </button>
+                    )}
 
                     {/* Desktop User Menu or Login Button */}
                     {isLoggedIn ? (

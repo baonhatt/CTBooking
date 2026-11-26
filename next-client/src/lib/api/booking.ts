@@ -4,15 +4,18 @@ import { VRPackageItem } from './vr-packages';
 /** Header that proves "this is my order" to the status and cancel routes. */
 const ORDER_TOKEN_HEADER = 'X-Order-Token';
 
-/** What the server returns for a new order. The payment reference, token and deadline all come from the server. */
+/**
+ * What the server returns for a new order. The payment reference, token and deadline all come from the server.
+ * A 0đ order (100% voucher) is paid at once: payment_status 'paid' and its ticket code.
+ */
 export interface CreatedBooking {
   id: number;
-  user_id?: number | null;
   pay_txt_code: string;
   order_token: string;
-  payment_expires_at: string;
+  payment_expires_at: string | null;
   server_now: string;
-  [key: string]: any;
+  payment_status: string;
+  booking_code: string | null;
 }
 
 export async function createBookingApi(body: {
@@ -51,24 +54,13 @@ export async function validateBookingApi(body: {
   voucher_code?: string;
   branch_id?: number;
 }) {
+  // Only the prices come back (the server checks the order; the account and voucher details stay on the server)
   return request<{
     status: string;
     message?: string;
-    user?: { id: number; email: string; fullname?: string; phone?: string };
-    movie?: {
-      id: number;
-      title: string;
-      is_active?: boolean | null;
-      duration_min?: number | null;
-    };
-    ticketPackage?: { id: number; name: string; price: number };
-    unitPrice?: number;
-    movieTotalPrice?: number;
-    vrTotalPrice?: number;
     originalTotalPrice?: number;
     voucherDiscountAmount?: number;
     totalPrice?: number;
-    vr_items?: any[];
   }>('/api/validate-booking', {
     method: 'POST',
     body: JSON.stringify(body)
@@ -98,6 +90,8 @@ export interface BookingStatus {
   payment_expires_at: string | null;
   server_now: string;
   booking_code?: string | null;
+  /** The order had closed (cancelled/expired) when the bank transfer arrived; staff will confirm it by hand */
+  payment_received_late?: boolean;
 }
 
 /** `httpStatus` is null when the server could not be reached at all (offline, timeout). */

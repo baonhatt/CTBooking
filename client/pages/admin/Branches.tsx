@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
-import { getBranches, deleteBranchApi, toggleBranchStatusApi, toggleBranchOpenApi } from '@/lib/api/branches';
+import {
+  getBranches,
+  getBranchById,
+  getBranchUnusedCodes,
+  deleteBranchApi,
+  toggleBranchStatusApi,
+  toggleBranchOpenApi
+} from '@/lib/api/branches';
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
 import {
@@ -70,7 +77,6 @@ interface Branch {
   booking_count: number;
   pending_bookings_count: number;
   paid_unused_count: number;
-  paid_unused_codes?: string;
   created_at: string;
   updated_at: string;
   created_by_staff_name?: string;
@@ -124,6 +130,46 @@ export default function BranchesPage() {
   const [statusAction, setStatusAction] = useState<{ kind: 'open' | 'active'; branch: Branch } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  // Codes of paid tickets never used, read when the close-branch dialog opens (null while loading)
+  const [unusedCodes, setUnusedCodes] = useState<{ codes: string[]; total: number } | null>(null);
+
+  // CLOSE-BRANCH WARNING: the unused ticket codes of the branch about to close
+  const closingBranchId =
+    statusAction?.kind === 'open' && statusAction.branch.is_open && statusAction.branch.paid_unused_count > 0
+      ? statusAction.branch.id
+      : null;
+  useEffect(() => {
+    setUnusedCodes(null);
+    if (!closingBranchId) return;
+    const controller = new AbortController();
+    getBranchUnusedCodes(closingBranchId, { signal: controller.signal })
+      .then((result) => setUnusedCodes(result))
+      .catch(() => {
+        if (!controller.signal.aborted) setUnusedCodes({ codes: [], total: 0 });
+      });
+    return () => controller.abort();
+  }, [closingBranchId]);
+
+  // DETAIL: the list rows carry no creator / editor names, so the detail is read when the dialog opens
+  const detailBranchId = isDetailDialogOpen ? selectedBranch?.id : undefined;
+  useEffect(() => {
+    if (!detailBranchId) return;
+    const controller = new AbortController();
+    getBranchById(detailBranchId, { signal: controller.signal })
+      .then(({ branch }) => {
+        setSelectedBranch((current) =>
+          current && current.id === detailBranchId
+            ? {
+                ...current,
+                created_by_staff_name: branch?.created_by_staff_name || undefined,
+                updated_by_staff_name: branch?.updated_by_staff_name || undefined
+              }
+            : current
+        );
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [detailBranchId]);
 
   const generateCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -468,7 +514,14 @@ export default function BranchesPage() {
                   <span className="block rounded border border-amber-100 bg-white/50 p-2">
                     <span className="mb-1 block text-[11px] font-bold uppercase text-amber-600">Danh sách mã vé (Để copy):</span>
                     <code className="break-all text-xs leading-relaxed text-slate-700">
-                      {statusAction.branch.paid_unused_codes || 'Không có mã nào'}
+                      {unusedCodes === null
+                        ? 'Đang tải...'
+                        : unusedCodes.codes.length
+                          ? unusedCodes.codes.join(', ') +
+                            (unusedCodes.total > unusedCodes.codes.length
+                              ? ` (và ${unusedCodes.total - unusedCodes.codes.length} mã khác)`
+                              : '')
+                          : 'Không có mã nào'}
                     </code>
                   </span>
                   <span className="block text-[11px] italic text-amber-600">

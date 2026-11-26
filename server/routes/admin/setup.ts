@@ -143,10 +143,9 @@ export async function seedRolesAndPermissionsImpl(db: any, tables: any) {
     }
   }
 
+  // The roles screen reads only the outcome; it reloads the roles and permissions itself
   return {
     status: 'success',
-    message: 'Roles và permissions đã được seed thành công',
-    permissions: PERMISSIONS_SEED,
-    roles: ROLES_SEED
+    message: 'Roles và permissions đã được seed thành công'
   };
 }

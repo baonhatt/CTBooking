@@ -40,7 +40,10 @@ async function fetchBranchData(
     if (saved) return { branches: items, selectedBranch: saved };
   }
 
-  const { branch: defaultBranch } = await getDefaultBranch();
+  // No default branch that is open (the server answers 404): fall through to the first open branch below
+  const defaultBranch = await getDefaultBranch()
+    .then((res) => res.branch)
+    .catch(() => null);
   if (defaultBranch) {
     if (typeof window !== 'undefined') {
       setCookie(SELECTED_BRANCH_KEY, String(defaultBranch.id), 60 * 60 * 24 * 30);

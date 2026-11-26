@@ -1,23 +1,11 @@
 import { request } from './http';
 
+/**
+ * The branches a customer can choose (active and open), default branch first. Each one has id, name, address, phone,
+ * email, banner_images and settings (a JSON text: hotline, map, bank account...).
+ */
 export async function getPublicBranches(options?: { signal?: AbortSignal }) {
-  return request<{ items: any[]; page: number; pageSize: number; total: number; totalPages: number }>('/api/branches', {
-    signal: options?.signal
-  });
-}
-
-export async function getBranchOptions(options?: { signal?: AbortSignal }) {
-  return request<{
-    items: Array<{
-      branch_id: number;
-      id: number;
-      name: string;
-      code: string;
-      is_default: boolean;
-      is_open: boolean;
-      is_active: boolean;
-    }>;
-  }>('/api/branches/options', {
+  return request<{ items: any[] }>('/api/branches', {
     signal: options?.signal
   });
 }

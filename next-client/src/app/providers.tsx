@@ -3,7 +3,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getCookie } from '@/lib/cookies';
 
 export default function Providers({ children }: React.PropsWithChildren) {
   const [queryClient] = useState(
@@ -18,6 +19,18 @@ export default function Providers({ children }: React.PropsWithChildren) {
         }
       })
   );
+
+  // Member-only packages are only sent to signed-in customers. The home page is drawn for visitors, so a signed-in
+  // customer reloads the package lists once on arrival, and everybody reloads them after signing in or out.
+  useEffect(() => {
+    const reloadPackageLists = () => {
+      queryClient.invalidateQueries({ queryKey: ['activeTickets'] });
+      queryClient.invalidateQueries({ queryKey: ['vrPackages'] });
+    };
+    if (getCookie('userToken')) reloadPackageLists();
+    window.addEventListener('user-auth-changed', reloadPackageLists);
+    return () => window.removeEventListener('user-auth-changed', reloadPackageLists);
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

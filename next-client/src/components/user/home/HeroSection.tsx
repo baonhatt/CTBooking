@@ -8,7 +8,6 @@ import {
   Waves,
   Clock,
   Star,
-  Calendar,
   Ticket,
   Gamepad2,
   ChevronLeft,
@@ -156,16 +155,17 @@ export default function HeroSection({
 
   const activeBanners = branchBanners;
 
-  // Ảnh nền hero: poster phim mới nhất (theo ngày phát hành, rồi theo id). Chỉ dùng khi chi nhánh chưa có banner.
+  // Ảnh nền hero: poster phim mới nhất (theo ngày phát hành, rồi theo id) của chi nhánh đang chọn.
+  // Chỉ dùng khi chi nhánh chưa có banner.
   const latestMovieCover = useMemo<string>(() => {
-    const withCover = (initialMovies || []).filter((movie: any) => movie?.cover_image);
+    const withCover = (Array.isArray(movies) ? movies : []).filter((movie: any) => movie?.cover_image);
     if (withCover.length === 0) return '';
     const sorted = [...withCover].sort((a: any, b: any) => {
       const dateDiff = String(b.release_date || '').localeCompare(String(a.release_date || ''));
       return dateDiff !== 0 ? dateDiff : Number(b.id || 0) - Number(a.id || 0);
     });
     return sorted[0].cover_image as string;
-  }, [initialMovies]);
+  }, [movies]);
 
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [slideDirection, setSlideDirection] = useState(1);
@@ -402,7 +402,7 @@ export default function HeroSection({
 
         {/* ================= BOTTOM SECTION: HERO SECTION CONTENT (TYPOGRAPHY, CTA & FEATURES) ================= */}
         <div
-          className={`container mx-auto px-4 sm:px-6 py-8 sm:py-12 pb-14 sm:pb-18 relative z-10 ${
+          className={`container mx-auto px-4 sm:px-6 py-6 sm:py-12 pb-8 sm:pb-18 relative z-10 ${
             branchBanners.length === 0 ? 'pt-24 sm:pt-32' : ''
           }`}
         >
@@ -412,19 +412,19 @@ export default function HeroSection({
               initial={false}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
-              className="lg:col-span-7 space-y-6"
+              className="lg:col-span-7 space-y-4 sm:space-y-6"
             >
               <div className="space-y-3">
                 <m.h1
                   initial={false}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none tracking-tight flex flex-col gap-1.5"
+                  className="text-4xl sm:text-6xl lg:text-7xl font-black leading-none tracking-tight flex flex-col gap-1.5"
                 >
                   <span className="bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(56,189,248,0.5)] py-1">
                     CINESPHERE
                   </span>
-                  <span className="text-white text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
+                  <span className="text-white text-xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
                     Huyễn cảnh không gian
                   </span>
                 </m.h1>
@@ -433,7 +433,7 @@ export default function HeroSection({
                   initial={false}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-base sm:text-lg text-gray-200 leading-relaxed max-w-2xl font-normal"
+                  className="text-sm sm:text-lg text-gray-200 leading-relaxed max-w-2xl font-normal"
                 >
                   Dùng không gian nhỏ mô phỏng thế giới vô biên. Mỗi suất chiếu là một hành trình nhập vai với độ phân
                   giải 8K và âm thanh đa tầng bao quanh.
@@ -477,19 +477,9 @@ export default function HeroSection({
                   )}
                 </div>
 
+                {/* One secondary link only: the schedule is already in the header menu. The video stays, it is the only
+                    way to open the hero video. */}
                 <div className="flex flex-wrap items-center gap-x-6">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 min-h-[44px] text-sm font-semibold text-cyan-300 hover:text-cyan-200 transition-colors cursor-pointer"
-                    onClick={() => {
-                      const scheduleSection = document.getElementById('schedule');
-                      scheduleSection?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    <Calendar className="h-4 w-4 shrink-0" />
-                    Lịch chiếu hôm nay
-                  </button>
-
                   {heroMedia?.url && (
                     <button
                       type="button"
@@ -509,7 +499,7 @@ export default function HeroSection({
               initial={false}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
-              className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-4"
+              className="lg:col-span-5 hidden sm:grid sm:grid-cols-3 lg:grid-cols-1 gap-4"
             >
               {[
                 {

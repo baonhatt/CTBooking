@@ -8,7 +8,7 @@ import {
   getRevenue7DaysImpl,
   topTicketsRange
 } from './dashboard';
-import { getRevenueImpl, listTransactionsImpl } from './payments';
+import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from './payments';
 
 // These tests run the real SQL on an in-memory SQLite database, so the WHERE clauses are really exercised.
 
@@ -378,5 +378,85 @@ describe('ticket count in the list', () => {
 
     expect(result.items).toHaveLength(150);
     expect(result.items.every((item: any) => item.vr_items.length === 1)).toBe(true);
+  });
+});
+
+describe('transaction list rows', () => {
+  const args: any = { page: 1, pageSize: 100, searchText: '', status: 'all', sort: 'created_at', dir: 'asc', payment_method: '' };
+
+  it('lists an order once even when its user has two accounts', async () => {
+    insertRows(raw, 'users', [{ id: 7, fullname: 'Khach A' }]);
+    insertRows(raw, 'accounts', [
+      { id: 1, user_id: 7, email: 'a@example.com', login_type: 'email' },
+      { id: 2, user_id: 7, email: 'a@gmail.example', login_type: 'google' }
+    ]);
+    insertRows(raw, 'bookings', [booking({ id: 601, user_id: 7 })]);
+
+    const result: any = await listTransactionsImpl(db, tables, args);
+
+    expect(result.total).toBe(1);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].userName).toBe('Khach A');
+  });
+
+  it('sends only the fields the list and the export read', async () => {
+    insertRows(raw, 'vouchers', [
+      {
+        id: 3,
+        code: 'SALE10',
+        name: 'Sale',
+        description: '{"sale_staff_id":9,"sale_name":"Lan","sale_email":"lan@example.com"}',
+        scope: 'all',
+        discount_type: 'fixed',
+        discount_value: 10000,
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01'
+      }
+    ]);
+    insertRows(raw, 'bookings', [booking({ id: 602, voucher_id: 3, expiry_date: '2099-01-01T00:00:00.000Z' })]);
+
+    const [item]: any[] = (await listTransactionsImpl(db, tables, args)).items;
+
+    expect(item).toMatchObject({ id: 602, voucher_code: 'SALE10', sale_name: 'Lan', sale_email: 'lan@example.com', expired: false });
+    for (const dropped of ['bookingId', 'name', 'daysLeft', 'expiryDate', 'payment_expires_at', 'voucher_id', 'sale_staff_id', 'user_id', 'transactionId']) {
+      expect(item).not.toHaveProperty(dropped);
+    }
+  });
+});
+
+describe('transaction detail', () => {
+  it('sends no raw voucher description, movie rows or combo, and reads the audit names', async () => {
+    const detailDb = makeSqliteDb([...TABLES, 'auditLogs', 'staffs']);
+    insertRows(detailDb.raw, 'branches', [{ id: 1, name: 'CN 1', code: 'CN1', created_at: 'x', updated_at: 'x' }]);
+    insertRows(detailDb.raw, 'vouchers', [
+      {
+        id: 3,
+        code: 'SALE10',
+        name: 'Sale',
+        description: '{"sale_staff_id":9,"sale_name":"Lan"}',
+        scope: 'vr',
+        discount_type: 'fixed',
+        discount_value: 10000,
+        created_at: 'x',
+        updated_at: 'x'
+      }
+    ]);
+    insertRows(detailDb.raw, 'bookings', [booking({ id: 701, booking_type: 'vr', voucher_id: 3, combo: '[1,2]' })]);
+    insertRows(detailDb.raw, 'booking_vr_items', [
+      { id: 1, booking_id: 701, vr_ticket_package_id: 4, package_name: 'VR 30', quantity: 2, unit_price: 50000, line_total: 100000 }
+    ]);
+    insertRows(detailDb.raw, 'auditLogs', [{ id: 1, staff_fullname: 'Nhan vien A', action: 'create', entity_type: 'booking', entity_id: '701', created_at: 'x' }]);
+
+    const detail: any = await getTransactionByIdImpl(detailDb.db, { ...tables, auditLogs: (schema as any).auditLogs, staffs: (schema as any).staffs }, 701);
+
+    expect(detail.voucher_info).toMatchObject({ scope: 'vr', sale_name: 'Lan' });
+    expect(detail.voucher_info).not.toHaveProperty('description');
+    expect(detail.voucher_info).not.toHaveProperty('sale_staff_id');
+    expect(detail.ticket_package).not.toHaveProperty('movies');
+    expect(detail.booking_details).not.toHaveProperty('combo');
+    expect(detail.vr_items).toEqual([
+      { id: 1, vr_ticket_package_id: 4, package_name: 'VR 30', quantity: 2, unit_price: 50000, discounted_unit_price: null, line_total: 100000 }
+    ]);
+    expect(detail.tracking.created_by_staff_name).toBe('Nhan vien A');
   });
 });

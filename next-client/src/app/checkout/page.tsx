@@ -95,6 +95,8 @@ export default function Checkout() {
         const [branchInfo, setBranchInfo] = useState<BranchInfo>({});
         const [slowProcessing, setSlowProcessing] = useState<boolean>(false);
         const [codeFailed, setCodeFailed] = useState<boolean>(false);
+        // The server says the money arrived after the order closed (payment_received_late)
+        const [receivedLate, setReceivedLate] = useState<boolean>(false);
         const [recheckKey, setRecheckKey] = useState<number>(0);
         const formatMoney = (n: number | string) => new Intl.NumberFormat('vi-VN').format(Number(n || 0));
 
@@ -205,6 +207,7 @@ export default function Checkout() {
                                 } catch { }
                         } else if (outcome === 'closed') {
                                 setStatus('failed');
+                                setReceivedLate(result.data.payment_received_late === true);
                         } else if (localStorage.getItem('qrPaymentData')) {
                                 // Not paid yet and the QR page can still be used: go back to it
                                 router.replace('/qr-payment');
@@ -315,6 +318,8 @@ export default function Checkout() {
         const movies = order ? getMovieList() : [];
         const isSuccess = status === 'success' || order?.payment_status === 'paid';
         const isError = status === 'failed' || order?.payment_status === 'failed';
+        // Closed order whose money arrived afterwards: shown as "awaiting confirmation" (amber), not as a failure (red)
+        const isLate = isError && receivedLate;
 
         if (noOrder) {
                 return (
@@ -368,20 +373,28 @@ export default function Checkout() {
                                                 <div className="relative bg-[#1a2744] border border-white/[0.22] rounded-3xl overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
                                                         {/* Top Section: Status */}
                                                         <div
-                                                                className={`p-1 pt-1 ${isSuccess ? 'bg-emerald-500/20' : isError ? 'bg-rose-500/20' : 'bg-slate-500/20'}`}
+                                                                className={`p-1 pt-1 ${isSuccess ? 'bg-emerald-500/20' : isLate ? 'bg-amber-500/20' : isError ? 'bg-rose-500/20' : 'bg-slate-500/20'}`}
                                                         >
                                                                 <div
-                                                                        className={`flex items-center justify-center gap-2 py-3 rounded-t-[1.4rem] ${isSuccess ? 'bg-emerald-500' : isError ? 'bg-rose-500' : 'bg-slate-500'}`}
+                                                                        className={`flex items-center justify-center gap-2 py-3 rounded-t-[1.4rem] ${isSuccess ? 'bg-emerald-500' : isLate ? 'bg-amber-500' : isError ? 'bg-rose-500' : 'bg-slate-500'}`}
                                                                 >
                                                                         {isSuccess ? (
                                                                                 <CheckCircle2 className="w-7 h-7 text-white" />
+                                                                        ) : isLate ? (
+                                                                                <Clock className="w-7 h-7 text-white" />
                                                                         ) : isError ? (
                                                                                 <XCircle className="w-7 h-7 text-white" />
                                                                         ) : (
                                                                                 <Loader2 className="w-7 h-7 text-white animate-spin" />
                                                                         )}
                                                                         <h1 className="text-white font-bold text-lg tracking-wide uppercase">
-                                                                                {isSuccess ? 'Thanh toán thành công' : isError ? 'Thanh toán thất bại' : 'Đang xử lý...'}
+                                                                                {isSuccess
+                                                                                        ? 'Thanh toán thành công'
+                                                                                        : isLate
+                                                                                                ? 'Đã nhận tiền – chờ xác nhận'
+                                                                                                : isError
+                                                                                                        ? 'Thanh toán thất bại'
+                                                                                                        : 'Đang xử lý...'}
                                                                         </h1>
                                                                 </div>
                                                         </div>
@@ -444,7 +457,20 @@ export default function Checkout() {
                                                                 </div>
                                                         )}
 
-                                                        {isError && (
+                                                        {isLate && (
+                                                                <div className="p-4 border-b border-white/10 bg-amber-500/5 space-y-3 text-sm leading-relaxed">
+                                                                        <p className="text-slate-200">
+                                                                                Chúng tôi đã nhận chuyển khoản của bạn sau khi đơn hết hạn thanh toán. Nhân viên sẽ đối chiếu và
+                                                                                xác nhận vé (hoặc hoàn tiền) trong giờ làm việc. Vé sẽ được gửi tới email của bạn khi xác nhận xong.
+                                                                        </p>
+                                                                        <p className="text-slate-300">
+                                                                                Cần hỗ trợ ngay, vui lòng gọi hotline <b className="text-white">{hotline}</b>
+                                                                                {order?.pay_txt_code ? <> và cung cấp mã <b className="text-white">{order.pay_txt_code}</b></> : null}.
+                                                                        </p>
+                                                                </div>
+                                                        )}
+
+                                                        {isError && !isLate && (
                                                                 <div className="p-4 border-b border-white/10 bg-rose-500/5 space-y-3 text-sm leading-relaxed">
                                                                         <p className="text-slate-200">
                                                                                 Đơn hàng chưa được thanh toán, đã bị hủy hoặc đã hết hạn thanh toán.

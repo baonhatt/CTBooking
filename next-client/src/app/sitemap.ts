@@ -32,8 +32,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let postPages: MetadataRoute.Sitemap = [];
   try {
-    const res = await getPublicPosts({ page: 1, pageSize: 200 });
-    const posts = (res.items ?? []).filter((p) => p.status === 'published');
+    // The server gives at most 100 posts per page: read page after page until every post is in
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 50;
+    const allPosts: any[] = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const res = await getPublicPosts({ page, pageSize: PAGE_SIZE });
+      const items = res.items ?? [];
+      allPosts.push(...items);
+      if (items.length < PAGE_SIZE || allPosts.length >= Number(res.total ?? 0)) break;
+    }
+    const posts = allPosts.filter((p) => p.status === 'published');
     postPages = posts.map((post) => ({
       url: `${SITE_URL}${buildPostHref(post)}`,
       lastModified: new Date(post.updated_at ?? post.published_at ?? post.created_at ?? Date.now()),

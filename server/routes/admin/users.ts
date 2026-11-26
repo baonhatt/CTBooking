@@ -80,10 +80,12 @@ export async function getUserByIdImpl(
   tables: { users: any; bookings: any; movies: any; ticket_packages: any; auditLogs: any },
   id: number
 ) {
+  // Only the columns the detail shows (the account's password hash is never read)
   const user = await anyDb.query.users.findFirst({
     where: eq(tables.users.id, id),
+    columns: { id: true, fullname: true, phone: true, avatar: true, gender: true, dob: true, created_at: true, updated_at: true },
     with: {
-      accounts: true
+      accounts: { columns: { email: true, is_active: true, login_type: true, created_at: true } }
     }
   });
 
@@ -91,7 +93,7 @@ export async function getUserByIdImpl(
 
   // Get tracking data from audit logs
   const [createLog] = await anyDb
-    .select()
+    .select({ staffFullname: tables.auditLogs.staffFullname })
     .from(tables.auditLogs)
     .where(
       and(
@@ -104,7 +106,7 @@ export async function getUserByIdImpl(
     .limit(1);
 
   const [updateLog] = await anyDb
-    .select()
+    .select({ staffFullname: tables.auditLogs.staffFullname })
     .from(tables.auditLogs)
     .where(
       and(
@@ -118,9 +120,17 @@ export async function getUserByIdImpl(
 
   const bookingsdata = await anyDb
     .select({
-      booking: tables.bookings,
-      movie: tables.movies,
-      ticket_package: tables.ticket_packages
+      booking: {
+        id: tables.bookings.id,
+        booking_code: tables.bookings.booking_code,
+        ticket_count: tables.bookings.ticket_count,
+        total_price: tables.bookings.total_price,
+        payment_method: tables.bookings.payment_method,
+        payment_status: tables.bookings.payment_status,
+        created_at: tables.bookings.created_at
+      },
+      movie: { title: tables.movies.title },
+      ticket_package: { name: tables.ticket_packages.name }
     })
     .from(tables.bookings)
     .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))

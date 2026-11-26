@@ -308,7 +308,6 @@ export default function MovieScheduleSection() {
     params.set('direct', '1');
     params.set('movie_id', String(slot.movie_id));
     if (matchedPackage?.id) params.set('package_id', String(matchedPackage.id));
-    params.set('time', slot.start_time);
 
     router.push(`/booking?${params.toString()}`);
   };
@@ -316,15 +315,15 @@ export default function MovieScheduleSection() {
   return (
     <section
       id="schedule"
-      className="relative py-10 sm:py-20 px-2 sm:px-3 bg-gradient-to-b from-[#050915] via-[#070e24] to-[#050915] border-t border-white/[0.06] overflow-hidden"
+      className="relative py-10 sm:py-20 bg-gradient-to-b from-[#050915] via-[#070e24] to-[#050915] border-t border-white/[0.06] overflow-hidden"
     >
       {/* Sci-Fi Ambient Glows */}
       <div className="absolute top-1/4 left-1/4 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] rounded-full bg-cyan-500/10 blur-[120px] sm:blur-[140px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] rounded-full bg-purple-600/10 blur-[120px] sm:blur-[140px] pointer-events-none" />
 
-      <div className="container mx-auto max-w-6xl relative z-10">
+      <div className="container mx-auto px-4 relative z-10">
         {/* Header Title */}
-        <div className="text-center max-w-2xl mx-auto mb-5 sm:mb-10">
+        <div className="max-w-2xl mb-5 sm:mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs sm:text-xs font-bold uppercase tracking-wider mb-2 sm:mb-3 backdrop-blur-md">
             <Compass className="w-3.5 h-3.5 text-cyan-400" />
             <span>Đồng Hồ Suất Chiếu Cinesphere</span>
@@ -336,7 +335,7 @@ export default function MovieScheduleSection() {
             </span>
           </h2>
 
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-slate-300 text-xs sm:text-xs mt-2.5 sm:mt-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-slate-300 text-xs sm:text-xs mt-2.5 sm:mt-3">
             <span className="flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/5 border border-white/10 font-medium">
               <MapPin className="w-3 h-3 text-cyan-400" />
               {(isMounted && selectedBranch?.name) || 'Cinesphere'}
@@ -636,7 +635,7 @@ export default function MovieScheduleSection() {
                       <span>8K / Âm vòm</span>
                     </div>
 
-                    {/* Nút Đặt vé: chỉ hiện ở SELECTED mode */}
+                    {/* Book button (only when a time is picked): books this film, the ticket is not tied to the time */}
                     {focusMode === 'selected' && (
                       <div className="pt-1 sm:pt-2 flex items-center gap-2">
                         <Button
@@ -645,7 +644,7 @@ export default function MovieScheduleSection() {
                         >
                           <span className="flex items-center gap-1.5 sm:gap-2">
                             <Ticket className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            Đặt vé suất này
+                            Đặt vé xem phim này
                             <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           </span>
                         </Button>
@@ -669,7 +668,10 @@ export default function MovieScheduleSection() {
                     {allItems.length} suất chiếu
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-300">Chạm một giờ chiếu để chọn suất và đặt vé.</p>
+                {/* A ticket is good for any showtime of the day: the clock shows what plays when, it does not reserve a time */}
+                <p className="text-xs sm:text-sm text-slate-300">
+                  Chạm một giờ chiếu để xem phim chiếu lúc đó. Vé dùng được cho mọi suất trong ngày, không cần chọn trước.
+                </p>
 
                 <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 sm:gap-2 lg:grid-cols-6">
                   {allItems.map((slot) => {

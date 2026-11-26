@@ -285,13 +285,18 @@ describe('voucher detail: redemption history', () => {
     expect(clampRedemptionLimit(5000)).toBe(200);
 
     let askedLimit = 0;
+    let askedColumns: any = null;
     const db: any = {
       query: {
         vouchers: { findFirst: async () => voucherRow(null) },
         voucher_redemption_logs: {
           findMany: async (options: any) => {
             askedLimit = options.limit;
-            return [{ id: 1, booking_id: 5, booking: { booking_code: 'CT123' } }, { id: 2, booking_id: 6, booking: null }];
+            askedColumns = options.columns;
+            return [
+              { id: 1, redeemed_at: '2026-11-01', discount_amount_applied: 10000, booking: { booking_code: 'CT123' } },
+              { id: 2, redeemed_at: '2026-11-02', discount_amount_applied: 5000, booking: null }
+            ];
           }
         }
       },
@@ -309,5 +314,52 @@ describe('voucher detail: redemption history', () => {
     expect(askedLimit).toBe(100);
     expect(detail.recent_redemptions.map((row: any) => row.booking_code)).toEqual(['CT123', null]);
     expect(detail.recent_redemptions[0]).not.toHaveProperty('booking');
+    // Only what the history table shows: no customer, staff or order totals
+    expect(askedColumns).toEqual({ id: true, redeemed_at: true, discount_amount_applied: true });
+    expect(detail.recent_redemptions[0]).toEqual({
+      id: 1,
+      booking_code: 'CT123',
+      redeemed_at: '2026-11-01',
+      discount_amount_applied: 10000
+    });
+  });
+});
+
+describe('100% vouchers (test vouchers)', () => {
+  const FULL = { ...NEW_VOUCHER, discount_type: 'percent', discount_value: 100, branch_ids: [1] };
+  const withStaff = (staff: any) => {
+    const fake = makeDb(null);
+    fake.db.query.staffs = { findFirst: async () => staff };
+    return fake;
+  };
+
+  it('a Super Admin may save one when its Sales person is a Super Admin', async () => {
+    const { db, voucherWrites } = withStaff({ id: 1, isSuperAdmin: true, isActive: true });
+    await createVoucherImpl(db, tables, { ...FULL, sale_staff_id: 1 }, staffInfo, null);
+    expect(voucherWrites).toHaveLength(1);
+  });
+
+  it('refused when the Sales person is not a Super Admin, or nobody is set', async () => {
+    for (const [staff, saleId] of [[{ id: 7, isSuperAdmin: false, isActive: true }, 7], [undefined, undefined]] as any) {
+      const { db, voucherWrites } = withStaff(staff);
+      await expect(createVoucherImpl(db, tables, { ...FULL, sale_staff_id: saleId }, staffInfo, null)).rejects.toMatchObject({
+        statusCode: 403
+      });
+      expect(voucherWrites).toHaveLength(0);
+    }
+  });
+
+  it('a branch manager can never save one, even naming a Super Admin as Sales', async () => {
+    const { db, voucherWrites } = withStaff({ id: 1, isSuperAdmin: true, isActive: true });
+    await expect(createVoucherImpl(db, tables, { ...FULL, sale_staff_id: 1 }, staffInfo, [1])).rejects.toMatchObject({
+      statusCode: 403
+    });
+    expect(voucherWrites).toHaveLength(0);
+  });
+
+  it('a 50% voucher needs nothing special', async () => {
+    const { db, voucherWrites } = withStaff(undefined);
+    await createVoucherImpl(db, tables, { ...FULL, discount_value: 50 }, staffInfo, [1]);
+    expect(voucherWrites).toHaveLength(1);
   });
 });

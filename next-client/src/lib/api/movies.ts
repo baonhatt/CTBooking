@@ -15,14 +15,13 @@ export type Movie = {
   price?: number;
 };
 
+/** A movie of the "showing now" list (GET /api/getActiveMovies). */
 export type ActiveMovieToday = {
   id: number;
   title: string;
   cover_image?: string;
   genres?: { id: number; name: string }[];
-  rating?: number;
-  duration_min?: number;
-  showtimes?: unknown[];
+  release_date?: string;
 };
 
 /** Lấy danh sách phim đang chiếu hôm nay – ISR 5 phút */
@@ -48,22 +47,6 @@ export async function getActiveMoviesToday(branchId?: number): Promise<ActiveMov
   if (!res.ok) return [];
   const data = (await res.json()) as { activeMovies?: ActiveMovieToday[] };
   return data.activeMovies ?? [];
-}
-
-/** Lấy danh sách phim 2025 – ISR 1h */
-export async function getMovies2025(): Promise<Movie[]> {
-  const res = await fetch(`${API}/api/movies/2025`, {
-    next: { revalidate: 3600 },
-    headers: {
-      // Thêm headers để giúp SEO bot nhận diện request server-side
-      ...(typeof window === 'undefined' && {
-        'User-Agent': `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})`
-      })
-    }
-  });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { items?: Movie[] } | Movie[];
-  return (data as any)?.items ?? (data as Movie[]);
 }
 
 /** Lấy chi tiết phim bằng ID – ISR 10 phút */

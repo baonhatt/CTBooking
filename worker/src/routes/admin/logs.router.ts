@@ -7,11 +7,17 @@ import { getRestrictBranchIds, getMailer } from './admin-helpers';
 
 
 import { getEmailLogsImpl } from '../../../../server/routes/admin/email-logs';
-import { getAuditLogsImpl } from '../../../../server/lib/audit-logger';
+import { getAuditLogsImpl, getAuditLogByIdImpl } from '../../../../server/lib/audit-logger';
 import { getUsersImpl, getUserByIdImpl, setUserActiveImpl } from '../../../../server/routes/admin/users';
 import { configureEmailBrand } from '../../../../server/lib/email-layout';
 import { refreshEmailBrandFromBranches } from '../../../../server/lib/email-brand-source';
-import { sendTestEmailImpl, getEmailPreviewImpl } from '../../../../server/routes/admin/email-preview';
+import {
+  sendTestEmailImpl,
+  getEmailPreviewImpl,
+  takeTestMailSlot,
+  TEST_MAIL_LIMIT
+} from '../../../../server/routes/admin/email-preview';
+import { clampPage } from '../../../../server/lib/paging';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const logsRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
@@ -55,9 +61,8 @@ logsRouter.get('/api/admin/email-logs', requireStaffAuth, requirePermission('ema
 
 logsRouter.get('/api/admin/users', requireStaffAuth, requirePermission('users', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 20);
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'));
 
     const q = String(c.req.query('q') || '');
     const status = String(c.req.query('status') || '');
@@ -192,6 +197,18 @@ logsRouter.get('/api/admin/audit-logs', requireStaffAuth, requirePermission('aud
   }
 });
 
+// One audit line with its saved values and browser: the list leaves them out. Same right as the list.
+logsRouter.get('/api/admin/audit-logs/:id', requireStaffAuth, requirePermission('audit_logs', 'view'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await getAuditLogByIdImpl(db, { auditLogs: schema.auditLogs }, Number(c.req.param('id')));
+    if (!r) return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
+    return c.json(r);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
+  }
+});
+
 // ============================================================
 // ===== MOVIES (Batch 2) =====================================
 // ============================================================
@@ -215,14 +232,28 @@ logsRouter.get('/api/admin/email-preview', requireStaffAuth, requirePermission('
 });
 
 
-// POST /api/admin/email-preview/send-test - send one sample mail to the address typed on the preview page
+// POST /api/admin/email-preview/send-test - send one sample mail to the address typed on the preview page.
+// Only the Super Admin, and at most 10 test mails in 10 minutes: a real branded mail goes out through the real provider.
 logsRouter.post(
   '/api/admin/email-preview/send-test',
   requireStaffAuth,
   requirePermission('email_logs', 'view'),
   async (c) => {
     try {
+      if (!c.get('isSuperAdmin')) {
+        return c.json({ status: 'error', message: 'Chỉ Super Admin được gửi thư thử' }, 403);
+      }
       const body: any = await c.req.json().catch(() => ({}));
+      const slot = await takeTestMailSlot(c.env.SETTINGS_KV, Number(c.get('staffId')));
+      if (slot.allowed === false) {
+        return c.json(
+          {
+            status: 'error',
+            message: `Đã gửi ${TEST_MAIL_LIMIT} thư thử trong 10 phút. Vui lòng đợi ${slot.waitSeconds} giây.`
+          },
+          429
+        );
+      }
       const r = await sendTestEmailImpl(String(body?.templateId || ''), String(body?.toEmail || ''), getMailer(c));
       return c.json(r, r.status === 'error' ? 400 : 200);
     } catch (err: any) {

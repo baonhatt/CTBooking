@@ -18,7 +18,8 @@ const getD1Tables = (schema: any) => ({
   booking_vr_items: (schema as any).booking_vr_items,
   vouchers: (schema as any).vouchers,
   voucher_redemption_logs: (schema as any).voucher_redemption_logs,
-  auditLogs: (schema as any).auditLogs
+  auditLogs: (schema as any).auditLogs,
+  unmatched_transfers: (schema as any).unmatched_transfers
 });
 
 import { getBookingEmailTemplate } from '../../../../server/lib/email-templates';
@@ -26,6 +27,19 @@ import { logSystemError } from '../../utils';
 import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from '../../../../server/routes/admin/payments';
 import { checkSepayTransactionImpl } from '../../../../server/routes/admin/sepay';
 import { confirmBookingImpl } from '../../../../server/routes/admin/confirm-booking';
+import {
+  listUnmatchedTransfersImpl,
+  assignUnmatchedTransferImpl,
+  ignoreUnmatchedTransferImpl
+} from '../../../../server/routes/admin/unmatched-transfers';
+import {
+  listOrderIssuesImpl,
+  listEmailIssuesImpl,
+  countActionItemsImpl,
+  resolveActionItemImpl,
+  confirmOrderIssueImpl,
+  resendEmailIssueImpl
+} from '../../../../server/routes/admin/action-items';
 import { clampPage, EXPORT_MAX_ROWS, MAX_PAGE_SIZE } from '../../../../server/lib/paging';
 import { resendBookingEmailImpl } from '../../../../server/routes/admin/resend-booking-email';
 import { confirmUseTicketImpl, getBookingByCodeImpl } from '../../../../server/routes/user/booking/query';
@@ -260,10 +274,11 @@ paymentsRouter.post('/api/admin/confirm-booking', requireStaffAuth, requirePermi
 
     const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
+    // Only what the ticket check screen reads (the whole order row is not sent back)
     const payload = {
-      ...(r as any),
-
-      status: status >= 400 ? 'error' : 'success'
+      status: status >= 400 ? 'error' : 'success',
+      message: (r as any).message,
+      voucher_slot_unavailable: (r as any).voucher_slot_unavailable
     };
 
     return c.json(payload, status as any);
@@ -273,6 +288,153 @@ paymentsRouter.post('/api/admin/confirm-booking', requireStaffAuth, requirePermi
     return c.json({ message: err?.message || 'Lỗi máy chủ nội bộ' }, 500);
   }
 });
+
+// ============================================================
+// UNMATCHED TRANSFERS ("Chuyển khoản chưa khớp")
+// Money SePay reported that matched no order. Seen by anyone who can view transactions (the money has no branch yet);
+// assigning it confirms an order, so it needs the same right as the manual confirmation (ticket_check.validate).
+// ============================================================
+
+const staffOf = (c: any) => ({ id: c.get('staffId'), email: c.get('staffEmail'), fullname: c.get('staffFullname') });
+
+paymentsRouter.get('/api/admin/unmatched-transfers', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listUnmatchedTransfersImpl(db, getD1Tables(schema), {
+      status: c.req.query('status'),
+      q: c.req.query('q'),
+      page: Number(c.req.query('page')),
+      pageSize: Number(c.req.query('pageSize'))
+    });
+    return c.json(r, 200);
+  } catch (err: any) {
+    logSystemError('unmatched-transfers-list', err);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
+paymentsRouter.post(
+  '/api/admin/unmatched-transfers/:id/assign',
+  requireStaffAuth,
+  requirePermission('ticket_check', 'validate'),
+  async (c) => {
+    let body: any = {};
+    try {
+      const db = drizzle(c.env.cinema_db, { schema });
+      body = await c.req.json().catch(() => ({}));
+      const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
+      const r: any = await assignUnmatchedTransferImpl(
+        db,
+        getD1Tables(schema),
+        { id: Number(c.req.param('id')), pay_code: body?.pay_code },
+        staffOf(c),
+        getRestrictBranchIds(c),
+        getMailer(c),
+        (data: any) => getBookingEmailTemplate(appBaseUrl, data),
+        c.executionCtx
+      );
+      return c.json({ ...r, status: r.status >= 400 ? 'error' : 'success' }, r.status);
+    } catch (err: any) {
+      logSystemError('unmatched-transfers-assign', err, body);
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    }
+  }
+);
+
+paymentsRouter.post(
+  '/api/admin/unmatched-transfers/:id/ignore',
+  requireStaffAuth,
+  requirePermission('ticket_check', 'validate'),
+  async (c) => {
+    let body: any = {};
+    try {
+      const db = drizzle(c.env.cinema_db, { schema });
+      body = await c.req.json().catch(() => ({}));
+      const r: any = await ignoreUnmatchedTransferImpl(
+        db,
+        getD1Tables(schema),
+        { id: Number(c.req.param('id')), note: body?.note },
+        staffOf(c)
+      );
+      return c.json({ ...r, status: r.status >= 400 ? 'error' : 'success' }, r.status);
+    } catch (err: any) {
+      logSystemError('unmatched-transfers-ignore', err, body);
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    }
+  }
+);
+
+// ============================================================
+// ACTION ITEMS ("Đơn cần xử lý"): orders not confirmed automatically and emails that failed
+// (unmatched transfers have their own routes above). Same rights as the unmatched transfers.
+// ============================================================
+
+const actionItemReply = (c: any, r: any) =>
+  c.json({ ...r, status: r.status >= 400 ? 'error' : 'success' }, r.status as any);
+
+paymentsRouter.get('/api/admin/action-items/count', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    return c.json(await countActionItemsImpl(db, getD1Tables(schema), getRestrictBranchIds(c)), 200);
+  } catch (err: any) {
+    logSystemError('action-items-count', err);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
+paymentsRouter.get('/api/admin/action-items/:kind', requireStaffAuth, requirePermission('transactions', 'view'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const args = { status: c.req.query('status'), page: Number(c.req.query('page')), pageSize: Number(c.req.query('pageSize')) };
+    const kind = c.req.param('kind');
+    if (kind !== 'orders' && kind !== 'emails') return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
+    const r =
+      kind === 'orders'
+        ? await listOrderIssuesImpl(db, getD1Tables(schema), args, getRestrictBranchIds(c))
+        : await listEmailIssuesImpl(db, getD1Tables(schema), args, getRestrictBranchIds(c));
+    return c.json(r, 200);
+  } catch (err: any) {
+    logSystemError('action-items-list', err);
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
+paymentsRouter.post(
+  '/api/admin/action-items/:kind/:id/:action',
+  requireStaffAuth,
+  requirePermission('ticket_check', 'validate'),
+  async (c) => {
+    let body: any = {};
+    try {
+      const db = drizzle(c.env.cinema_db, { schema });
+      body = await c.req.json().catch(() => ({}));
+      const kind = c.req.param('kind');
+      const action = c.req.param('action');
+      const id = Number(c.req.param('id'));
+      const appBaseUrl = c.env.VITE_CLIENT_BASE_URL || 'https://cinesphere.com.vn';
+      const renderBooking = (data: any) => getBookingEmailTemplate(appBaseUrl, data);
+      const tables = getD1Tables(schema);
+      const restrict = getRestrictBranchIds(c);
+
+      if ((kind === 'orders' || kind === 'emails') && action === 'resolve') {
+        const r = await resolveActionItemImpl(db, tables, { kind: kind === 'orders' ? 'order' : 'email', id, note: body?.note }, staffOf(c), restrict);
+        return actionItemReply(c, r);
+      }
+      if (kind === 'orders' && action === 'confirm') {
+        const r = await confirmOrderIssueImpl(db, tables, { id }, staffOf(c), restrict, getMailer(c), renderBooking, c.executionCtx);
+        return actionItemReply(c, r);
+      }
+      if (kind === 'emails' && action === 'resend') {
+        const r = await resendEmailIssueImpl(db, tables, { id }, staffOf(c), restrict, getMailer(c), renderBooking, c.executionCtx);
+        return actionItemReply(c, r);
+      }
+      return c.json({ status: 'error', message: 'Không tìm thấy' }, 404);
+    } catch (err: any) {
+      logSystemError('action-items-action', err, body);
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+    }
+  }
+);
 
 // Staff send the confirmation email of a paid order again. Uses the existing ticket_check.validate right.
 paymentsRouter.post('/api/admin/bookings-resend-email', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
@@ -316,7 +478,8 @@ paymentsRouter.get('/api/admin/bookings-code/:code', requireStaffAuth, requirePe
 
   const code = String(c.req.param('code') || '');
 
-  const r = await getBookingByCodeImpl(db, code, tables);
+  // Staff only look up tickets of their own branches
+  const r = await getBookingByCodeImpl(db, code, tables, getRestrictBranchIds(c));
 
   const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 

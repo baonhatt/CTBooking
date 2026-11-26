@@ -14,6 +14,7 @@ import {
   listTicketPackagesImpl,
   getTicketPackageImpl
 } from '../../../../server/routes/admin/tickets';
+import { clampPage } from '../../../../server/lib/paging';
 
 const getD1Tables = (schema: any) => ({ bookings: schema.bookings, users: schema.users, accounts: schema.accounts, movies: schema.movies, ticket_packages: schema.ticket_packages, email_logs: schema.email_logs, branches: schema.branches, showtimes: schema.showtimes });
 
@@ -171,8 +172,7 @@ ticketsRouter.get(
   requirePermission('tickets', 'view_deleted'),
   async (c) => {
     try {
-      const page = Number(c.req.query('page') || 1);
-      const pageSize = Number(c.req.query('pageSize') || 10);
+      const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
       const search = String(c.req.query('search') || '');
       const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : null;
       const restrictBranchIds = getRestrictBranchIds(c);
@@ -181,7 +181,7 @@ ticketsRouter.get(
 
       const r = await listDeletedTicketPackagesImpl(
         db,
-        { ticket_packages: schema.ticket_packages, staffs: schema.staffs },
+        { ticket_packages: schema.ticket_packages, staffs: schema.staffs, branches: schema.branches },
         { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || ''), branch_id, restrictToBranchIds: restrictBranchIds }
       );
 
@@ -225,8 +225,7 @@ ticketsRouter.post(
 
 ticketsRouter.get('/api/admin/tickets', requireStaffAuth, requirePermission('tickets', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-    const pageSize = Number(c.req.query('pageSize') || 20);
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'));
     const q = String(c.req.query('q') || '');
     const includeInactive = c.req.query('includeInactive') === 'true';
     const typeRaw = c.req.query('type') || 'all';

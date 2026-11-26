@@ -1,18 +1,20 @@
 import type { Movie, MoviesResponse, ActiveMoviesTodayResponse } from '@shared/api';
 import { request } from './http';
 
-export async function getMovies2025(options?: { signal?: AbortSignal }) {
-  return request<MoviesResponse>('/api/movies/2025', {
-    signal: options?.signal
-  });
-}
-
-export async function getAllActiveMoviesToday(options?: { signal?: AbortSignal }) {
-  return request<{ activeMovies: ActiveMoviesTodayResponse[] }>('/api/getActiveMovies', {
-    method: 'GET',
-    signal: options?.signal
-  });
-}
+/** A row of the admin movie list (GET /api/admin/movies). */
+export type AdminMovieListItem = {
+  id: number;
+  title: string;
+  release_date: string | null;
+  duration_min: number | null;
+  genres: string[];
+  cover_image: string | null;
+  updated_at: string | null;
+  rating: number | null;
+  is_active: boolean;
+  branch_id: number | null;
+  branch_ids: number[] | null;
+};
 
 export async function getMoviesAdmin(options?: {
   page?: number;
@@ -22,6 +24,8 @@ export async function getMoviesAdmin(options?: {
   dir?: 'asc' | 'desc';
   status?: 'all' | 'active' | 'inactive';
   branch_id?: number | 'all' | null;
+  /** Picker mode: also open to showtime and ticket package staff, and allows bigger pages. */
+  picker?: boolean;
   signal?: AbortSignal;
 }) {
   const params = new URLSearchParams();
@@ -32,13 +36,41 @@ export async function getMoviesAdmin(options?: {
   if (options?.dir) params.set('dir', options.dir);
   if (options?.status) params.set('status', options.status);
   if (options?.branch_id) params.set('branch_id', String(options.branch_id));
-  const path = `/api/movies${params.toString() ? `?${params.toString()}` : ''}`;
+  if (options?.picker) params.set('picker', '1');
+  const path = `/api/admin/movies${params.toString() ? `?${params.toString()}` : ''}`;
   return request<{
-    items: any[];
+    items: AdminMovieListItem[];
     page: number;
     pageSize: number;
     total: number;
   }>(path, { signal: options?.signal });
+}
+
+/** One page a picker request may load (the server allows up to 500 in picker mode). */
+const MOVIE_PICKER_PAGE_SIZE = 500;
+
+/** The most pages a picker loads, so a broken total can never loop forever. */
+const MOVIE_PICKER_MAX_PAGES = 20;
+
+/**
+ * Every movie that matches, for a picker (e.g. the showtime form's movie select): loads page after page until the
+ * total is reached, so the list is never cut off silently.
+ */
+export async function getAllMoviesForPicker(options: {
+  status?: 'all' | 'active' | 'inactive';
+  branch_id?: number | 'all' | null;
+  q?: string;
+  signal?: AbortSignal;
+}) {
+  const items: AdminMovieListItem[] = [];
+  let total = 0;
+  for (let page = 1; page <= MOVIE_PICKER_MAX_PAGES; page++) {
+    const res = await getMoviesAdmin({ ...options, page, pageSize: MOVIE_PICKER_PAGE_SIZE, sort: 'title', dir: 'asc', picker: true });
+    items.push(...(res.items || []));
+    total = Number(res.total || 0);
+    if (!res.items?.length || items.length >= total) break;
+  }
+  return { items, total };
 }
 
 export async function createMovieApi(body: {
@@ -95,21 +127,26 @@ export async function getMovieById(id: number) {
     description: string;
     cover_image: string | null;
     genres: any[];
-    rating: number;
-    duration_min: number;
-    price: number;
+    rating: number | null;
+    duration_min: number | null;
     is_active: boolean;
     branch_id: number | null;
     branch_ids?: number[] | null;
-    branch?: any;
     release_date: string | null;
-    created_at: string;
-    updated_at: string;
-    stats: {
-      totalTicketsSold: number;
-      totalRevenue: number;
-      successfulBookings: number;
-    };
+    created_at: string | null;
+    updated_at: string | null;
+    deleted_at: string | null;
+    created_by_staff_name: string | null;
+    updated_by_staff_name: string | null;
+    detail_images: string[];
+    applicable_packages: Array<{
+      id: number;
+      name: string;
+      code: string | null;
+      price: number;
+      branch_id: number | null;
+      branch_ids: number[] | null;
+    }>;
   }>(`/api/admin/movies/${id}`);
 }
 
@@ -119,7 +156,6 @@ export async function updateMovieStatus(id: number, isActive: boolean) {
   return request<{
     status: string;
     message: string;
-    item: any;
   }>(`/api/admin/movies-status/${id}`, {
     method: 'POST',
     body: JSON.stringify({ is_active: isActive })

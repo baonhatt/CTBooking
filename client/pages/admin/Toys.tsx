@@ -38,7 +38,9 @@ export default function ToysPage() {
           price: Number(t.price),
           stock: t.stock,
           status: t.status,
-          image_url: t.image_url
+          image_url: t.image_url,
+          created_at: t.created_at,
+          updated_at: t.updated_at
         }))
       );
       setTotalToys(total);
@@ -81,7 +83,9 @@ export default function ToysPage() {
         price: Number(t.price),
         stock: t.stock,
         status: t.status,
-        image_url: t.image_url
+        image_url: t.image_url,
+        created_at: t.created_at,
+        updated_at: t.updated_at
       }))
     );
     setTotalToys(total);

@@ -2,8 +2,15 @@ import { eq, desc, asc, or, count, and, isNull, isNotNull, like, sql, sum, inArr
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
-import { sqlBranchIdsStaffAccessFilter, staffCanAccessBranchIds, staffCanModifyBranchRecord } from '../../lib/branch-ids';
+import {
+  parseBranchIds,
+  sqlBranchIdsStaffAccessFilter,
+  staffCanAccessBranchIds,
+  staffCanModifyBranchRecord
+} from '../../lib/branch-ids';
 import { validateVoucherFields, checkVoucherBranches } from '../../lib/voucher-input';
+import { isFullDiscountVoucher, isSuperAdminStaff, FULL_DISCOUNT_SALES_MESSAGE } from '../../lib/free-voucher';
+import { staffs as staffsTable, bookings as bookingsTable } from '../../../shared/schema';
 
 /** True for a number the screen left empty (undefined, null or an empty text). */
 function isEmptyNumber(value: unknown): boolean {
@@ -116,9 +123,45 @@ export function buildVoucherOrderBy(vouchers: any, sort_by?: string, sort_dir?: 
   return [direction(vouchers[columnName]), desc(vouchers.id)];
 }
 
+/** Vouchers of one branch: the global ones (no branch list) and those whose list holds the branch. */
+export function voucherBranchCondition(vouchers: any, branchId: number | null | undefined) {
+  if (!branchId) return null;
+  return sqlBranchIdsStaffAccessFilter(vouchers.branch_ids, [branchId]);
+}
+
+/** The is_active filter of the lists: 'true'/'1' active, 'false'/'0' inactive, anything else (all, blank) no filter. */
+export function voucherActiveCondition(vouchers: any, isActive: string | undefined) {
+  if (isActive === 'true' || isActive === '1') return eq(vouchers.is_active, true);
+  if (isActive === 'false' || isActive === '0') return eq(vouchers.is_active, false);
+  return null;
+}
+
+/**
+ * The fields a voucher row sends to the admin screens: the stored description is replaced by its parsed parts
+ * (note, Sales person), and the columns no screen reads (applicable_user_ids, excluded_ticket_package_ids) stay out.
+ */
+function voucherRowForScreen(row: any) {
+  const {
+    description,
+    applicable_user_ids: _unusedUserIds,
+    excluded_ticket_package_ids: _unusedExcludedIds,
+    ...voucherFields
+  } = row;
+  const meta = parseVoucherMetadata(description);
+  return {
+    ...voucherFields,
+    note: meta.note,
+    sale_staff_id: meta.sale_staff_id,
+    sale_name: meta.sale_name,
+    sale_email: meta.sale_email,
+    applicable_ticket_package_ids: parseJsonArrayOutput(row.applicable_ticket_package_ids),
+    branch_ids: parseJsonArrayOutput(row.branch_ids)
+  };
+}
+
 export async function listVouchersImpl(
   anyDb: any,
-  tables: { vouchers: any; voucher_redemption_logs?: any },
+  tables: { vouchers: any; voucher_redemption_logs?: any; bookings?: any },
   args: {
     page: number;
     pageSize: number;
@@ -129,10 +172,11 @@ export async function listVouchersImpl(
     status?: string;
     sort_by?: string;
     sort_dir?: string;
+    branch_id?: number | null;
     restrictToBranchIds?: number[] | null;
   }
 ) {
-  const { page, pageSize, q, scope, is_active, sale_staff_id, status, sort_by, sort_dir, restrictToBranchIds = null } = args;
+  const { page, pageSize, q, scope, is_active, sale_staff_id, status, sort_by, sort_dir, branch_id, restrictToBranchIds = null } = args;
   const conditions = [] as any[];
   conditions.push(isNull(tables.vouchers.deleted_at));
 
@@ -151,10 +195,11 @@ export async function listVouchersImpl(
     conditions.push(eq(tables.vouchers.scope, scope));
   }
 
-  if (is_active !== undefined && is_active !== 'all' && is_active !== '') {
-    const val = is_active === 'true' || is_active === '1' ? 1 : 0;
-    conditions.push(eq(tables.vouchers.is_active, val));
-  }
+  const activeCondition = voucherActiveCondition(tables.vouchers, is_active);
+  if (activeCondition) conditions.push(activeCondition);
+
+  const branchCondition = voucherBranchCondition(tables.vouchers, branch_id);
+  if (branchCondition) conditions.push(branchCondition);
 
   if (sale_staff_id && sale_staff_id !== 'all') {
     const targetStaffId = Number(sale_staff_id);
@@ -193,16 +238,8 @@ export async function listVouchersImpl(
 
   if (voucherIds.length > 0 && tables.voucher_redemption_logs) {
     try {
-      const statsList = await anyDb
-        .select({
-          voucher_id: tables.voucher_redemption_logs.voucher_id,
-          total_revenue: sum(tables.voucher_redemption_logs.order_total_after_discount),
-          total_count: count()
-        })
-        .from(tables.voucher_redemption_logs)
-        .where(inArray(tables.voucher_redemption_logs.voucher_id, voucherIds))
-        .groupBy(tables.voucher_redemption_logs.voucher_id);
-        
+      const statsList = await voucherRedemptionStats(anyDb, tables, voucherIds, restrictToBranchIds);
+
       statsList.forEach((stat: any) => {
         aggregatedStats[stat.voucher_id] = stat;
       });
@@ -210,7 +247,6 @@ export async function listVouchersImpl(
   }
 
   const items = rawItems.map((v: any) => {
-    const meta = parseVoucherMetadata(v.description);
     let total_revenue = 0;
     let redemptions_count = v.used_count || 0;
 
@@ -222,31 +258,60 @@ export async function listVouchersImpl(
       }
     }
 
-    // applicable_user_ids is no longer part of the admin API (the column stays in the database)
-    const { applicable_user_ids: _unusedUserIds, ...voucherFields } = v;
     return {
-      ...voucherFields,
-      note: meta.note,
-      sale_staff_id: meta.sale_staff_id,
-      sale_name: meta.sale_name,
-      sale_email: meta.sale_email,
+      ...voucherRowForScreen(v),
       total_revenue,
-      used_count: redemptions_count,
-      applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
-        branch_ids: parseJsonArrayOutput(v.branch_ids)
+      used_count: redemptions_count
     };
   });
 
   return { items, page, pageSize, total };
 }
 
+/**
+ * Revenue and redemption count per voucher. Staff of some branches count only the orders of their own branches
+ * (the order's branch); the Super Admin (null) counts every branch.
+ */
+export async function voucherRedemptionStats(
+  anyDb: any,
+  tables: { voucher_redemption_logs?: any; bookings?: any },
+  voucherIds: number[],
+  restrictToBranchIds: number[] | null
+): Promise<Array<{ voucher_id: number; total_revenue: any; total_count: number }>> {
+  const logs = tables.voucher_redemption_logs;
+  const fields = {
+    voucher_id: logs.voucher_id,
+    total_revenue: sum(logs.order_total_after_discount),
+    total_count: count()
+  };
+  if (restrictToBranchIds === null || restrictToBranchIds === undefined) {
+    return anyDb.select(fields).from(logs).where(inArray(logs.voucher_id, voucherIds)).groupBy(logs.voucher_id);
+  }
+  if (!tables.bookings) throw new Error('bookings table is needed to scope voucher revenue by branch');
+  if (restrictToBranchIds.length === 0) return [];
+  return anyDb
+    .select(fields)
+    .from(logs)
+    .innerJoin(tables.bookings, eq(logs.booking_id, tables.bookings.id))
+    .where(and(inArray(logs.voucher_id, voucherIds), inArray(tables.bookings.branch_id, restrictToBranchIds)))
+    .groupBy(logs.voucher_id);
+}
+
 export async function listDeletedVouchersImpl(
   anyDb: any,
   tables: { vouchers: any },
-  options: { page?: number; pageSize?: number; search?: string; scope?: string; restrictToBranchIds?: number[] | null } = {}
+  options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    scope?: string;
+    is_active?: string;
+    branch_id?: number | null;
+    restrictToBranchIds?: number[] | null;
+  } = {}
 ) {
   const { vouchers } = tables;
-  const { page = 1, pageSize = 10, search = '', scope, restrictToBranchIds = null } = options;
+  const { page = 1, pageSize = 10, search = '', scope, is_active, branch_id, restrictToBranchIds = null } = options;
   const conditions = [] as any[];
   if (search) {
     const lowerQ = search.toLowerCase();
@@ -258,6 +323,12 @@ export async function listDeletedVouchersImpl(
     conditions.push(eq(vouchers.scope, scope));
   }
   conditions.push(isNotNull(vouchers.deleted_at));
+
+  const activeCondition = voucherActiveCondition(vouchers, is_active);
+  if (activeCondition) conditions.push(activeCondition);
+
+  const branchCondition = voucherBranchCondition(vouchers, branch_id);
+  if (branchCondition) conditions.push(branchCondition);
 
   // Branch access filter
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
@@ -278,14 +349,52 @@ export async function listDeletedVouchersImpl(
     offset: (page - 1) * pageSize
   });
   
-  const items = itemsRaw.map(({ applicable_user_ids: _unusedUserIds, deleted_by_staff, ...v }: any) => ({
-    ...v,
-    deleted_by_staff_name: deleted_by_staff?.fullname || null,
-    applicable_ticket_package_ids: parseJsonArrayOutput(v.applicable_ticket_package_ids),
-    branch_ids: parseJsonArrayOutput(v.branch_ids)
+  const items = itemsRaw.map(({ deleted_by_staff, ...v }: any) => ({
+    ...voucherRowForScreen(v),
+    deleted_by_staff_name: deleted_by_staff?.fullname || null
   }));
   const [countResult] = await anyDb.select({ count: count() }).from(vouchers).where(whereClause);
   return { status: 'success', items, total: countResult?.count || 0, page, pageSize };
+}
+
+/** The most ticket packages the voucher form lists (far above the real number of packages). */
+export const VOUCHER_PACKAGE_OPTIONS_LIMIT = 1000;
+
+/**
+ * Ticket packages the voucher form can pick: active and inactive ones (an old voucher may point at a package that is
+ * switched off now), never deleted ones. Staff of some branches see the global packages and those of their branches.
+ * Only the fields the form shows.
+ */
+export async function listVoucherPackageOptionsImpl(
+  anyDb: any,
+  tables: { ticket_packages: any },
+  options: { type?: string; branch_id?: number | null; restrictToBranchIds?: number[] | null } = {}
+) {
+  const packages = tables.ticket_packages;
+  const restrictToBranchIds = options.restrictToBranchIds ?? null;
+  const conditions: any[] = [isNull(packages.deleted_at)];
+  if (options.type === 'vr') conditions.push(eq(packages.type, 'vr'));
+  if (options.type === 'movie') conditions.push(sql`(${packages.type} IS NULL OR ${packages.type} != 'vr')`);
+  if (options.branch_id) conditions.push(sqlBranchIdsStaffAccessFilter(packages.branch_ids, [options.branch_id]));
+  if (restrictToBranchIds) conditions.push(sqlBranchIdsStaffAccessFilter(packages.branch_ids, restrictToBranchIds));
+
+  const rows = await anyDb
+    .select({
+      id: packages.id,
+      name: packages.name,
+      price: packages.price,
+      type: packages.type,
+      branch_id: packages.branch_id,
+      branch_ids: packages.branch_ids,
+      is_active: packages.is_active
+    })
+    .from(packages)
+    .where(and(...conditions))
+    .orderBy(asc(packages.display_order), desc(packages.id))
+    .limit(VOUCHER_PACKAGE_OPTIONS_LIMIT);
+
+  const items = rows.map((row: any) => ({ ...row, branch_ids: parseBranchIds(row.branch_ids) }));
+  return { items, total: items.length };
 }
 
 /** How many redemptions the detail shows by default, and the most it can be asked for ("xem thêm"). */
@@ -316,21 +425,37 @@ export async function getVoucherImpl(
 
   const meta = parseVoucherMetadata(voucher.description);
 
+  // Branch staff only see (and count) the uses on orders of their own branches; the Super Admin (null) sees all
+  const redemptionWhere =
+    restrictToBranchIds !== null && restrictToBranchIds !== undefined
+      ? and(
+          eq(tables.voucher_redemption_logs.voucher_id, id),
+          inArray(
+            tables.voucher_redemption_logs.booking_id,
+            anyDb.select({ id: bookingsTable.id }).from(bookingsTable).where(inArray(bookingsTable.branch_id, restrictToBranchIds))
+          )
+        )
+      : eq(tables.voucher_redemption_logs.voucher_id, id);
+
   const [redemptionCountRes] = await anyDb
     .select({ count: count() })
     .from(tables.voucher_redemption_logs)
-    .where(eq(tables.voucher_redemption_logs.voucher_id, id));
+    .where(redemptionWhere);
 
   const redemptionRows = await anyDb.query.voucher_redemption_logs.findMany({
-    where: eq(tables.voucher_redemption_logs.voucher_id, id),
+    where: redemptionWhere,
+    // Only what the history table shows: no customer, staff or order totals
+    columns: { id: true, redeemed_at: true, discount_amount_applied: true },
     // The booking code is what staff know a booking by (the numeric id stays out of the screen)
     with: { booking: { columns: { booking_code: true } } },
     orderBy: [desc(tables.voucher_redemption_logs.redeemed_at)],
     limit: clampRedemptionLimit(redemptionLimit)
   });
-  const recent_redemptions = redemptionRows.map(({ booking, ...row }: any) => ({
-    ...row,
-    booking_code: booking?.booking_code || null
+  const recent_redemptions = redemptionRows.map((row: any) => ({
+    id: row.id,
+    booking_code: row.booking?.booking_code || null,
+    redeemed_at: row.redeemed_at,
+    discount_amount_applied: row.discount_amount_applied
   }));
 
   const [createLog] = await anyDb
@@ -375,6 +500,23 @@ export async function getVoucherImpl(
   };
 }
 
+/**
+ * A 100% voucher (test voucher, see lib/free-voucher.ts) is saved only by a Super Admin (no branch restriction) and
+ * only with a Super Admin as its Sales person.
+ */
+async function checkFullDiscountVoucher(
+  anyDb: any,
+  fields: { discount_type?: string | null; discount_value?: any },
+  saleStaffId: number | null | undefined,
+  restrictToBranchIds: number[] | null | undefined
+) {
+  if (!isFullDiscountVoucher(fields)) return;
+  const callerIsSuperAdmin = restrictToBranchIds === null || restrictToBranchIds === undefined;
+  if (!callerIsSuperAdmin || !(await isSuperAdminStaff(anyDb, staffsTable, saleStaffId))) {
+    throw Object.assign(new Error(FULL_DISCOUNT_SALES_MESSAGE), { statusCode: 403 });
+  }
+}
+
 export async function createVoucherImpl(
   anyDb: any,
   tables: { vouchers: any; auditLogs: any },
@@ -407,6 +549,7 @@ export async function createVoucherImpl(
   validateVoucherFields({ ...args, scope: args.scope || 'all' });
   const dValue = Number(args.discount_value);
   const branchIdsToSave = checkVoucherBranches(args.branch_ids, restrictToBranchIds, { required: true });
+  await checkFullDiscountVoucher(anyDb, args, args.sale_staff_id, restrictToBranchIds);
 
   const formattedDesc = formatVoucherDescription(args.note || args.description, {
     staff_id: args.sale_staff_id,
@@ -546,6 +689,12 @@ export async function updateVoucherImpl(
     valid_until: pick('valid_until')
   });
   const branchIdsToSave = checkVoucherBranches(args.branch_ids, restrictToBranchIds, { required: false });
+  await checkFullDiscountVoucher(
+    anyDb,
+    { discount_type: pick('discount_type'), discount_value: pick('discount_value') },
+    targetSaleStaffId,
+    restrictToBranchIds
+  );
 
   const data: any = { updated_at: formatDateForDb(new Date()) };
   if (args.code !== undefined) data.code = (args.code || '').trim().toUpperCase();

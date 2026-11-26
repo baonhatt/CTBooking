@@ -4,6 +4,7 @@ import {
   createStaffImpl,
   deleteStaffImpl,
   getStaffByIdImpl,
+  listDeletedStaffImpl,
   listStaffImpl,
   resetStaffPasswordImpl,
   restoreStaffImpl,
@@ -175,5 +176,19 @@ describe('staff router: reset password', () => {
     const args = (resetStaffPasswordImpl as any).mock.calls[0];
     expect(args).toHaveLength(5);
     expect(JSON.stringify(args.slice(2))).not.toContain('chosen-by-caller');
+  });
+});
+
+describe('staff lists: page size is capped', () => {
+  it('the staff list caps 100000 at 100', async () => {
+    await call('GET', '/api/admin/staff?page=0&pageSize=100000', SUPER);
+    expect((listStaffImpl as any).mock.calls.at(-1)[2]).toMatchObject({ page: 1, pageSize: 100 });
+  });
+
+  it('the deleted staff list caps 100000 at 100 and defaults to 10', async () => {
+    await call('GET', '/api/admin/deleted/staff?pageSize=100000', SUPER);
+    expect((listDeletedStaffImpl as any).mock.calls.at(-1)[2]).toMatchObject({ page: 1, pageSize: 100 });
+    await call('GET', '/api/admin/deleted/staff?pageSize=abc', SUPER);
+    expect((listDeletedStaffImpl as any).mock.calls.at(-1)[2]).toMatchObject({ pageSize: 10 });
   });
 });

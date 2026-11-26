@@ -14,8 +14,19 @@ import {
   toggleBranchStatusImpl,
   toggleBranchOpenImpl,
   restoreBranchImpl,
-  listDeletedBranchesImpl
+  listDeletedBranchesImpl,
+  listAdminBranchOptionsImpl,
+  listBranchUnusedCodesImpl
 } from '../../../../server/routes/admin/branches';
+import { clampPage } from '../../../../server/lib/paging';
+
+/** True when the staff member may act on this branch: the Super Admin on any, other staff only on their own branches. */
+export function staffHasBranch(c: Context, branchId: number): boolean {
+  const restrictBranchIds = getRestrictBranchIds(c);
+  return restrictBranchIds === null || restrictBranchIds.includes(branchId);
+}
+
+const OTHER_BRANCH_MESSAGE = 'Bạn không có quyền với chi nhánh này';
 
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const branchesRouter = new Hono<{ Bindings: any; Variables: Variables }>();
@@ -28,7 +39,7 @@ branchesRouter.get('/api/admin/branches/options', requireStaffAuth, async (c) =>
 
     const db = drizzle(c.env.cinema_db, { schema });
 
-    const r = await listBranchOptionsImpl(
+    const r = await listAdminBranchOptionsImpl(
       db,
       { branches: schema.branches },
       { includeInactive, onlyOpen, restrictToBranchIds: restrictBranchIds }
@@ -42,9 +53,7 @@ branchesRouter.get('/api/admin/branches/options', requireStaffAuth, async (c) =>
 
 branchesRouter.get('/api/admin/branches', requireStaffAuth, requirePermission('branches', 'view'), async (c) => {
   try {
-    const page = Number(c.req.query('page') || 1);
-
-    const pageSize = Number(c.req.query('pageSize') || 10);
+    const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
 
     const q = String(c.req.query('q') || '');
 
@@ -60,7 +69,7 @@ branchesRouter.get('/api/admin/branches', requireStaffAuth, requirePermission('b
         ticket_packages: schema.ticket_packages,
         bookings: schema.bookings
       },
-      { page, pageSize, q, includeInactive }
+      { page, pageSize, q, includeInactive, restrictToBranchIds: getRestrictBranchIds(c) }
     );
 
     return c.json(r);
@@ -69,9 +78,26 @@ branchesRouter.get('/api/admin/branches', requireStaffAuth, requirePermission('b
   }
 });
 
+// Paid tickets of one branch never used: the close-branch dialog warns with their codes (read when it opens)
+branchesRouter.get('/api/admin/branches/:id/unused-codes', requireStaffAuth, requirePermission('branches', 'view'), async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    if (!Number.isInteger(id) || id <= 0) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
+    if (!staffHasBranch(c, id)) return c.json({ status: 'error', message: OTHER_BRANCH_MESSAGE }, 403);
+
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listBranchUnusedCodesImpl(db, { bookings: schema.bookings }, id);
+    return c.json(r, 200);
+  } catch (err: any) {
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
+
 branchesRouter.get('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'view'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    // Another branch's record is answered like a missing one
+    if (!staffHasBranch(c, id)) return c.json({ message: 'Không tìm thấy chi nhánh' }, 404);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -112,6 +138,7 @@ branchesRouter.post('/api/admin/branches', requireStaffAuth, requirePermission('
 branchesRouter.put('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'edit'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    if (!staffHasBranch(c, id)) return c.json({ status: 'error', message: OTHER_BRANCH_MESSAGE }, 403);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -142,6 +169,7 @@ branchesRouter.put('/api/admin/branches/:id', requireStaffAuth, requirePermissio
 branchesRouter.delete('/api/admin/branches/:id', requireStaffAuth, requirePermission('branches', 'delete'), async (c) => {
   try {
     const id = Number(c.req.param('id'));
+    if (!staffHasBranch(c, id)) return c.json({ status: 'error', message: OTHER_BRANCH_MESSAGE }, 403);
 
     const db = drizzle(c.env.cinema_db, { schema });
 
@@ -178,6 +206,7 @@ branchesRouter.post(
   async (c) => {
     try {
       const id = Number(c.req.param('id'));
+      if (!staffHasBranch(c, id)) return c.json({ status: 'error', message: OTHER_BRANCH_MESSAGE }, 403);
 
       const db = drizzle(c.env.cinema_db, { schema });
 
@@ -210,6 +239,7 @@ branchesRouter.post(
   async (c) => {
     try {
       const id = Number(c.req.param('id'));
+      if (!staffHasBranch(c, id)) return c.json({ status: 'error', message: OTHER_BRANCH_MESSAGE }, 403);
       const db = drizzle(c.env.cinema_db, { schema });
       const staffId = c.get('staffId');
       const staffEmail = c.get('staffEmail');
@@ -240,6 +270,7 @@ branchesRouter.post(
   async (c) => {
     try {
       const id = Number(c.req.param('id'));
+      if (!staffHasBranch(c, id)) return c.json({ status: 'error', message: OTHER_BRANCH_MESSAGE }, 403);
       const db = drizzle(c.env.cinema_db, { schema });
       const staffId = c.get('staffId');
       const staffEmail = c.get('staffEmail');
@@ -264,8 +295,7 @@ branchesRouter.get(
   requirePermission('branches', 'view_deleted'),
   async (c) => {
     try {
-      const page = Number(c.req.query('page') || 1);
-      const pageSize = Number(c.req.query('pageSize') || 10);
+      const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
       const search = String(c.req.query('search') || '');
 
       const db = drizzle(c.env.cinema_db, { schema });
@@ -273,7 +303,14 @@ branchesRouter.get(
       const r = await listDeletedBranchesImpl(
         db,
         { branches: schema.branches, staffs: schema.staffs },
-        { page, pageSize, search, sort: String(c.req.query('sort') || ''), dir: String(c.req.query('dir') || '') }
+        {
+          page,
+          pageSize,
+          search,
+          sort: String(c.req.query('sort') || ''),
+          dir: String(c.req.query('dir') || ''),
+          restrictToBranchIds: getRestrictBranchIds(c)
+        }
       );
 
       return c.json(r, 200);

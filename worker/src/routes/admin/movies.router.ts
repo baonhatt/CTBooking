@@ -1,4 +1,4 @@
-import { Hono, Context } from 'hono';
+import { Hono, Context, Next } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
@@ -11,13 +11,73 @@ import {
   updateMovieStatusImpl,
   restoreMovieImpl,
   listDeletedMoviesImpl,
-  getMovieByIdImpl
+  getMovieByIdImpl,
+  listAdminMoviesImpl
 } from '../../../../server/routes/admin/movies';
+import { clampPage } from '../../../../server/lib/paging';
 
 const getD1Tables = (schema: any) => ({ bookings: schema.bookings, users: schema.users, accounts: schema.accounts, movies: schema.movies, ticket_packages: schema.ticket_packages, email_logs: schema.email_logs, branches: schema.branches, showtimes: schema.showtimes });
 
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const moviesRouter = new Hono<{ Bindings: any; Variables: Variables }>();
+
+/** The most movies one picker request may load (the showtime form lists every active movie of a branch). */
+export const MOVIE_PICKER_MAX_PAGE_SIZE = 500;
+
+/** The rights that may read the movie list: the Movies screen, and the movie pickers of the showtime and ticket package forms. */
+const MOVIE_LIST_PERMISSIONS: Array<[string, string]> = [
+  ['movies', 'view'],
+  ['showtimes', 'view'],
+  ['tickets', 'view']
+];
+
+/**
+ * The Movies screen needs movies.view. Picker mode (?picker=1) is also open to staff who may view showtimes or ticket
+ * packages, because their forms pick a movie.
+ */
+async function requireMovieListPermission(c: Context, next: Next) {
+  if (c.get('isSuperAdmin')) return next();
+  const granted = (c.get('staffPermissions') as Array<{ module: string; action: string }> | undefined) || [];
+  const allowed = c.req.query('picker') === '1' ? MOVIE_LIST_PERMISSIONS : MOVIE_LIST_PERMISSIONS.slice(0, 1);
+  const ok = allowed.some(([module, action]) => granted.some((p) => p.module === module && p.action === action));
+  if (!ok) return c.json({ status: 'error', message: 'Không có quyền thực hiện thao tác này' }, 403);
+  return next();
+}
+
+moviesRouter.get('/api/admin/movies', requireStaffAuth, requireMovieListPermission, async (c) => {
+  try {
+    const isPicker = c.req.query('picker') === '1';
+    const { page, pageSize } = clampPage(
+      c.req.query('page'),
+      c.req.query('pageSize'),
+      isPicker ? { maxPageSize: MOVIE_PICKER_MAX_PAGE_SIZE } : {}
+    );
+    const statusRaw = String(c.req.query('status') || 'all');
+    const status = statusRaw === 'active' || statusRaw === 'inactive' ? statusRaw : 'all';
+    const branchRaw = c.req.query('branch_id');
+    const branchNumber = Number(branchRaw);
+    const branch_id = branchRaw && branchRaw !== 'all' && Number.isInteger(branchNumber) && branchNumber > 0 ? branchNumber : null;
+
+    const db = drizzle(c.env.cinema_db, { schema });
+    const r = await listAdminMoviesImpl(
+      db,
+      { movies: schema.movies },
+      {
+        page,
+        pageSize,
+        q: String(c.req.query('q') || ''),
+        sort: String(c.req.query('sort') || 'updated_at'),
+        dir: String(c.req.query('dir') || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc',
+        status,
+        branch_id,
+        restrictToBranchIds: getRestrictBranchIds(c)
+      }
+    );
+    return c.json(r, 200);
+  } catch {
+    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  }
+});
 
 moviesRouter.post('/api/admin/movies', requireStaffAuth, requirePermission('movies', 'create'), async (c) => {
   try {
@@ -169,21 +229,19 @@ moviesRouter.post(
 
       const status = typeof (r as any).status === 'number' ? (r as any).status : 200;
 
+      // The screen reads only the outcome and the message, not the movie row
       const payload = {
-        ...(r as any),
-
-        status: status >= 400 ? 'error' : 'success'
+        status: status >= 400 ? 'error' : 'success',
+        message: (r as any).message
       };
 
       // Không cần xóa cache: KV cache cho phim đã bị vô hiệu hóa hoàn toàn
 
       return c.json(payload, status);
-    } catch (err) {
-      return new Response(JSON.stringify({ status: 'error', message: 'Lỗi máy chủ nội bộ' }), {
-        status: 500,
-
-        headers: { 'Content-Type': 'application/json' }
-      });
+    } catch (err: any) {
+      // A refusal (403: another branch's movie) keeps its code and message
+      if (err?.statusCode) return c.json({ status: 'error', message: err.message }, err.statusCode);
+      return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
     }
   }
 );
@@ -261,8 +319,7 @@ moviesRouter.get(
   requirePermission('movies', 'view_deleted'),
   async (c) => {
     try {
-      const page = Number(c.req.query('page') || 1);
-      const pageSize = Number(c.req.query('pageSize') || 10);
+      const { page, pageSize } = clampPage(c.req.query('page'), c.req.query('pageSize'), { defaultPageSize: 10 });
       const search = String(c.req.query('search') || '');
       const branch_id = c.req.query('branch_id') ? Number(c.req.query('branch_id')) : null;
       const restrictBranchIds = getRestrictBranchIds(c);
@@ -294,7 +351,6 @@ moviesRouter.get('/api/admin/movies/:id', requireStaffAuth, requirePermission('m
       db,
       {
         movies: schema.movies,
-        bookings: schema.bookings,
         ticket_packages: schema.ticket_packages,
         auditLogs: schema.auditLogs
       },

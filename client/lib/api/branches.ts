@@ -21,28 +21,6 @@ export async function getBranches(options?: {
   );
 }
 
-export async function getPublicBranches(options?: { signal?: AbortSignal }) {
-  return request<{ items: any[]; page: number; pageSize: number; total: number; totalPages: number }>('/api/branches', {
-    signal: options?.signal
-  });
-}
-
-export async function getBranchOptions(options?: { signal?: AbortSignal }) {
-  return request<{
-    items: Array<{
-      branch_id: number;
-      id: number;
-      name: string;
-      code: string;
-      is_default: boolean;
-      is_open: boolean;
-      is_active: boolean;
-    }>;
-  }>('/api/branches/options', {
-    signal: options?.signal
-  });
-}
-
 export async function getAdminBranchOptions(options?: {
   includeInactive?: boolean;
   onlyOpen?: boolean;
@@ -53,10 +31,12 @@ export async function getAdminBranchOptions(options?: {
   if (options?.onlyOpen) params.set('onlyOpen', 'true');
   return request<{
     items: Array<{
+      /** Same as id (kept for older readers) */
       branch_id: number;
       id: number;
       name: string;
       code: string;
+      address: string | null;
       is_default: boolean;
       is_open: boolean;
       is_active: boolean;
@@ -64,8 +44,9 @@ export async function getAdminBranchOptions(options?: {
   }>(`/api/admin/branches/options?${params.toString()}`, { signal: options?.signal });
 }
 
-export async function getDefaultBranch(options?: { signal?: AbortSignal }) {
-  return request<{ branch: any }>('/api/branches/default', {
+/** Booking codes of paid tickets of one branch that were never used (at most 50), and how many there are in all. */
+export async function getBranchUnusedCodes(id: number, options?: { signal?: AbortSignal }) {
+  return request<{ codes: string[]; total: number }>(`/api/admin/branches/${id}/unused-codes`, {
     signal: options?.signal
   });
 }

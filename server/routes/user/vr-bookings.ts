@@ -1,7 +1,7 @@
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import type { VRBookingRequest, VRBookingResponse, VRPackageLineItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
-import { validateVoucherForVRImpl, matchesBranch } from './vouchers';
+import { validateVoucherForVRImpl, packageServesBranch } from './vouchers';
 import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
 import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '../../../shared/booking-invoice';
 import { generatePayTxtCode, isPayCodeCollision } from '../../lib/pay-code';
@@ -24,6 +24,23 @@ export async function listActiveVRPackagesImpl(anyDb: any, tables: { ticket_pack
 
   const items = await anyDb.query.ticket_packages.findMany({
     where: whereClause,
+    // What the customer screens show, plus is_member_only (the route hides those packages from visitors)
+    columns: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+      features: true,
+      type: true,
+      vr_genre: true,
+      cover_image: true,
+      duration_min: true,
+      min_players: true,
+      max_players: true,
+      display_order: true,
+      is_member_only: true,
+      branch_ids: true
+    },
     orderBy: [sql`CAST(${pkgs.display_order} AS INTEGER) ASC`, sql`CAST(${pkgs.price} AS REAL) ASC`]
   });
 
@@ -86,8 +103,12 @@ export async function validateVRBookingInput(
   }
 
   for (const p of pkgs) {
-    if (!matchesBranch(p.branch_ids, branch_id)) {
+    if (branch_id && !packageServesBranch(p, Number(branch_id))) {
       throw new Error(`Gói "${p.name}" không bán tại chi nhánh bạn chọn`);
+    }
+    // Member-only packages need a signed-in customer (the route takes it from the session, never from the form)
+    if (p.is_member_only && !(Number((body as any).signed_in_account_id) > 0)) {
+      throw new Error('Gói này chỉ dành cho thành viên. Vui lòng đăng nhập để đặt.');
     }
   }
 
@@ -104,6 +125,11 @@ export async function validateVRBookingInput(
     original_total += info.price * it.quantity;
   }
 
+  // A package priced 0 is a setup mistake: never an order without anything to pay (only a 100% voucher makes 0đ)
+  if (!Number.isFinite(original_total) || original_total <= 0) {
+    throw new Error('Giá gói VR không hợp lệ');
+  }
+
   // Voucher (nếu có)
   let voucher_result: any = { valid: false };
   if (voucher_code && voucher_code.trim()) {
@@ -117,6 +143,8 @@ export async function validateVRBookingInput(
       vr_subtotal: original_total,
       vr_price_map: vrPriceMap,
       branch_id,
+      // The customer's email, so the per-customer limit (paid + still-pending orders) is checked here too
+      email: emailBook,
       order_total_before: original_total
     });
     if (!voucher_result.valid) {
@@ -145,14 +173,12 @@ export async function validateVRBookingInput(
 export async function validateVRBookingImpl(anyDb: any, payload: VRBookingRequest, tables: any) {
   try {
     const res = await validateVRBookingInput(anyDb, payload, tables);
+    // Only the prices go back to the browser: the voucher's internal details (Sales person, usage counters) stay here
     return {
       status: 200,
       original_total_price: res.original_total_price,
       voucher_discount_amount: res.voucher_discount_amount,
-      total_price: res.total_price,
-      total_quantity: res.total_quantity,
-      vr_items_resolved: res.vr_items_resolved,
-      voucher_applied: res.voucher_result
+      total_price: res.total_price
     };
   } catch (err: any) {
     return { status: err.statusCode || 400, message: err.message || 'Lỗi validate' };
@@ -171,6 +197,7 @@ export async function createVRBookingImpl(
     vouchers: any;
     voucher_redemption_logs: any;
     users: any;
+    accounts?: any;
     bookings: any;
     booking_vr_items: any;
     branches: any;
@@ -207,14 +234,17 @@ export async function createVRBookingImpl(
     const booking_type = 'vr';
 
     const nowIso = new Date();
-    // Tìm user_id nếu có đăng nhập (từ email hoặc phone)
+    // The customer's account, found by email like movie orders do (the email lives on accounts, not users)
     let user_id: number | null = null;
-    try {
-      const matchUser = await anyDb.query.users.findFirst({
-        where: sql`LOWER(${tables.users.email}) = LOWER(${emailBook})`
-      });
-      if (matchUser) user_id = matchUser.id;
-    } catch {}
+    if (tables.accounts) {
+      const accountEmail = String((orderPayload as any).email || emailBook || '').trim();
+      const [account] = await anyDb
+        .select({ user_id: tables.accounts.user_id })
+        .from(tables.accounts)
+        .where(sql`LOWER(${tables.accounts.email}) = LOWER(${accountEmail})`)
+        .limit(1);
+      if (account?.user_id) user_id = Number(account.user_id);
+    }
 
     const voucher_applied = validated.voucher_result;
 

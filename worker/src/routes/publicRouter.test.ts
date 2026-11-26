@@ -5,6 +5,7 @@ import { createPaymentImpl } from '../../../server/routes/user/booking/create';
 import { createVRBookingImpl } from '../../../server/routes/user/vr-bookings';
 import { updatePaymentImpl } from '../../../server/routes/user/booking/update';
 import { validateSessionTokenImpl } from '../../../server/routes/user/auth';
+import { payFreeOrderNow } from '../../../server/routes/user/booking/free-order';
 
 const fakeDb: any = {
   query: {
@@ -22,6 +23,7 @@ vi.mock('../../../server/routes/user/vr-bookings', () => ({
   createVRBookingImpl: vi.fn()
 }));
 vi.mock('../../../server/routes/user/auth', () => ({ validateSessionTokenImpl: vi.fn() }));
+vi.mock('../../../server/routes/user/booking/free-order', () => ({ payFreeOrderNow: vi.fn() }));
 
 const SECRET = 'router-test-secret';
 const REAL_HOST = 'https://api.example.com';
@@ -36,7 +38,8 @@ const BOOKING = {
   name: 'Nguyen Van A',
   phone: '0900000000',
   payment_status: 'pending',
-  payment_expires_at: '2026-11-09T10:10:00.000Z'
+  // Still inside its 10 minutes, so the routes do not expire it (see the "overdue" tests below)
+  payment_expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString()
 };
 
 function call(path: string, init: RequestInit = {}, environment: any = env, host = REAL_HOST) {
@@ -60,7 +63,32 @@ beforeEach(() => {
   fakeDb.query.accounts.findFirst.mockResolvedValue(undefined);
   (validateSessionTokenImpl as any).mockResolvedValue({ valid: false });
   (updatePaymentImpl as any).mockResolvedValue({ status: 200, message: 'ok' });
+  (payFreeOrderNow as any).mockResolvedValue(null);
 });
+
+/** A new order row as the create functions return it: more than the booking page may see. */
+const CREATED_ROW = {
+  id: 55,
+  pay_txt_code: 'CS482913057741',
+  payment_expires_at: '2026-11-09T10:10:00.000Z',
+  payment_status: 'pending',
+  user_id: 9,
+  name: 'Nguyen Van A',
+  phone: '0900000000',
+  email: 'guest@example.com',
+  total_price: 90000,
+  vr_items: [{ id: 1, booking_id: 55, voucher_id: 3 }]
+};
+
+const CUSTOMER_BOOKING_KEYS = [
+  'booking_code',
+  'id',
+  'order_token',
+  'pay_txt_code',
+  'payment_expires_at',
+  'payment_status',
+  'server_now'
+];
 
 describe('GET /api/bookings/:id (payment status)', () => {
   it('answers 404 without a token, the same as for an order that does not exist', async () => {
@@ -129,6 +157,31 @@ describe('GET /api/bookings/:id (payment status)', () => {
   });
 });
 
+describe('GET /api/bookings/:id on an overdue order', () => {
+  it('expires it at once instead of waiting for the cron', async () => {
+    const overdue = { ...BOOKING, payment_expires_at: new Date(Date.now() - 60 * 1000).toISOString() };
+    fakeDb.query.bookings.findFirst.mockResolvedValue(overdue);
+    const updated: any[] = [];
+    fakeDb.update = () => ({
+      set: (values: any) => ({
+        where: () => ({
+          returning: async () => {
+            updated.push(values);
+            return [{ id: 55 }];
+          }
+        })
+      })
+    });
+
+    const response = await call('/api/bookings/55', { headers: { 'X-Order-Token': await tokenFor() } });
+    const body: any = await response.json();
+
+    expect(body.payment_status).toBe('expired');
+    expect(updated[0].payment_status).toBe('expired');
+    delete fakeDb.update;
+  });
+});
+
 describe('POST /api/cancel-booking', () => {
   it('refuses without proof of ownership and cancels nothing', async () => {
     const response = await post('/api/cancel-booking', { payment_id: 55, payment_status: 'failed' });
@@ -137,7 +190,7 @@ describe('POST /api/cancel-booking', () => {
     expect(updatePaymentImpl).not.toHaveBeenCalled();
   });
 
-  it('cancels with the right token, and sends only the booking id and "failed"', async () => {
+  it('cancels with the right token, and sends only the booking id and "cancelled"', async () => {
     const response = await post(
       '/api/cancel-booking',
       { payment_id: 55, payment_status: 'paid', transaction_id: 'FAKE', amount: 1 },
@@ -146,13 +199,22 @@ describe('POST /api/cancel-booking', () => {
 
     expect(response.status).toBe(200);
     const sent = (updatePaymentImpl as any).mock.calls[0][1];
-    expect(sent).toEqual({ payment_id: 55, payment_status: 'failed' });
+    expect(sent).toEqual({ payment_id: 55, payment_status: 'cancelled' });
   });
 
   it('cannot be used to mark an order paid', async () => {
     await post('/api/cancel-booking', { payment_id: 55, payment_status: 'paid' }, { 'X-Order-Token': await tokenFor() });
 
-    expect((updatePaymentImpl as any).mock.calls[0][1].payment_status).toBe('failed');
+    expect((updatePaymentImpl as any).mock.calls[0][1].payment_status).toBe('cancelled');
+  });
+
+  it('an order past its 10 minutes (the countdown ran out) is closed as "expired"', async () => {
+    const overdue = { ...BOOKING, payment_expires_at: new Date(Date.now() - 60 * 1000).toISOString() };
+    fakeDb.query.bookings.findFirst.mockResolvedValue(overdue);
+
+    await post('/api/cancel-booking', { payment_id: 55 }, { 'X-Order-Token': await tokenFor() });
+
+    expect((updatePaymentImpl as any).mock.calls[0][1].payment_status).toBe('expired');
   });
 
   it('refuses another order\'s token', async () => {
@@ -161,6 +223,19 @@ describe('POST /api/cancel-booking', () => {
 
     expect(response.status).toBe(404);
     expect(updatePaymentImpl).not.toHaveBeenCalled();
+  });
+
+  it('sends back only the status and the message, never the booking row', async () => {
+    (updatePaymentImpl as any).mockResolvedValue({
+      status: 200,
+      message: 'Đã hủy',
+      booking: { id: 55, confirmed_by_staff_id: 4, transaction_id: 'TX1', email: 'guest@example.com' }
+    });
+
+    const response = await post('/api/cancel-booking', { payment_id: 55 }, { 'X-Order-Token': await tokenFor() });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'success', message: 'Đã hủy' });
   });
 
   it('passes on a conflict from the update (for example an order that was already paid)', async () => {
@@ -187,6 +262,27 @@ describe('POST /api/create-booking', () => {
     expect(body.status).toBe('success');
     expect(body.booking.order_token).toBe(await tokenFor());
     expect(body.booking.server_now).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+  });
+
+  it('sends back only what the booking page reads (no name, phone, email, user id or prices)', async () => {
+    (createPaymentImpl as any).mockResolvedValue({ status: 201, message: 'ok', booking: { ...CREATED_ROW } });
+
+    const body: any = await (await post('/api/create-booking', { name: 'A' })).json();
+
+    expect(Object.keys(body.booking).sort()).toEqual(CUSTOMER_BOOKING_KEYS);
+    expect(body.booking).toMatchObject({ id: 55, payment_status: 'pending', booking_code: null });
+    expect(JSON.stringify(body)).not.toMatch(/Nguyen|0900000000|guest@example/);
+  });
+
+  it('a 0đ order comes back paid, with its ticket code', async () => {
+    (createPaymentImpl as any).mockResolvedValue({ status: 201, booking: { ...CREATED_ROW, total_price: 0 } });
+    (payFreeOrderNow as any).mockResolvedValue({ payment_status: 'paid', booking_code: 'TK123456' });
+
+    const body: any = await (await post('/api/create-booking', { name: 'A' })).json();
+
+    expect(body.booking.payment_status).toBe('paid');
+    expect(body.booking.booking_code).toBe('TK123456');
+    expect(body.booking.order_token).toBe(await tokenFor());
   });
 
   it('adds no token to a failed order', async () => {
@@ -243,6 +339,21 @@ describe('POST /api/vr/create-booking', () => {
     expect(response.status).toBe(201);
     expect(body.booking.order_token).toBe(await tokenFor());
     expect((createVRBookingImpl as any).mock.calls[0][2]).toHaveProperty('branches');
+  });
+
+  it('sends back only what the booking page reads, and the 0đ result', async () => {
+    (createVRBookingImpl as any).mockResolvedValue({
+      status: 201,
+      success: true,
+      booking: { ...CREATED_ROW, voucher_id: 3, voucher_code_snapshot: 'SALE10' }
+    });
+    (payFreeOrderNow as any).mockResolvedValue({ payment_status: 'paid', booking_code: 'TK654321' });
+
+    const body: any = await (await post('/api/vr/create-booking', { items: [] })).json();
+
+    expect(body.success).toBe(true);
+    expect(Object.keys(body.booking).sort()).toEqual(CUSTOMER_BOOKING_KEYS);
+    expect(body.booking.booking_code).toBe('TK654321');
   });
 
   it('refuses before creating anything when the secret is missing', async () => {

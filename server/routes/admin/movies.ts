@@ -490,23 +490,17 @@ export async function listDeletedMoviesImpl(
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+  // Only the columns the deleted-movies screen shows
   const items = await anyDb
     .select({
       id: movies.id,
       title: movies.title,
-      description: movies.description,
       cover_image: movies.cover_image,
       genres: movies.genres,
       rating: movies.rating,
       duration_min: movies.duration_min,
-      branch_id: movies.branch_id,
-      branch_ids: movies.branch_ids,
-      created_at: movies.created_at,
-      updated_at: movies.updated_at,
-      is_active: movies.is_active,
       release_date: movies.release_date,
       deleted_at: movies.deleted_at,
-      deleted_by_staff_id: movies.deleted_by_staff_id,
       deleted_by_staff_name: staffs.fullname
     })
     .from(movies)
@@ -524,11 +518,101 @@ export async function listDeletedMoviesImpl(
 
   return {
     status: 'success',
-    items: enrichItemsWithParsedBranchIds(items),
+    // The screen lists genres as tags, so they go out as an array, not the stored JSON text
+    items: items.map((item: any) => ({ ...item, genres: parseGenres(item.genres) })),
     total: countResult?.count || 0,
     page,
     pageSize
   };
+}
+
+/** Genres as an array, whatever the stored form: JSON array text, an array, or blank. */
+export function parseGenres(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+export type AdminMovieListStatus = 'all' | 'active' | 'inactive';
+
+/**
+ * The admin movie list (Movies screen and the movie pickers of the showtime and ticket package forms).
+ * Never returns deleted movies. Staff of some branches see the global movies and the movies of their branches.
+ * Returns only the columns those screens read.
+ */
+export async function listAdminMoviesImpl(
+  anyDb: any,
+  tables: { movies: any },
+  options: {
+    page: number;
+    pageSize: number;
+    q?: string;
+    sort?: string;
+    dir?: 'asc' | 'desc';
+    status?: AdminMovieListStatus;
+    branch_id?: number | null;
+    restrictToBranchIds?: number[] | null;
+  }
+) {
+  const { movies } = tables;
+  const { page, pageSize, q = '', sort = 'updated_at', dir = 'desc', status = 'all', branch_id = null } = options;
+  const restrictToBranchIds = options.restrictToBranchIds ?? null;
+
+  const conditions: any[] = [isNull(movies.deleted_at)];
+  const searchText = q.trim().toLowerCase();
+  if (searchText) {
+    const term = `%${searchText}%`;
+    conditions.push(or(sql`lower(${movies.title}) like ${term}`, sql`lower(${movies.description}) like ${term}`));
+  }
+  if (status === 'active') conditions.push(eq(movies.is_active, true));
+  if (status === 'inactive') conditions.push(eq(movies.is_active, false));
+  if (branch_id) conditions.push(sqlBranchIdsMatchFilter(movies.branch_ids, movies.branch_id, branch_id));
+  if (restrictToBranchIds) conditions.push(sqlBranchIdsStaffAccessFilter(movies.branch_ids, restrictToBranchIds));
+  const whereClause = and(...conditions);
+
+  const sortColumns: Record<string, any> = {
+    release_date: movies.release_date,
+    title: movies.title,
+    rating: movies.rating,
+    updated_at: movies.updated_at
+  };
+  const sortColumn = sortColumns[sort] || movies.updated_at;
+  const order = dir === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+  const rows = await anyDb
+    .select({
+      id: movies.id,
+      title: movies.title,
+      release_date: movies.release_date,
+      duration_min: movies.duration_min,
+      genres: movies.genres,
+      cover_image: movies.cover_image,
+      updated_at: movies.updated_at,
+      rating: movies.rating,
+      is_active: movies.is_active,
+      branch_id: movies.branch_id,
+      branch_ids: movies.branch_ids
+    })
+    .from(movies)
+    .where(whereClause)
+    .orderBy(order, desc(movies.id))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  const [countResult] = await anyDb.select({ count: count() }).from(movies).where(whereClause);
+
+  const items = rows.map((row: any) => ({
+    ...row,
+    genres: parseGenres(row.genres),
+    branch_ids: parseBranchIds(row.branch_ids)
+  }));
+
+  return { items, page, pageSize, total: Number(countResult?.count || 0) };
 }
 
 export async function updateMovieStatusImpl(
@@ -637,7 +721,7 @@ export async function updateMovieStatusImpl(
 
 export async function getMovieByIdImpl(
   anyDb: any,
-  tables: { movies: any; bookings: any; ticket_packages: any; auditLogs: any },
+  tables: { movies: any; bookings?: any; ticket_packages: any; auditLogs: any },
   movieId: number,
   restrictToBranchIds: number[] | null = null
 ) {
@@ -667,25 +751,8 @@ export async function getMovieByIdImpl(
     restrictToBranchIds && restrictToBranchIds.length > 0
       ? and(eq(tables.movies.id, movieId), sqlBranchIdsStaffAccessFilter(tables.movies.branch_ids, restrictToBranchIds))
       : eq(tables.movies.id, movieId);
-  const movie = await anyDb.query.movies.findFirst({
-    where: movieWhere,
-    with: {
-      branch: true
-    }
-  });
+  const movie = await anyDb.query.movies.findFirst({ where: movieWhere });
   if (!movie) return null;
-
-  const paid = await anyDb.query.bookings.findMany({
-    where: and(eq(tables.bookings.movie_id, movieId), inArray(tables.bookings.payment_status, ['paid'])),
-    columns: { ticket_count: true, total_price: true }
-  });
-
-  const totalTicketsSold = (paid || []).reduce(
-    (sum: number, booking: any) => sum + (Number(booking.ticket_count) || 0),
-    0
-  );
-  const totalRevenue = (paid || []).reduce((sum: number, booking: any) => sum + Number(booking.total_price || 0), 0);
-  const successfulBookings = (paid || []).length;
 
   // Lấy các gói vé có chứa phim này
   const searchId = String(movieId);
@@ -694,11 +761,8 @@ export async function getMovieByIdImpl(
       id: tables.ticket_packages.id,
       name: tables.ticket_packages.name,
       combo: tables.ticket_packages.combo,
+      code: tables.ticket_packages.code,
       price: tables.ticket_packages.price,
-      is_active: tables.ticket_packages.is_active,
-      type: tables.ticket_packages.type,
-      description: tables.ticket_packages.description,
-      features: tables.ticket_packages.features,
       // The movie detail tells same-named packages of different branches apart
       branch_id: tables.ticket_packages.branch_id,
       branch_ids: tables.ticket_packages.branch_ids
@@ -735,6 +799,15 @@ export async function getMovieByIdImpl(
     }
     return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
   });
+  // Only what the movie detail shows: name, code, price and the branch tag (the combo was needed for the filter only)
+  const applicableRows = applicablePackages.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    code: p.code ?? null,
+    price: p.price,
+    branch_id: p.branch_id,
+    branch_ids: parseBranchIds(p.branch_ids)
+  }));
 
   // Get tracking data from audit logs
   const [createLog] = await anyDb
@@ -779,8 +852,7 @@ export async function getMovieByIdImpl(
     deleted_at: safeDate(movie.deleted_at),
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null,
-    stats: { totalTicketsSold, totalRevenue, successfulBookings },
-    applicable_packages: applicablePackages || [],
+    applicable_packages: applicableRows,
     detail_images: safeParseJson(movie.detail_images),
     branch_id: movie.branch_id,
     branch_ids: parseBranchIds(movie.branch_ids)

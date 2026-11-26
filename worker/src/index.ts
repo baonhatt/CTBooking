@@ -68,43 +68,40 @@ type Bindings = {
   SUPER_ADMIN_FULLNAME: string;
 };
 
+// CORS: only our own sites may call the API with the customer's cookie (credentials: true).
+// Any other origin gets no Access-Control-Allow-Origin header, so the browser blocks the reply.
+// Before, every *.pages.dev / *.workers.dev site and finally any origin at all was echoed back.
+const ALLOWED_PAGES_PROJECTS = [
+  'cinema-pages', // admin (Vite), preview: preview.cinema-pages.pages.dev
+  'cinema-admin-pages', // admin, "npm run pages:deploy:*"
+  'cinema-next' // customer site (next-client), preview: preview.cinema-next.pages.dev
+];
+
+function isAllowedOrigin(origin: string | undefined): origin is string {
+  if (!origin) return false;
+  let hostname = '';
+  try {
+    hostname = new URL(origin).hostname;
+  } catch {
+    return false;
+  }
+  // Local development
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) return true;
+  // cinesphere.com.vn and its subdomains (www, admin, api)
+  if (hostname === 'cinesphere.com.vn' || hostname.endsWith('.cinesphere.com.vn')) return true;
+  // Our Cloudflare Pages projects and their branch/preview deployments, e.g. preview.cinema-next.pages.dev
+  return ALLOWED_PAGES_PROJECTS.some(
+    (project) => hostname === `${project}.pages.dev` || hostname.endsWith(`.${project}.pages.dev`)
+  );
+}
+
 const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
 
 // 1. CORS Middleware - MUST BE THE VERY FIRST MIDDLEWARE
 app.use(
   '*',
   cors({
-    origin: (origin, c) => {
-      if (!origin) return 'https://cinesphere.com.vn';
-
-      // 1. Allow localhost & 127.0.0.1 for development
-      try {
-        const url = new URL(origin);
-        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.endsWith('.localhost')) {
-          return origin;
-        }
-
-        // 2. Allow all cinesphere.com.vn domains & subdomains
-        if (url.hostname === 'cinesphere.com.vn' || url.hostname.endsWith('.cinesphere.com.vn')) {
-          return origin;
-        }
-
-        // 3. Allow all Cloudflare Pages domains & subdomains (*.pages.dev)
-        if (url.hostname === 'pages.dev' || url.hostname.endsWith('.pages.dev')) {
-          return origin;
-        }
-
-        // 4. Allow all Cloudflare Workers domains (*.workers.dev)
-        if (url.hostname === 'workers.dev' || url.hostname.endsWith('.workers.dev')) {
-          return origin;
-        }
-      } catch {
-        // ignore parse error
-      }
-
-      // Default fallback: echo origin if available, otherwise prod domain
-      return origin || 'https://cinesphere.com.vn';
-    },
+    origin: (origin) => (isAllowedOrigin(origin) ? origin : null),
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
     allowHeaders: [
       'Content-Type',

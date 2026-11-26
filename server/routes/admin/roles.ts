@@ -2,6 +2,7 @@ import { eq, and, desc, asc, count, isNull, isNotNull, like, sql, inArray } from
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import { addRequiredPermissions } from '../../../shared/permission-rules';
+import { PERMISSIONS_SEED } from '../../lib/rbac-seed';
 
 const SUPER_ADMIN_ONLY_MESSAGE = 'Chỉ Super Admin mới được quản lý vai trò';
 const MAX_ROLE_NAME_LENGTH = 100;
@@ -22,6 +23,30 @@ async function countStaffByRole(db: any, tables: any, roleIds: number[]): Promis
     .groupBy(staffRoles.roleId);
   for (const row of rows) {
     countByRole.set(row.roleId, row.total);
+  }
+  return countByRole;
+}
+
+/** The permissions the role screens can grant ("module:action"), the same matrix as the client's APPLICABLE_ACTIONS */
+const GRANTABLE_PERMISSION_KEYS = new Set(PERMISSIONS_SEED.map((permission) => `${permission.module}:${permission.action}`));
+
+// How many grantable permissions each role holds (older rows may hold permissions the matrix no longer shows)
+async function countGrantedPermissionsByRole(
+  db: any,
+  rolePermissions: any,
+  permissions: any,
+  roleIds: number[]
+): Promise<Map<number, number>> {
+  const countByRole = new Map<number, number>();
+  if (!rolePermissions || !permissions || roleIds.length === 0) return countByRole;
+  const rows = await db
+    .select({ roleId: rolePermissions.roleId, module: permissions.module, action: permissions.action })
+    .from(rolePermissions)
+    .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+    .where(inArray(rolePermissions.roleId, roleIds));
+  for (const row of rows) {
+    if (!GRANTABLE_PERMISSION_KEYS.has(`${row.module}:${row.action}`)) continue;
+    countByRole.set(row.roleId, (countByRole.get(row.roleId) || 0) + 1);
   }
   return countByRole;
 }
@@ -67,7 +92,18 @@ export async function listRolesImpl(
   const { page = 1, pageSize = 100, q = '', isSystem } = params || {};
   const offset = (page - 1) * pageSize;
 
-  let query = db.select().from(roles);
+  // Only what the roles screen and the staff form read
+  const query = db
+    .select({
+      id: roles.id,
+      name: roles.name,
+      description: roles.description,
+      isSystem: roles.isSystem,
+      level: roles.level,
+      createdAt: roles.createdAt,
+      updatedAt: roles.updatedAt
+    })
+    .from(roles);
   
   const conditions = [isNull(roles.deleted_at)];
   if (q) {
@@ -87,41 +123,13 @@ export async function listRolesImpl(
 
   const roleIds = roleList.map((r: any) => r.id);
   const staffCountByRole = await countStaffByRole(db, tables, roleIds);
-  const rolesWithPerms = roleList.map((r: any) => ({
+  const permissionCountByRole = await countGrantedPermissionsByRole(db, rolePermissions, permissions, roleIds);
+  // The list screen shows "Quyền: N/M", so it gets the number, not the permission rows
+  const rolesWithCounts = roleList.map((r: any) => ({
     ...r,
     staffCount: staffCountByRole.get(r.id) || 0,
-    permissionIds: [],
-    permissions: []
+    permissionCount: permissionCountByRole.get(r.id) || 0
   }));
-
-  if (roleIds.length > 0) {
-    const allPerms = await db
-      .select({
-        roleId: rolePermissions.roleId,
-        permissionId: rolePermissions.permissionId,
-        module: permissions.module,
-        action: permissions.action
-      })
-      .from(rolePermissions)
-      .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-      .where(inArray(rolePermissions.roleId, roleIds));
-
-    const permsByRole = allPerms.reduce((acc: any, p: any) => {
-      if (!acc[p.roleId]) acc[p.roleId] = [];
-      acc[p.roleId].push(p);
-      return acc;
-    }, {});
-
-    rolesWithPerms.forEach((r: any) => {
-      const perms = permsByRole[r.id] || [];
-      r.permissionIds = perms.map((p: any) => p.permissionId);
-      r.permissions = perms.map((p: any) => ({
-        id: p.permissionId,
-        module: p.module,
-        action: p.action
-      }));
-    });
-  }
 
   // Get total count
   const [countResult] = await db
@@ -130,7 +138,7 @@ export async function listRolesImpl(
     .where(and(...conditions));
 
   return {
-    items: rolesWithPerms,
+    items: rolesWithCounts,
     total: countResult?.count || 0,
     page,
     pageSize
@@ -205,14 +213,14 @@ export async function getRoleByIdImpl(db: any, tables: any, id: number) {
 
   // Get tracking data from audit logs
   const [createLog] = await db
-    .select()
+    .select({ staffFullname: auditLogs.staffFullname })
     .from(auditLogs)
     .where(and(eq(auditLogs.entityType, 'role'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'create')))
     .orderBy(auditLogs.createdAt)
     .limit(1);
 
   const [updateLog] = await db
-    .select()
+    .select({ staffFullname: auditLogs.staffFullname })
     .from(auditLogs)
     .where(and(eq(auditLogs.entityType, 'role'), eq(auditLogs.entityId, String(id)), eq(auditLogs.action, 'update')))
     .orderBy(desc(auditLogs.createdAt))
@@ -515,7 +523,7 @@ export async function restoreRoleImpl(
   const { roles } = tables;
 
   if (!staffInfo?.isSuperAdmin) {
-    return { status: 'error', message: SUPER_ADMIN_ONLY_MESSAGE };
+    return { status: 'error', code: 'forbidden', message: SUPER_ADMIN_ONLY_MESSAGE };
   }
 
   // Check if role exists and is deleted
@@ -525,7 +533,7 @@ export async function restoreRoleImpl(
     .where(and(eq(roles.id, id), isNotNull(roles.deleted_at)))
     .limit(1);
   if (!existing) {
-    return { status: 'error', message: 'Role not found or not deleted' };
+    return { status: 'error', code: 'not_found', message: 'Role not found or not deleted' };
   }
 
   // Check constraint: Active role with same name?
@@ -536,7 +544,7 @@ export async function restoreRoleImpl(
     .limit(1);
 
   if (activeRoleWithSameName) {
-    return { status: 'error', message: `Không thể khôi phục: Đã có vai trò "${existing.name}" đang hoạt động` };
+    return { status: 'error', code: 'conflict', message: `Không thể khôi phục: Đã có vai trò "${existing.name}" đang hoạt động` };
   }
 
   // Restore by setting deleted_at to null

@@ -30,6 +30,7 @@ import {
 import ChangePasswordDialog from '@/components/user/account/ChangePasswordDialog';
 import TicketDetailDialog from '@/components/user/account/TicketDetailDialog';
 import { formatDateTime, getBookingCode, formatMoney } from '@/lib/account-format';
+import DobSelect from '@/components/user/account/DobSelect';
 import { updateUserProfileApi, getUserTransactionsApi, getUserProfileByEmailApi } from '@/lib/api';
 import { getCookie, setCookie } from '@/lib/cookies';
 import {
@@ -42,20 +43,16 @@ import {
 } from '@/components/ui/pagination';
 import { parseMoviePackages, bookingTypeBadge } from '@shared/booking-invoice';
 
+/** A VR line of an order, as GET /api/user/transactions sends it. */
 export interface VRItem {
-    id?: number;
-    booking_id?: number;
     package_name: string;
     quantity: number;
     unit_price: number;
-    discounted_unit_price?: number;
     line_total?: number;
     vr_ticket_package_id?: number;
-    vr_package_id?: number;
 }
 
 export interface UserTransactionItem {
-    id: number;
     booking_id: number;
     booking_code: string;
     pay_txt_code: string;
@@ -72,14 +69,12 @@ export interface UserTransactionItem {
     voucher_code: string | null;
     voucher_details?: {
         scope?: string | null;
-        description?: string | null;
         applicable_ids?: unknown;
     } | null;
     method: string;
     payment_status: string;
     booking_type?: 'movie' | 'vr' | 'combo_vr';
     vr_items?: VRItem[];
-    ticket_unit_price?: number;
     created_at: string;
     paid_at?: string;
     expiry_date?: string;
@@ -88,7 +83,6 @@ export interface UserTransactionItem {
     branch_name?: string;
     branch_address?: string;
     isExpired?: boolean;
-    expired?: boolean;
     remainingTimeLabel?: string;
 }
 
@@ -132,6 +126,7 @@ export default function Account() {
     const [cancelTarget, setCancelTarget] = useState<UserTransactionItem | null>(null);
     const [isCancelling, setIsCancelling] = useState(false);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [nameError, setNameError] = useState('');
     // Server clock minus this browser's clock. A payment deadline is counted on the server's time.
     const [serverClockOffset, setServerClockOffset] = useState(0);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -183,7 +178,7 @@ export default function Account() {
 
             localStorage.setItem('qrPaymentEndTime', String(deadlineMs));
             localStorage.setItem('qrPaymentData', JSON.stringify({
-                bookingId: t.booking_id || t.id,
+                bookingId: t.booking_id,
                 orderId: t.pay_txt_code,
                 pay_txt_code: t.pay_txt_code,
                 order_token: t.order_token,
@@ -352,14 +347,15 @@ export default function Account() {
         const target = cancelTarget;
         if (!target?.order_token) return;
         setIsCancelling(true);
-        const { httpStatus } = await cancelBookingByToken(Number(target.booking_id || target.id), String(target.order_token));
+        const { httpStatus } = await cancelBookingByToken(Number(target.booking_id), String(target.order_token));
         setIsCancelling(false);
         setCancelTarget(null);
 
         if (httpStatus === 200) {
             toast.success('Đã hủy đơn');
             setTransactions((previous) =>
-                previous.map((item) => (item.id === target.id ? { ...item, payment_status: 'failed' } : item))
+                // Only the cancelled order (the list items carry booking_id, not id)
+                previous.map((item) => (item.booking_id === target.booking_id ? { ...item, payment_status: 'cancelled' } : item))
             );
         } else if (httpStatus === 409) {
             toast.info('Đơn này đã được thanh toán');
@@ -442,6 +438,17 @@ export default function Account() {
         tx?.cover_image || tx?.coverImage || tx?.poster || tx?.poster_url || tx?.thumbnail || tx?.image || '';
 
     const handleSaveProfile = async () => {
+        // Same rule as the server (users.ts): the error shows under the name field, not only in a toast
+        const trimmedName = String(profile.name || '').trim();
+        const nameProblem = !trimmedName
+            ? 'Tên không được để trống'
+            : trimmedName.length > 100
+              ? 'Tên tối đa 100 ký tự'
+              : /[<>]/.test(trimmedName)
+                ? 'Tên không được chứa ký tự < hoặc >'
+                : '';
+        setNameError(nameProblem);
+        if (nameProblem) return;
         setIsSavingProfile(true);
         try {
             await updateUserProfileApi({
@@ -462,7 +469,9 @@ export default function Account() {
             setCookie('userProfile', JSON.stringify(p), 60 * 60 * 24 * 30);
             toast.success('Cập nhật thành công');
         } catch (e: any) {
-            toast.error('Cập nhật thất bại', { description: e?.message || '' });
+            const message = String(e?.message || '');
+            if (/tên/i.test(message)) setNameError(message);
+            toast.error('Cập nhật thất bại', { description: message });
         } finally {
             setIsSavingProfile(false);
         }
@@ -483,7 +492,7 @@ export default function Account() {
                         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/25 to-transparent" />
                         <div className="absolute inset-0 neon-noise opacity-25" />
                     </div>
-                    <div className="relative z-10 max-w-3xl mx-auto px-3 sm:px-4 pb-16 pt-28 md:pt-36 w-full overflow-x-hidden">
+                    <div className="relative z-10 max-w-3xl mx-auto px-3 sm:px-4 pb-16 pt-20 sm:pt-28 md:pt-36 w-full overflow-x-hidden">
                         <div className="flex items-center pt-2 gap-2 text-sm text-gray-300 mb-6">
                             <Link href="/" className="inline-flex items-center min-h-[44px] text-blue-300 hover:text-blue-200">
                                 Trang chủ
@@ -527,28 +536,29 @@ export default function Account() {
                                                         <Input
                                                             id="profile-name" autoComplete="name" className="h-11 bg-[#0e1730] border-white/[0.2] text-white focus:border-blue-500/50 transition-all"
                                                             value={profile.name}
-                                                            onChange={(e) =>
+                                                            aria-invalid={!!nameError}
+                                                            aria-describedby={nameError ? 'profile-name-error' : undefined}
+                                                            onChange={(e) => {
+                                                                setNameError('');
                                                                 setProfile((p) => ({
                                                                     ...p,
                                                                     name: e.target.value
-                                                                }))
-                                                            }
+                                                                }));
+                                                            }}
                                                             placeholder="Nhập họ và tên"
                                                         />
+                                                        {nameError && (
+                                                            <p id="profile-name-error" className="ml-1 text-xs text-red-400">
+                                                                {nameError}
+                                                            </p>
+                                                        )}
                                                     </div>
 
                                                     <div className="space-y-2">
                                                         <Label className="text-xs font-semibold text-gray-400 ml-1">Ngày sinh</Label>
-                                                        <Input
-                                                            type="date"
+                                                        <DobSelect
                                                             value={profile.dob || ''}
-                                                            onChange={(e) =>
-                                                                setProfile((p) => ({
-                                                                    ...p,
-                                                                    dob: e.target.value
-                                                                }))
-                                                            }
-                                                            className="h-11 bg-[#0e1730] border-white/[0.2] text-white focus:border-blue-500/50 transition-all cursor-pointer"
+                                                            onChange={(dob) => setProfile((p) => ({ ...p, dob }))}
                                                         />
                                                     </div>
 
@@ -662,16 +672,15 @@ export default function Account() {
                                                     <Link href="/#promotions">Đặt vé ngay</Link>
                                                 </Button>
                                                 <div className="text-xs text-gray-400">
-                                                    Đơn mua khi chưa đăng nhập không hiện ở đây. Mã vé của các đơn đó nằm trong email xác nhận.
+                                                    Vé đã mua bằng email này, kể cả khi chưa đăng nhập, sẽ hiện ở đây.
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="space-y-8">
                                                 <div className="flex items-center justify-between">
                                                     <div className="text-xs text-gray-400 italic">
-                                                        * Chỉ hiển thị {limitedTransactions.length} giao dịch gần nhất
-                                                        <br />* Các giao dịch chờ thanh toán sẽ tự động hết hạn sau 10 phút nếu chưa hoàn tất
-                                                        <br />* Đơn mua khi chưa đăng nhập không hiện ở đây, mã vé nằm trong email xác nhận
+                                                        * {limitedTransactions.length} giao dịch, gồm cả vé đã mua bằng email này khi chưa đăng nhập
+                                                        <br />* Đơn chờ thanh toán tự hết hạn sau 10 phút nếu chưa thanh toán
                                                     </div>
                                                 </div>
 
@@ -815,6 +824,13 @@ export default function Account() {
                                                                                             <span className="text-slate-400 font-medium flex items-center gap-2 px-2 py-1 bg-slate-400/5 rounded-lg border border-slate-400/20">
                                                                                                 <Clock size={14} /> Hết hạn thanh toán
                                                                                             </span>
+                                                                                        ) : t.payment_received_late ? (
+                                                                                            <span
+                                                                                                className="text-amber-400 font-medium flex items-center gap-2 px-2 py-1 bg-amber-400/5 rounded-lg border border-amber-400/20"
+                                                                                                title="Đã nhận chuyển khoản sau khi đơn hết hạn. Nhân viên sẽ đối chiếu và xác nhận."
+                                                                                            >
+                                                                                                <Clock size={14} /> Đã nhận tiền – chờ xác nhận
+                                                                                            </span>
                                                                                         ) : t.payment_status === 'failed' || t.payment_status === 'cancelled' ? (
                                                                                             <span className="text-rose-400 font-medium flex items-center gap-2 px-2 py-1 bg-rose-400/5 rounded-lg border border-rose-400/20">
                                                                                                 <XCircle size={14} /> Đã hủy thanh toán
@@ -896,7 +912,7 @@ export default function Account() {
                                                                                             {canPay && (
                                                                                                 <Button
                                                                                                     size="sm"
-                                                                                                    className="w-full sm:w-auto bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-900/20 h-11 px-6 sm:px-8 rounded-xl font-bold transition-all active:scale-95"
+                                                                                                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30 h-11 px-6 sm:px-8 rounded-xl font-bold transition-all active:scale-95"
                                                                                                     onClick={() => handleContinuePayment(t)}
                                                                                                 >
                                                                                                     Thanh toán ngay

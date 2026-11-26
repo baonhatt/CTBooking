@@ -9,6 +9,7 @@ import {
 } from './staff-auth';
 import { LOCKED_MESSAGE } from '../../lib/login-throttle';
 import { STAFF_SESSION_MAX_AGE_DAYS } from '../../lib/staff-auth';
+import { makeStaffOtpChallenge, makeOtpChallenge } from '../../lib/otp-challenge';
 
 vi.mock('../../lib/audit-logger', () => ({
   logAuditAction: vi.fn(async () => undefined)
@@ -59,6 +60,7 @@ function makeDb(options: { staff?: any; otpRecord?: any }) {
     select: () => selectChain,
     query: { staffTokens: { findFirst: vi.fn(async () => options.otpRecord) } },
     insert: () => ({ values: async (values: any) => void inserted.push(values) }),
+    delete: () => ({ where: async () => undefined }),
     update: () => ({ set: (values: any) => ({ where: async () => void updated.push(values) }) })
   };
   return { db, inserted, updated };
@@ -67,6 +69,13 @@ function makeDb(options: { staff?: any; otpRecord?: any }) {
 const activeStaff = { id: STAFF_ID, email: 'staff@example.com', fullname: 'Staff', isActive: true, isSuperAdmin: false };
 const validOtpRecord = { id: 1, expiredAt: futureIso() };
 const rejectedMessage = 'OTP không hợp lệ hoặc đã hết hạn';
+
+// The OTP step only accepts the challenge signed at the password step
+const SECRET = 'test-secret';
+async function verifyAs(db: any, kv: any, staffId: number, otp: any) {
+  const otpChallenge = await makeStaffOtpChallenge(SECRET, staffId);
+  return staffVerifyLoginOtpImpl(db, tables, kv, { otpChallenge, otp }, SECRET);
+}
 
 describe('staffVerifyLoginOtpImpl', () => {
   beforeEach(() => {
@@ -77,7 +86,7 @@ describe('staffVerifyLoginOtpImpl', () => {
     const { db, inserted } = makeDb({ staff: activeStaff, otpRecord: undefined });
     const kv = makeKv(twoFactorOn);
 
-    const result: any = await staffVerifyLoginOtpImpl(db, tables, kv, { staffId: STAFF_ID, otp: '123456' });
+    const result: any = await verifyAs(db, kv, STAFF_ID, '123456');
 
     expect(result.status).toBe('error');
     expect(result.message).toBe(rejectedMessage);
@@ -88,7 +97,7 @@ describe('staffVerifyLoginOtpImpl', () => {
     const { db, inserted } = makeDb({ staff: activeStaff, otpRecord: validOtpRecord });
     const kv = makeKv(twoFactorOff);
 
-    const result: any = await staffVerifyLoginOtpImpl(db, tables, kv, { staffId: STAFF_ID, otp: '482913' });
+    const result: any = await verifyAs(db, kv, STAFF_ID, '482913');
 
     expect(result.status).toBe('error');
     expect(inserted).toHaveLength(0);
@@ -98,10 +107,7 @@ describe('staffVerifyLoginOtpImpl', () => {
     const superAdmin = { ...activeStaff, isSuperAdmin: true };
     const { db, inserted } = makeDb({ staff: superAdmin, otpRecord: validOtpRecord });
 
-    const result: any = await staffVerifyLoginOtpImpl(db, tables, makeKv(twoFactorOn), {
-      staffId: STAFF_ID,
-      otp: '123456'
-    });
+    const result: any = await verifyAs(db, makeKv(twoFactorOn), STAFF_ID, '123456');
 
     expect(result.status).toBe('error');
     expect(inserted).toHaveLength(0);
@@ -112,14 +118,8 @@ describe('staffVerifyLoginOtpImpl', () => {
     const unknown = makeDb({ staff: undefined, otpRecord: validOtpRecord });
     const kv = makeKv(twoFactorOn);
 
-    const inactiveResult: any = await staffVerifyLoginOtpImpl(inactive.db, tables, kv, {
-      staffId: STAFF_ID,
-      otp: '482913'
-    });
-    const unknownResult: any = await staffVerifyLoginOtpImpl(unknown.db, tables, kv, {
-      staffId: 999,
-      otp: '482913'
-    });
+    const inactiveResult: any = await verifyAs(inactive.db, kv, STAFF_ID, '482913');
+    const unknownResult: any = await verifyAs(unknown.db, kv, 999, '482913');
 
     expect(inactiveResult.message).toBe(rejectedMessage);
     expect(unknownResult.message).toBe(rejectedMessage);
@@ -130,15 +130,19 @@ describe('staffVerifyLoginOtpImpl', () => {
     const kv = makeKv(twoFactorOn);
     const selectSpy = vi.spyOn(db, 'select');
 
-    for (const badInput of [
-      { staffId: STAFF_ID, otp: '12ab56' },
-      { staffId: STAFF_ID, otp: '123' },
-      { staffId: STAFF_ID, otp: 123456 as any },
-      { staffId: '7' as any, otp: '482913' },
-      { staffId: -1, otp: '482913' },
-      { staffId: undefined as any, otp: '482913' }
+    for (const otp of ['12ab56', '123', 123456 as any]) {
+      expect(((await verifyAs(db, kv, STAFF_ID, otp)) as any).status).toBe('error');
+    }
+    const goodChallenge = await makeStaffOtpChallenge(SECRET, STAFF_ID);
+    for (const otpChallenge of [
+      undefined as any,
+      '7',
+      goodChallenge.replace(/^7\./, '8.'), // another staff id with the same signature
+      await makeStaffOtpChallenge('other-secret', STAFF_ID),
+      await makeStaffOtpChallenge(SECRET, STAFF_ID, Date.now() - 60 * 60 * 1000), // expired
+      await makeOtpChallenge(SECRET, STAFF_ID) // a customer login challenge
     ]) {
-      const result: any = await staffVerifyLoginOtpImpl(db, tables, kv, badInput);
+      const result: any = await staffVerifyLoginOtpImpl(db, tables, kv, { otpChallenge, otp: '482913' }, SECRET);
       expect(result.status).toBe('error');
     }
     expect(selectSpy).not.toHaveBeenCalled();
@@ -148,7 +152,7 @@ describe('staffVerifyLoginOtpImpl', () => {
     const { db, inserted } = makeDb({ staff: activeStaff, otpRecord: validOtpRecord });
     const kv = makeKv(twoFactorOn);
 
-    const result: any = await staffVerifyLoginOtpImpl(db, tables, kv, { staffId: STAFF_ID, otp: '482913' });
+    const result: any = await verifyAs(db, kv, STAFF_ID, '482913');
 
     expect(result.status).toBe('success');
     expect(typeof result.token).toBe('string');
@@ -161,12 +165,12 @@ describe('staffVerifyLoginOtpImpl', () => {
     const wrong = makeDb({ staff: activeStaff, otpRecord: undefined });
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const result: any = await staffVerifyLoginOtpImpl(wrong.db, tables, kv, { staffId: STAFF_ID, otp: '111111' });
+      const result: any = await verifyAs(wrong.db, kv, STAFF_ID, '111111');
       expect(result.message).toBe(rejectedMessage);
     }
 
     const right = makeDb({ staff: activeStaff, otpRecord: validOtpRecord });
-    const locked: any = await staffVerifyLoginOtpImpl(right.db, tables, kv, { staffId: STAFF_ID, otp: '482913' });
+    const locked: any = await verifyAs(right.db, kv, STAFF_ID, '482913');
 
     expect(locked.status).toBe('error');
     expect(locked.message).toBe(LOCKED_MESSAGE);
@@ -177,9 +181,9 @@ describe('staffVerifyLoginOtpImpl', () => {
     const kv = makeKv({ admin_otp_settings: { enable_2fa: true, max_otp_attempts: 2 } });
     const wrong = makeDb({ staff: activeStaff, otpRecord: undefined });
 
-    await staffVerifyLoginOtpImpl(wrong.db, tables, kv, { staffId: STAFF_ID, otp: '111111' });
-    await staffVerifyLoginOtpImpl(wrong.db, tables, kv, { staffId: STAFF_ID, otp: '111111' });
-    const third: any = await staffVerifyLoginOtpImpl(wrong.db, tables, kv, { staffId: STAFF_ID, otp: '111111' });
+    await verifyAs(wrong.db, kv, STAFF_ID, '111111');
+    await verifyAs(wrong.db, kv, STAFF_ID, '111111');
+    const third: any = await verifyAs(wrong.db, kv, STAFF_ID, '111111');
 
     expect(third.message).toBe(LOCKED_MESSAGE);
   });

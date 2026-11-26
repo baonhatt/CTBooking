@@ -27,7 +27,7 @@ import {
   ADMIN_TH,
   ADMIN_INPUT
 } from '@/components/admin/common/adminTokens';
-import { roleLevelLabel, countGrantedPermissions, TOTAL_APPLICABLE_PERMISSIONS } from './roleConstants';
+import { roleLevelLabel, TOTAL_APPLICABLE_PERMISSIONS } from './roleConstants';
 
 interface Role {
   id: number;
@@ -36,8 +36,8 @@ interface Role {
   level: number;
   isSystem: boolean;
   staffCount?: number;
-  permissionIds?: number[];
-  permissions?: { module: string; action: string }[];
+  /** How many grantable permissions the role holds (counted by the server) */
+  permissionCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -301,7 +301,7 @@ export default function RolesPage() {
                     <TableCell>{roleLevelLabel(role.level)}</TableCell>
                     <TableCell>{role.staffCount || 0}</TableCell>
                     <TableCell>
-                      Quyền: {countGrantedPermissions(role.permissions)}/{TOTAL_APPLICABLE_PERMISSIONS}
+                      Quyền: {role.permissionCount || 0}/{TOTAL_APPLICABLE_PERMISSIONS}
                     </TableCell>
                     <TableCell className="whitespace-normal text-slate-600">
                       <span className="line-clamp-2" title={role.description || ''}>

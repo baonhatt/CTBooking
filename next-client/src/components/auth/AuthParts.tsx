@@ -103,7 +103,7 @@ export function TurnstileBox({ containerRef, hasToken, loadFailed }: TurnstileBo
 // Shows the same rule as PASSWORD_PATTERN (at least 6 characters, a letter and a digit) as ticks while the customer types
 export function PasswordChecklist({ password }: { password: string }) {
   const rules = [
-    { label: 'Ít nhất 6 ký tự', isMet: password.length >= 6 },
+    { label: 'Ít nhất 8 ký tự', isMet: password.length >= 8 },
     { label: 'Có chữ', isMet: /[A-Za-z]/.test(password) },
     { label: 'Có số', isMet: /\d/.test(password) }
   ];

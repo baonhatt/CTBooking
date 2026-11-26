@@ -1,4 +1,5 @@
 import { eq, desc, and, sql, count } from 'drizzle-orm';
+import { clampPage } from '../../lib/paging';
 
 export async function getEmailLogsImpl(
   anyDb: any,
@@ -12,8 +13,8 @@ export async function getEmailLogsImpl(
   }
 ) {
   try {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
+    // The page size is capped at 100 and a bad page number becomes 1
+    const { page, pageSize: limit } = clampPage(query.page, query.limit);
     const offset = (page - 1) * limit;
 
     const whereConditions = [];

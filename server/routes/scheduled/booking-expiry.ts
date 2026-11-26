@@ -122,3 +122,48 @@ export async function releaseVoucherForCancelledBooking(
 
   console.log(`[Voucher] Released 1 usage for voucher #${voucher_id} due to booking cancellation.`);
 }
+
+/** True while an order is 'pending' and its 10-minute payment deadline has passed (old rows: created over 10 minutes ago). */
+export function isOverduePending(
+  booking: { payment_status?: string | null; payment_expires_at?: string | null; created_at?: string | null },
+  now: Date = new Date()
+): boolean {
+  if (String(booking.payment_status || '').toLowerCase() !== 'pending') return false;
+  const deadline = booking.payment_expires_at
+    ? new Date(booking.payment_expires_at).getTime()
+    : booking.created_at
+      ? new Date(booking.created_at).getTime() + 10 * 60 * 1000
+      : NaN;
+  return Number.isFinite(deadline) && deadline < now.getTime();
+}
+
+/**
+ * Expires ONE overdue order right away, the same way the cron does (status 'expired' + its voucher use given back),
+ * so a customer never sees "pending" for the up to 5 minutes until the next cron run.
+ * The change is one conditional UPDATE (only while still 'pending'), so it cannot clash with the cron or a payment.
+ * Returns the order as it is now (expired, or unchanged).
+ */
+export async function expireBookingIfOverdue<T extends Record<string, any>>(
+  anyDb: any,
+  tables: { bookings: any; vouchers?: any },
+  booking: T
+): Promise<T> {
+  if (!isOverduePending(booking)) return booking;
+  const nowIso = formatDateForDb(new Date());
+  const changed = await anyDb
+    .update(tables.bookings)
+    .set({ payment_status: 'expired', updated_at: nowIso })
+    .where(and(eq(tables.bookings.id, booking.id), eq(tables.bookings.payment_status, 'pending')))
+    .returning({ id: tables.bookings.id });
+  if (!Array.isArray(changed) || changed.length === 0) {
+    // Someone else changed it first (cron, payment, cancel): read what it is now
+    return (await anyDb.query.bookings.findFirst({ where: eq(tables.bookings.id, booking.id) })) || booking;
+  }
+  if (booking.voucher_id && tables.vouchers) {
+    await releaseVoucherForCancelledBooking(anyDb, { vouchers: tables.vouchers }, {
+      voucher_id: Number(booking.voucher_id),
+      previous_payment_status: 'pending'
+    });
+  }
+  return { ...booking, payment_status: 'expired', updated_at: nowIso };
+}

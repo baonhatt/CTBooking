@@ -6,6 +6,7 @@ import { buildAuditPayload } from '../../lib/audit-utils';
 import {
   enrichWithParsedBranchIds,
   enrichItemsWithParsedBranchIds,
+  parseBranchIds,
   resolveBranchIdsInput,
   staffCanAccessBranchIds,
   staffCanModifyBranchRecord,
@@ -907,9 +908,17 @@ export async function restoreTicketPackageImpl(
   }
 }
 
+/** "Tất cả chi nhánh" for a package of every branch, else the names of its branches (unknown ids are skipped). */
+export function branchNamesLabel(rawBranchIds: string | null | undefined, namesById: Map<number, string>): string | null {
+  const ids = parseBranchIds(rawBranchIds ?? null);
+  if (ids === null) return 'Tất cả chi nhánh';
+  const names = ids.map((id) => namesById.get(id)).filter((name): name is string => Boolean(name));
+  return names.length ? names.join(', ') : null;
+}
+
 export async function listDeletedTicketPackagesImpl(
   anyDb: any,
-  tables: { ticket_packages: any; staffs: any },
+  tables: { ticket_packages: any; staffs: any; branches?: any },
   options: {
     page?: number;
     pageSize?: number;
@@ -937,27 +946,17 @@ export async function listDeletedTicketPackagesImpl(
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+  // Only the columns the deleted-packages screen shows (branch ids are turned into names below)
   const items = await anyDb
     .select({
       id: ticket_packages.id,
       name: ticket_packages.name,
       code: ticket_packages.code,
-      description: ticket_packages.description,
       price: ticket_packages.price,
-      features: ticket_packages.features,
       type: ticket_packages.type,
-      combo: ticket_packages.combo,
-      min_group_size: ticket_packages.min_group_size,
-      max_group_size: ticket_packages.max_group_size,
       is_member_only: ticket_packages.is_member_only,
-      is_active: ticket_packages.is_active,
-      display_order: ticket_packages.display_order,
-      branch_id: ticket_packages.branch_id,
       branch_ids: ticket_packages.branch_ids,
-      created_at: ticket_packages.created_at,
-      updated_at: ticket_packages.updated_at,
       deleted_at: ticket_packages.deleted_at,
-      deleted_by_staff_id: ticket_packages.deleted_by_staff_id,
       deleted_by_staff_name: staffs.fullname
     })
     .from(ticket_packages)
@@ -973,9 +972,15 @@ export async function listDeletedTicketPackagesImpl(
 
   const [countResult] = await anyDb.select({ count: count() }).from(ticket_packages).where(whereClause);
 
+  const namesById = new Map<number, string>();
+  if (tables.branches) {
+    const branchRows = await anyDb.select({ id: tables.branches.id, name: tables.branches.name }).from(tables.branches);
+    for (const branch of branchRows) namesById.set(Number(branch.id), branch.name);
+  }
+
   return {
     status: 'success',
-    items: enrichItemsWithParsedBranchIds(items),
+    items: items.map(({ branch_ids, ...item }: any) => ({ ...item, branch_name: branchNamesLabel(branch_ids, namesById) })),
     total: countResult?.count || 0,
     page,
     pageSize

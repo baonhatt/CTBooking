@@ -136,26 +136,45 @@ export async function listTransactionsImpl(
 
   const total = totalRes?.count || 0;
 
-  // Query lấy dữ liệu chi tiết
-  let selectFields: any = {
-    booking: tables.bookings,
-    user: tables.users,
-    account_email: tables.accounts.email,
-    movie_title: tables.movies.title,
-    ticket_package_name: tables.ticket_packages.name
+  // Only the columns the list, the screen and the exports read. The join to accounts (several per user) is gone:
+  // it doubled the rows of a user with two accounts, and nothing read its email.
+  const bookingColumns = {
+    id: tables.bookings.id,
+    booking_code: tables.bookings.booking_code,
+    pay_txt_code: tables.bookings.pay_txt_code,
+    branch_id: tables.bookings.branch_id,
+    email: tables.bookings.email,
+    phone: tables.bookings.phone,
+    ticket_package_name: tables.bookings.ticket_package_name,
+    ticket_count: tables.bookings.ticket_count,
+    is_used: tables.bookings.is_used,
+    total_price: tables.bookings.total_price,
+    original_total_price: tables.bookings.original_total_price,
+    payment_method: tables.bookings.payment_method,
+    payment_status: tables.bookings.payment_status,
+    created_at: tables.bookings.created_at,
+    paid_at: tables.bookings.paid_at,
+    updated_at: tables.bookings.updated_at,
+    expiry_date: tables.bookings.expiry_date,
+    booking_type: tables.bookings.booking_type,
+    voucher_code_snapshot: tables.bookings.voucher_code_snapshot,
+    voucher_discount_amount: tables.bookings.voucher_discount_amount
+  };
+  const selectFields: any = {
+    booking: bookingColumns,
+    user_fullname: tables.users.fullname
   };
 
   if (tables.vouchers) {
-    selectFields.voucher = tables.vouchers;
+    // The voucher description holds the sale person as JSON
+    selectFields.voucher_code = tables.vouchers.code;
+    selectFields.voucher_description = tables.vouchers.description;
   }
 
   let query = anyDb
     .select(selectFields)
     .from(tables.bookings)
-    .leftJoin(tables.users, eq(tables.bookings.user_id, tables.users.id))
-    .leftJoin(tables.accounts, eq(tables.users.id, tables.accounts.user_id))
-    .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
-    .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id));
+    .leftJoin(tables.users, eq(tables.bookings.user_id, tables.users.id));
 
   if (tables.vouchers) {
     query = query.leftJoin(tables.vouchers, eq(tables.bookings.voucher_id, tables.vouchers.id));
@@ -207,18 +226,15 @@ export async function listTransactionsImpl(
     const now = new Date();
     const expiryAt = tx.expiry_date ? new Date(tx.expiry_date) : null;
     const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
-    const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
-    let sale_staff_id = null;
     let sale_name = null;
     let sale_email = null;
 
-    if (row.voucher?.description) {
+    if (row.voucher_description) {
       try {
-        const trimmed = row.voucher.description.trim();
+        const trimmed = row.voucher_description.trim();
         if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
           const meta = JSON.parse(trimmed);
-          sale_staff_id = meta.sale_staff_id ? Number(meta.sale_staff_id) : null;
           sale_name = meta.sale_name || null;
           sale_email = meta.sale_email || null;
         }
@@ -229,16 +245,14 @@ export async function listTransactionsImpl(
     const vrItems = vrItemsByBooking[tx.id] || [];
     const finalTicketCount = Number(tx.ticket_count || 0);
 
+    // Only what the list screen and the exports read
     return {
       id: tx.id,
-      bookingId: tx.id,
       booking_code: tx.booking_code || tx.pay_txt_code || `BK${tx.id}`,
-      user_id: tx.user_id,
       branch_id: tx.branch_id,
       email: tx.email || '',
       phone: tx.phone || '',
-      name: tx.name || row.user?.fullname || '',
-      userName: row.user?.fullname || 'Khách Vãng Lai',
+      userName: row.user_fullname || 'Khách Vãng Lai',
       ticket_package_name: tx.ticket_package_name || '',
       vr_items: vrItems,
       ticketCount: finalTicketCount,
@@ -247,19 +261,13 @@ export async function listTransactionsImpl(
       originalTotalPrice: Number(tx.original_total_price || tx.total_price || 0),
       paymentMethod: tx.payment_method,
       paymentStatus: tx.payment_status,
-      transactionId: tx.transaction_id,
       createdAt: tx.created_at,
       paidAt: tx.paid_at,
       updatedAt: tx.updated_at,
-      expiryDate: tx.expiry_date || null,
       expired,
-      daysLeft,
       booking_type: tx.booking_type || 'movie',
-      voucher_id: tx.voucher_id,
-      voucher_code: tx.voucher_code_snapshot || row.voucher?.code || null,
+      voucher_code: tx.voucher_code_snapshot || row.voucher_code || null,
       voucher_discount_amount: Number(tx.voucher_discount_amount || 0),
-      payment_expires_at: tx.payment_expires_at || null,
-      sale_staff_id,
       sale_name,
       sale_email
     };
@@ -302,7 +310,6 @@ export async function getTransactionByIdImpl(
         voucher_id: tables.bookings.voucher_id,
         voucher_code_snapshot: tables.bookings.voucher_code_snapshot,
         voucher_discount_amount: tables.bookings.voucher_discount_amount,
-        combo: tables.bookings.combo,
         pay_txt_code: tables.bookings.pay_txt_code,
         booking_code: tables.bookings.booking_code,
         checked_in_at: tables.bookings.checked_in_at,
@@ -339,7 +346,8 @@ export async function getTransactionByIdImpl(
     .leftJoin(tables.branches, eq(tables.bookings.branch_id, tables.branches.id))
     .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
     .where(
-      restrictToBranchIds && restrictToBranchIds.length > 0
+      // null = Super Admin (every branch). A list, even an empty one, limits the order to those branches.
+      restrictToBranchIds
         ? and(eq(tables.bookings.id, id), inArray(tables.bookings.branch_id, restrictToBranchIds))
         : eq(tables.bookings.id, id)
     );
@@ -365,34 +373,9 @@ export async function getTransactionByIdImpl(
   const expired = Boolean(expiryAt && now.getTime() > expiryAt.getTime());
   const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
-  // 3. Xử lý combo phim
-  let comboMovies: any[] = [];
-  if (booking.combo) {
-    try {
-      let movieIds: any[] = [];
-      if (Array.isArray(booking.combo)) {
-        movieIds = booking.combo;
-      } else if (typeof booking.combo === 'string') {
-        if (booking.combo.includes('|')) {
-          movieIds = booking.combo
-            .split('|')
-            .map((x: string) => x.trim())
-            .filter(Boolean);
-        } else {
-          movieIds = JSON.parse(booking.combo);
-        }
-      }
-      if (Array.isArray(movieIds) && movieIds.length > 0) {
-        comboMovies = await anyDb.select().from(tables.movies).where(inArray(tables.movies.id, movieIds));
-      }
-    } catch (e) {
-      console.error('Lỗi parse combo:', e);
-    }
-  }
-
   // 4. Audit logs
   const [createLog] = await anyDb
-    .select()
+    .select({ staffFullname: tables.auditLogs.staffFullname })
     .from(tables.auditLogs)
     .where(
       and(
@@ -405,7 +388,7 @@ export async function getTransactionByIdImpl(
     .limit(1);
 
   const [updateLog] = await anyDb
-    .select()
+    .select({ staffFullname: tables.auditLogs.staffFullname })
     .from(tables.auditLogs)
     .where(
       and(
@@ -422,8 +405,17 @@ export async function getTransactionByIdImpl(
   const bType = booking.booking_type || 'movie';
   if (tables.booking_vr_items) {
     try {
+      // Only the columns the detail screen reads for a VR line
       vr_items = await anyDb
-        .select()
+        .select({
+          id: tables.booking_vr_items.id,
+          vr_ticket_package_id: tables.booking_vr_items.vr_ticket_package_id,
+          package_name: tables.booking_vr_items.package_name,
+          quantity: tables.booking_vr_items.quantity,
+          unit_price: tables.booking_vr_items.unit_price,
+          discounted_unit_price: tables.booking_vr_items.discounted_unit_price,
+          line_total: tables.booking_vr_items.line_total
+        })
         .from(tables.booking_vr_items)
         .where(eq(tables.booking_vr_items.booking_id, id))
         .orderBy(tables.booking_vr_items.id);
@@ -432,26 +424,30 @@ export async function getTransactionByIdImpl(
     }
   }
 
-  // 6. Load voucher and sale info
-  let sale_staff_id = null;
+  // 6. Load voucher and sale info (the description holds the sale person as JSON; it is read here, not sent)
   let sale_name = null;
   let sale_email = null;
   let voucher_scope: string | null = null;
-  let voucher_description: string | null = null;
   let voucher_applicable_ids: any = null;
 
   if (booking.voucher_id && tables.vouchers) {
     try {
-      const v = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, booking.voucher_id) });
+      const [v] = await anyDb
+        .select({
+          scope: tables.vouchers.scope,
+          description: tables.vouchers.description,
+          applicable_ticket_package_ids: tables.vouchers.applicable_ticket_package_ids
+        })
+        .from(tables.vouchers)
+        .where(eq(tables.vouchers.id, booking.voucher_id))
+        .limit(1);
       if (v) {
         voucher_scope = v.scope || 'all';
-        voucher_description = v.description || null;
         voucher_applicable_ids = v.applicable_ticket_package_ids ?? null;
         if (v.description) {
           const trimmed = v.description.trim();
           if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
             const meta = JSON.parse(trimmed);
-            sale_staff_id = meta.sale_staff_id ? Number(meta.sale_staff_id) : null;
             sale_name = meta.sale_name || null;
             sale_email = meta.sale_email || null;
           }
@@ -481,8 +477,7 @@ export async function getTransactionByIdImpl(
     },
     ticket_package: {
       name: ticket_package?.name || booking.ticket_package_name || '',
-      ticket_unit_price: booking.ticket_unit_price,
-      movies: comboMovies
+      ticket_unit_price: booking.ticket_unit_price
     },
     voucher_info: {
       voucher_id: booking.voucher_id,
@@ -490,9 +485,7 @@ export async function getTransactionByIdImpl(
       voucher_discount_amount: Number(booking.voucher_discount_amount || 0),
       original_total_price: Number(booking.original_total_price || booking.total_price || 0),
       scope: voucher_scope,
-      description: voucher_description,
       applicable_ids: voucher_applicable_ids,
-      sale_staff_id,
       sale_name,
       sale_email
     },
@@ -500,23 +493,6 @@ export async function getTransactionByIdImpl(
       ticket_count: booking.ticket_count,
       total_price: Number(booking.total_price),
       original_total_price: Number(booking.original_total_price || booking.total_price || 0),
-      combo: booking?.combo
-        ? Array.isArray(booking.combo)
-          ? booking.combo
-          : (() => {
-              try {
-                if (typeof booking.combo === 'string' && booking.combo.includes('|')) {
-                  return booking.combo
-                    .split('|')
-                    .map((x: string) => x.trim())
-                    .filter(Boolean);
-                }
-                return typeof booking.combo === 'string' ? JSON.parse(booking.combo) : [];
-              } catch {
-                return [];
-              }
-            })()
-        : [],
       pay_txt_code: booking?.pay_txt_code,
       booking_code: booking?.booking_code,
       confirmed_by_staff_name: confirmedByStaffName,

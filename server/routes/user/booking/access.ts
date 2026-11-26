@@ -47,11 +47,24 @@ export async function findBookingForOwner(
  * findBookingForOwner proved they placed the order (order token or owning account), and the same code goes to them
  * by email, so the result page can show it.
  */
+/**
+ * True when the order had already failed (cancelled or expired) and the bank transfer arrived afterwards.
+ * The SePay webhook then keeps the bank reference in transaction_id and leaves the order for staff to confirm
+ * (sepay.ts, 'sepay_late_payment'), so the customer is told "money received, awaiting confirmation"
+ * instead of "cancelled". Only this yes/no goes to the customer, never the bank reference itself.
+ */
+export function isPaymentReceivedLate(booking: { payment_status?: string | null; transaction_id?: string | null }): boolean {
+  const paymentStatus = String(booking.payment_status || '').toLowerCase();
+  const isClosed = paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'expired';
+  return isClosed && String(booking.transaction_id || '').trim() !== '';
+}
+
 export function bookingStatusPayload(booking: {
   id: number;
   payment_status?: string | null;
   payment_expires_at?: string | null;
   booking_code?: string | null;
+  transaction_id?: string | null;
 }) {
   const paymentStatus = String(booking.payment_status || 'pending').toLowerCase();
   const payload: Record<string, unknown> = {
@@ -61,6 +74,10 @@ export function bookingStatusPayload(booking: {
     payment_expires_at: booking.payment_expires_at || null,
     server_now: formatDateForDb(new Date())
   };
+  // Present only when true, so the usual reply keeps exactly its fields
+  if (isPaymentReceivedLate(booking)) {
+    payload.payment_received_late = true;
+  }
   if (paymentStatus === 'paid' && booking.booking_code) {
     payload.booking_code = booking.booking_code;
   }

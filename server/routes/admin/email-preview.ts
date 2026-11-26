@@ -216,6 +216,38 @@ export async function getEmailPreviewImpl() {
 const TEST_RECIPIENT_PATTERN = /^[^\s@,;<>"']+@[^\s@,;<>"']+\.[^\s@,;<>"']{2,}$/;
 const TEST_RECIPIENT_MAX_LENGTH = 254;
 
+/** Test mails a Super Admin may send: at most TEST_MAIL_LIMIT in any TEST_MAIL_WINDOW_MS. */
+export const TEST_MAIL_LIMIT = 10;
+export const TEST_MAIL_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Takes one test-mail slot for this staff member, or says how long to wait. The send times of the last 10 minutes are
+ * kept in KV under one key per staff member (KV keeps it for the window only).
+ */
+export async function takeTestMailSlot(
+  kv: any,
+  staffId: number,
+  now: number = Date.now()
+): Promise<{ allowed: true } | { allowed: false; waitSeconds: number }> {
+  const key = `test_mail_sends:${staffId}`;
+  let sentAt: number[] = [];
+  try {
+    const saved = kv ? await kv.get(key) : null;
+    const parsed = saved ? JSON.parse(saved) : [];
+    if (Array.isArray(parsed)) sentAt = parsed.map(Number).filter((time) => Number.isFinite(time));
+  } catch {
+    sentAt = [];
+  }
+  sentAt = sentAt.filter((time) => time > now - TEST_MAIL_WINDOW_MS);
+  if (sentAt.length >= TEST_MAIL_LIMIT) {
+    const oldest = Math.min(...sentAt);
+    return { allowed: false, waitSeconds: Math.max(1, Math.ceil((oldest + TEST_MAIL_WINDOW_MS - now) / 1000)) };
+  }
+  sentAt.push(now);
+  if (kv) await kv.put(key, JSON.stringify(sentAt), { expirationTtl: Math.ceil(TEST_MAIL_WINDOW_MS / 1000) + 60 });
+  return { allowed: true };
+}
+
 export async function sendTestEmailImpl(
   templateId: string,
   toEmail: string,

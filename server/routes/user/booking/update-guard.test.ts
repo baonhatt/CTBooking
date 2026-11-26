@@ -25,7 +25,7 @@ const tables: any = {
 };
 const dialect = new SQLiteSyncDialect();
 
-function captureStatusChangeSql(currentStatus: string, requested: string) {
+function captureStatusChangeSql(currentStatus: string, requested: string, extra: Record<string, any> = {}) {
   const row = { id: 55, user_id: null, payment_status: currentStatus, voucher_id: null, branch_id: null, booking_code: null };
   const lookup: any = { leftJoin: () => lookup, where: () => lookup, limit: async () => [{ booking: row }] };
   const captured: string[] = [];
@@ -46,8 +46,23 @@ function captureStatusChangeSql(currentStatus: string, requested: string) {
       })
     })
   };
-  return { db, captured, run: () => updatePaymentImpl(db, { payment_id: 55, payment_status: requested }, undefined, undefined, tables) };
+  return { db, captured, run: () => updatePaymentImpl(db, { payment_id: 55, payment_status: requested, ...extra }, undefined, undefined, tables) };
 }
+
+describe('SePay payment guard', () => {
+  it('a payment made in time compares the deadline with the bank time, and may pay an order the system closed', async () => {
+    const bankTime = new Date('2026-11-26T03:05:00.000Z');
+    const { captured, run } = captureStatusChangeSql('expired', 'paid', {
+      only_open_pending: true,
+      paid_in_time_at: bankTime,
+      allow_system_expired: true
+    });
+    await run();
+    expect(captured[0]).toContain("in ('pending', 'expired')");
+    expect(captured[0]).toContain('"bookings"."payment_expires_at" >= ?');
+    expect(captured[0]).not.toContain("'cancelled'");
+  });
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -63,10 +78,11 @@ describe('updatePaymentImpl: the SQL of the status change', () => {
     expect(captured[0]).toMatch(/coalesce\(lower\("bookings"\."payment_status"\), ''\) <> 'paid'/);
   });
 
-  it('to failed: only changes a row that is pending or expired', async () => {
+  it('to failed: only changes a row that is still pending (a closed order is never closed twice)', async () => {
     const { captured, run } = captureStatusChangeSql('pending', 'failed');
     await run();
 
-    expect(captured[0]).toMatch(/coalesce\(lower\("bookings"\."payment_status"\), ''\) in \('pending', 'expired'\)/);
+    expect(captured[0]).toMatch(/coalesce\(lower\("bookings"\."payment_status"\), ''\) = 'pending'/);
+    expect(captured[0]).not.toMatch(/'expired'/);
   });
 });

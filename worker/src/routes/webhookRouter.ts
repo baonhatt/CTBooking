@@ -46,7 +46,8 @@ const getD1Tables = (schema: any) => ({
   booking_vr_items: schema.booking_vr_items,
   vouchers: schema.vouchers,
   voucher_redemption_logs: schema.voucher_redemption_logs,
-  auditLogs: schema.auditLogs
+  auditLogs: schema.auditLogs,
+  unmatched_transfers: schema.unmatched_transfers
 });
 
 webhookRouter.post('/api/webhooks/sepay', async (c) => {

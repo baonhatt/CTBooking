@@ -14,13 +14,22 @@ import { useTurnstile } from '@/hooks/useTurnstile';
 interface OTPDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  tempAccountId: number;
+  otpChallenge: string;
   email: string;
   onSuccess: (userData: any, token: string) => void;
   auth: any;
+  // 'login': the 2-step login code. 'register': the code that proves the email before the account is created.
+  purpose?: 'login' | 'register';
 }
 
-export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSuccess, auth }: OTPDialogProps) {
+// Where each kind of code is checked and sent again
+const OTP_ENDPOINTS = {
+  login: { verify: '/api/validate-otp', resend: '/api/resend-otp' },
+  register: { verify: '/api/register/verify', resend: '/api/register/resend' }
+};
+
+export function OTPDialog({ isOpen, onOpenChange, otpChallenge, email, onSuccess, auth, purpose = 'login' }: OTPDialogProps) {
+  const endpoints = OTP_ENDPOINTS[purpose];
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -145,13 +154,13 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       setIsLoading(true);
       setError('');
 
-      const response = await fetch(buildUrl('/api/validate-otp'), {
+      const response = await fetch(buildUrl(endpoints.verify), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          temp_account_id: tempAccountId,
+          otp_challenge: otpChallenge,
           otp: otpValue
         })
       });
@@ -162,7 +171,7 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
         // Mirror cookie để frontend check nhanh
         setCookie('userToken', data.token, 86400);
         localStorage.setItem('userToken', data.token);
-        toast.success('Xác thực OTP thành công!');
+        toast.success(purpose === 'register' ? 'Đăng ký thành công!' : 'Xác thực OTP thành công!');
         onSuccess(data.user, data.token);
         onOpenChange(false);
       } else {
@@ -208,14 +217,13 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       setIsResending(true);
       setError('');
 
-      const response = await fetch(buildUrl('/api/resend-otp'), {
+      const response = await fetch(buildUrl(endpoints.resend), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          temp_account_id: tempAccountId,
-          email: email,
+          otp_challenge: otpChallenge,
           turnstileToken: turnstile.token
         })
       });
@@ -252,10 +260,14 @@ export function OTPDialog({ isOpen, onOpenChange, tempAccountId, email, onSucces
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       layerClass="z-[10000]"
-      title="Xác Thực 2 Lớp"
+      title={purpose === 'register' ? 'Xác Minh Email' : 'Xác Thực 2 Lớp'}
       description={`Mã OTP đã được gửi đến ${email}`}
-      asideTitle="Thêm một lớp bảo vệ"
-      asideText="Mã gồm 6 số được gửi tới email của bạn, giúp chỉ bạn mới đăng nhập được tài khoản."
+      asideTitle={purpose === 'register' ? 'Xác minh email của bạn' : 'Thêm một lớp bảo vệ'}
+      asideText={
+        purpose === 'register'
+          ? 'Nhập mã 6 số vừa gửi tới email để hoàn tất đăng ký. Bước này giúp chắc chắn email là của bạn.'
+          : 'Mã gồm 6 số được gửi tới email của bạn, giúp chỉ bạn mới đăng nhập được tài khoản.'
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Timer */}

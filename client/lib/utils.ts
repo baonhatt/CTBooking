@@ -69,9 +69,9 @@ export function formatDateVN(dateString?: string | Date | null): string {
 }
 
 export function getVNYear(dateString?: string | Date | null): number {
-  if (!dateString) return new Date().getFullYear();
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return new Date().getFullYear();
+  // No date (or a bad one): the current year in Vietnam, not on this machine's clock
+  const parsed = dateString ? new Date(dateString) : new Date();
+  const d = isNaN(parsed.getTime()) ? new Date() : parsed;
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Ho_Chi_Minh',
     year: 'numeric'

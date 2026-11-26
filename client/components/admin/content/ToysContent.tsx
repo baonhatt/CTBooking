@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/admin/common/PageHeader';
 import { AdminPagination } from '@/components/admin/common/AdminPagination';
 import { EmptyState, TableSkeleton } from '@/components/admin/common/EmptyState';
 import { notify } from '@/components/admin/common/notify';
+import { getToyById } from '@/lib/api/toys';
 import {
   ADMIN_BTN_PRIMARY,
   ADMIN_BTN_OUTLINE,
@@ -96,23 +97,40 @@ export default function ToysContent({
     onSearchChange(localSearch);
   };
 
+  // DETAIL: the list rows carry no creator / editor names, so the toy is read when the dialog opens
+  const detailToyId = isDetailDialogOpen ? selectedToy?.id : undefined;
+  useEffect(() => {
+    if (!detailToyId) return;
+    let cancelled = false;
+    getToyById(detailToyId)
+      .then(({ toy }) => {
+        if (cancelled || !toy) return;
+        setSelectedToy((current) =>
+          current && current.id === detailToyId
+            ? {
+                ...current,
+                created_at: toy.created_at ?? current.created_at,
+                updated_at: toy.updated_at ?? current.updated_at,
+                created_by_staff_name: toy.created_by_staff_name || undefined,
+                updated_by_staff_name: toy.updated_by_staff_name || undefined
+              }
+            : current
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [detailToyId]);
+
   const handleDelete = async (id: number) => {
     setIsDeleting(true);
     try {
-      if (deleteToyApi) {
-        await deleteToyApi(id);
-      } else {
-        // Fallback when no delete API is provided: set status to inactive
-        const response = await fetch(`/api/toys/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'inactive' })
-        });
-        if (!response.ok) throw new Error('Failed to update toy status');
-      }
+      await deleteToyApi(id);
 
-      // Update local state
-      setToys((prev) => prev.map((toy) => (toy.id === id ? { ...toy, status: 'inactive' } : toy)));
+      // A deleted toy leaves the list (it moves to the deleted toys page)
+      setToys((prev) => prev.filter((toy) => toy.id !== id));
+      onRefresh();
       notify.deleted('đồ chơi');
       setToyToDelete(null);
     } catch (e: any) {

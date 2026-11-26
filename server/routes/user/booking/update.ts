@@ -26,6 +26,21 @@ export async function updatePaymentImpl(
     paid_at?: string | Date;
     /** Staff member who confirmed the payment by hand. Stored on the booking when it becomes paid. */
     confirmed_by_staff_id?: number;
+    /**
+     * SePay: pay only while the order is still 'pending' and its 10-minute deadline has not passed. Staff confirming
+     * by hand leave this off and can pay an expired or cancelled order.
+     */
+    only_open_pending?: boolean;
+    /**
+     * SePay: when the bank made the transfer. With only_open_pending the deadline is compared with this time instead
+     * of "now", so a transfer made in time but reported late by the bank still counts.
+     */
+    paid_in_time_at?: Date;
+    /**
+     * SePay: an order the SYSTEM closed at its deadline ('expired', never one the customer cancelled) may still be
+     * paid when the bank time is inside the deadline. The webhook only asks this for orders without a voucher.
+     */
+    allow_system_expired?: boolean;
   },
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getBookingEmailHtml?: (data: any) => string,
@@ -97,7 +112,8 @@ export async function updatePaymentImpl(
 
     // Bảo vệ: Nếu đơn đã thanh toán (isAlreadyPaid) mà request gửi lên là failed
     // => Chặn update, trả về thông báo để Client xử lý (Alert "Đã thanh toán" thay vì "Đã hủy")
-    if (isAlreadyPaid && payment_status === 'failed') {
+    const isClosing = payment_status === 'failed' || payment_status === 'cancelled' || payment_status === 'expired';
+    if (isAlreadyPaid && isClosing) {
       return {
         status: 409, // Conflict
         message: 'Giao dịch đã được thanh toán thành công',
@@ -155,7 +171,18 @@ export async function updatePaymentImpl(
     //  - to 'paid': only while the order is not paid yet;
     //  - to failed / cancelled / expired: only while the order is still pending or expired.
     const currentStatusSql = sql`coalesce(lower(${bookingsTable.payment_status}), '')`;
-    const transitionGuard = isPaid ? sql`${currentStatusSql} <> 'paid'` : sql`${currentStatusSql} in ('pending', 'expired')`;
+    //  - SePay (only_open_pending): only while 'pending' and the deadline is still ahead.
+    //  - Closing only from 'pending': a closed order is never closed again, so its voucher use is given back once.
+    const deadlineCheckAt = payload.paid_in_time_at instanceof Date && !isNaN(payload.paid_in_time_at.getTime()) ? payload.paid_in_time_at : now;
+    const openStatusSql = payload.allow_system_expired
+      ? sql`${currentStatusSql} in ('pending', 'expired')`
+      : sql`${currentStatusSql} = 'pending'`;
+    const openPendingGuard = sql`${openStatusSql} and (${bookingsTable.payment_expires_at} is null or ${bookingsTable.payment_expires_at} >= ${formatDateForDb(deadlineCheckAt)})`;
+    const transitionGuard = isPaid
+      ? payload.only_open_pending
+        ? openPendingGuard
+        : sql`${currentStatusSql} <> 'paid'`
+      : sql`${currentStatusSql} = 'pending'`;
 
     const updatedRes = await anyDb
       .update(bookingsTable)
@@ -181,7 +208,11 @@ export async function updatePaymentImpl(
       // A booking that was failed or expired had its voucher usage released. Take the slot again now that it is paid.
       // If the voucher has no slot left the payment is still accepted (the money was received); the caller is told.
       const previousStatus = String(booking.payment_status || '').toLowerCase();
-      if (['failed', 'expired', 'cancelled'].includes(previousStatus) && booking.voucher_id && vouchersTable) {
+      if (
+        ['failed', 'expired', 'cancelled'].includes(previousStatus) &&
+        booking.voucher_id &&
+        vouchersTable
+      ) {
         try {
           const relocked = await anyDb
             .update(vouchersTable)
@@ -256,7 +287,7 @@ export async function updatePaymentImpl(
     return {
       status: 200,
       message:
-        payment_status === 'failed'
+        isClosing
           ? 'Giao dịch đã được hủy thành công'
           : 'Giao dịch đã xử lý xong (Mail đã được gửi tới khách hàng)',
       booking: updatedBooking,

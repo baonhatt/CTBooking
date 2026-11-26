@@ -19,7 +19,7 @@ export async function loginApi(body: { email: string; password: string; turnstil
   return res;
 }
 
-export async function verifyAdminLoginOtpApi(body: { staffId: number; otp: string }) {
+export async function verifyAdminLoginOtpApi(body: { otpChallenge: string; otp: string }) {
   const res = await request<any>('/api/admin/auth/verify-login-otp', {
     method: 'POST',
     body: JSON.stringify(body),

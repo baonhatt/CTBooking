@@ -17,6 +17,10 @@ import {
 // Shown when a staff member has locked the customer account (accounts.is_active = false)
 export const ACCOUNT_LOCKED_MESSAGE = 'Tài khoản đã bị khóa, vui lòng liên hệ hỗ trợ';
 
+// One answer for an unknown email and for a wrong password, so the login form cannot be used to find out
+// which emails have an account
+export const LOGIN_FAILED_MESSAGE = 'Email hoặc mật khẩu không đúng!';
+
 export async function loginImpl(anyDb: any, tables: { accounts: any; users: any }, payload: Partial<Login>) {
   const email = payload.email || '';
   const password = payload.password || '';
@@ -24,11 +28,11 @@ export async function loginImpl(anyDb: any, tables: { accounts: any; users: any 
     where: eq(tables.accounts.email, email)
   });
   if (!useracc) {
-    return { status: 404, message: 'Email không tồn tại!' };
+    return { status: 400, message: LOGIN_FAILED_MESSAGE };
   }
   const isPasswordValid = await bcrypt.compare(password, useracc.password || '');
   if (!isPasswordValid) {
-    return { status: 400, message: 'Mật khẩu không đúng!' };
+    return { status: 400, message: LOGIN_FAILED_MESSAGE };
   }
   // Locked accounts cannot sign in (checked after the password so the lock state is not leaked to strangers)
   if (useracc.is_active === false) {
@@ -62,11 +66,11 @@ export async function loginWithSessionImpl(
     where: eq(tables.accounts.email, email)
   });
   if (!useracc) {
-    return { status: 404, message: 'Email không tồn tại!' };
+    return { status: 400, message: LOGIN_FAILED_MESSAGE };
   }
   const isPasswordValid = await bcrypt.compare(password, useracc.password || '');
   if (!isPasswordValid) {
-    return { status: 400, message: 'Mật khẩu không đúng!' };
+    return { status: 400, message: LOGIN_FAILED_MESSAGE };
   }
   // Locked accounts cannot sign in (checked after the password so the lock state is not leaked to strangers)
   if (useracc.is_active === false) {
@@ -226,15 +230,17 @@ export async function validateOTPImpl(
   };
 }
 
+// The new code always goes to the account's own email. The caller passes only the account id, which the router
+// takes from a signed OTP challenge (otp-challenge.ts), never an email or an id typed by the client.
 export async function resendOTPImpl(
   anyDb: any,
   tables: { accounts: any; users: any; tokens: any; email_logs?: any },
-  payload: { temp_account_id: number; email: string },
+  payload: { temp_account_id: number },
   kv?: any,
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
-  const { temp_account_id, email } = payload;
+  const { temp_account_id } = payload;
 
   const useracc = await anyDb.query.accounts.findFirst({
     where: eq(tables.accounts.id, temp_account_id)
@@ -249,6 +255,10 @@ export async function resendOTPImpl(
   const user = await anyDb.query.users.findFirst({
     where: eq(tables.users.id, useracc.user_id)
   });
+  const email: string = useracc.email || '';
+  if (!email) {
+    return { status: 400, message: 'Tài khoản chưa có email để nhận OTP' };
+  }
 
   // Get settings for cooldown
   const settingsResult = await getGlobalSettingsImpl(kv);
@@ -272,7 +282,7 @@ export async function resendOTPImpl(
   const otp = generateOTP(otpLength);
   console.log('[RESEND OTP] Generated OTP for account:', temp_account_id);
   await createOTPRecord(anyDb, { tokens: tables.tokens }, temp_account_id, otp, otpExpiryMinutes);
-  console.log('[RESEND OTP] Sending email to:', email);
+  console.log('[RESEND OTP] Sending email for account:', temp_account_id);
   await sendOTPEmail(
     anyDb,
     { email_logs: tables.email_logs },
@@ -309,7 +319,8 @@ export async function checkEmailAvailableImpl(
     where: eq(staffs.email, email)
   });
   if (staffExist) {
-    return { available: false, message: 'Email này thuộc về hệ thống quản lý. Vui lòng dùng email khác.' };
+    // The same answer as for a customer: nobody can use this form to find out who works here
+    return { available: false, message: 'Email đã tồn tại' };
   }
 
   return { available: true };
@@ -318,27 +329,28 @@ export async function checkEmailAvailableImpl(
 export async function registerImpl(
   anyDb: any,
   tables: { accounts: any; users: any; email_logs?: any },
-  payload: Partial<Register> & { gender?: string; dob?: string; phone?: string; name?: string },
+  // password_hash: given by register-otp.ts after the email code was checked (the plain password is not kept)
+  payload: Partial<Register> & { gender?: string; dob?: string; phone?: string; name?: string; password_hash?: string },
   sendMailFn?: (to: string, subject: string, html: string) => Promise<any>,
   getWelcomeEmailHtml?: (data: { customerName: string; email: string }) => string,
   context?: { waitUntil: (promise: Promise<any>) => void }
 ) {
   try {
-    const { email, password } = payload;
+    const { email, password, password_hash } = payload;
     const gender = payload.gender;
     const dobStr = payload.dob;
     const phone = payload.phone;
 
-    if (!email || !password) {
+    if (!email || (!password && !password_hash)) {
       return { status: 400, message: 'Email và mật khẩu không được để trống!' };
     }
 
     const emailCheck = await checkEmailAvailableImpl(anyDb, tables, email);
-    if (!emailCheck.available) {
+    if (emailCheck.available === false) {
       return { status: 400, message: emailCheck.message };
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = password_hash || (await bcrypt.hash(password as string, 10));
 
     let fullname = payload.name;
     if (!fullname || fullname.trim() === '') {
@@ -435,6 +447,7 @@ export async function registerImpl(
       status: 200,
       message: 'Đăng ký thành công',
       user: { id: newUser.id, email },
+      account_id: (await anyDb.query.accounts.findFirst({ where: eq(tables.accounts.email, email) }))?.id,
       emailSent: true
     };
   } catch (err: any) {

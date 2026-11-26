@@ -200,3 +200,59 @@ describe('Pro-rata Discount Allocation to VR Items', () => {
     expect(isLineDiscounted({ discountAmount: 10000, scope: 'movie', applicableIds: [], kind: 'vr', packageId: 2 })).toBe(false);
   });
 });
+
+describe('vouchers that take the whole price off', () => {
+  const baseVoucher = { id: 3, code: 'FREE', is_active: true, scope: 'vr', applicable_ticket_package_ids: '[]' };
+  const run = (voucher: any, saleStaff: any) =>
+    validateVoucherForVRImpl(
+      {
+        query: {
+          vouchers: { findFirst: vi.fn().mockResolvedValue(voucher) },
+          staffs: { findFirst: vi.fn().mockResolvedValue(saleStaff) }
+        }
+      } as any,
+      { vouchers: { code: 'code', deleted_at: 'col' } } as any,
+      { code: voucher.code, vr_subtotal: 100, vr_items: [{ vr_package_id: 1, quantity: 1 }], vr_price_map: new Map([[1, 100]]) }
+    );
+  const superAdminSales = JSON.stringify({ note: '', sale_staff_id: 1, sale_name: 'Root' });
+
+  it('a 100% voucher whose Sales person is a Super Admin makes the order 0đ', async () => {
+    const result = await run({ ...baseVoucher, discount_type: 'percent', discount_value: 100, description: superAdminSales }, {
+      id: 1,
+      isSuperAdmin: true,
+      isActive: true
+    });
+    expect(result.valid).toBe(true);
+    expect(result.order_total_after).toBe(0);
+  });
+
+  it('a 100% voucher whose Sales person is not (or no longer) a Super Admin is refused', async () => {
+    const result = await run({ ...baseVoucher, discount_type: 'percent', discount_value: 100, description: superAdminSales }, {
+      id: 1,
+      isSuperAdmin: false,
+      isActive: true
+    });
+    expect(result.valid).toBe(false);
+  });
+
+  it('the description shown to the customer is the note only, never the JSON with the Sales person', async () => {
+    const description = JSON.stringify({ sale_staff_id: 9, sale_name: 'Lan', sale_email: 'lan@example.com' });
+    const result: any = await run({ ...baseVoucher, discount_type: 'fixed', discount_value: 10, description }, undefined);
+
+    expect(result.valid).toBe(true);
+    expect(result.voucher_details.description).toBe('');
+    expect(result.message).toContain('Sale Lan');
+  });
+
+  it('a plain-text description is still shown as the note', async () => {
+    const result: any = await run({ ...baseVoucher, discount_type: 'fixed', discount_value: 10, description: 'Giảm 10đ' }, undefined);
+
+    expect(result.voucher_details.description).toBe('Giảm 10đ');
+  });
+
+  it('a fixed voucher larger than the order cannot make it free', async () => {
+    const result = await run({ ...baseVoucher, discount_type: 'fixed', discount_value: 500 }, undefined);
+    expect(result.valid).toBe(false);
+    expect(result.message).toBe('Mã giảm giá này không dùng được vì giảm hết giá trị đơn hàng');
+  });
+});

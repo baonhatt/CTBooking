@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Monitor, Smartphone, Code, ScanFace, FileCode2, Eye, Copy, FileText, AlertTriangle, Users, UserCog, Send } from 'lucide-react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
+import { useStaffStore } from '@/store/staffStore';
 import { notify } from '@/components/admin/common/notify';
 import { ADMIN_BTN_OUTLINE, ADMIN_CARD } from '@/components/admin/common/adminTokens';
 import { EmptyState, InlineLoading } from '@/components/admin/common/EmptyState';
@@ -81,6 +82,9 @@ export default function EmailPreviewPage() {
   }, [templates, activeTab]);
 
   const currentTemplate = templates.find(t => t.id === activeTab);
+
+  // Only the Super Admin may send test mails (the server checks it too, and allows 10 in 10 minutes)
+  const can_send_test = useStaffStore((state) => Boolean(state.staff?.isSuperAdmin));
 
   // Sends the selected sample to the address typed in the box next to the button
   const [test_email, setTestEmail] = useState<string>(() => localStorage.getItem('adminEmail') || '');
@@ -239,6 +243,7 @@ export default function EmailPreviewPage() {
             Sao chép mã nguồn
           </Button>
 
+          {can_send_test && (
           <form
             className="flex shrink-0 items-center gap-1.5"
             onSubmit={(event) => {
@@ -267,6 +272,7 @@ export default function EmailPreviewPage() {
               {send_test.isPending ? 'Đang gửi...' : 'Gửi thử'}
             </Button>
           </form>
+          )}
         </div>
 
         <div className="border-b border-slate-200 bg-white px-4 py-2 text-xs text-slate-600">

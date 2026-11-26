@@ -23,7 +23,7 @@ import { EmptyState, InlineLoading } from '@/components/admin/common/EmptyState'
 import { notify } from '@/components/admin/common/notify';
 import { ADMIN_BTN_OUTLINE, ADMIN_BTN_PRIMARY, ADMIN_CARD, ADMIN_INPUT, ADMIN_TEXT } from '@/components/admin/common/adminTokens';
 import { useStaffPermissions, useIsSuperAdmin } from '@/hooks/useStaffPermission';
-import { getMoviesAdmin } from '@/lib/api/movies';
+import { getAllMoviesForPicker } from '@/lib/api/movies';
 import {
   copyShowtimesApi,
   createShowtimeApi,
@@ -130,9 +130,8 @@ export default function ShowtimesContent({
     setMoviesStatus('loading');
     (async () => {
       try {
-        const { items: movieItems } = await getMoviesAdmin({
-          page: 1,
-          pageSize: 200,
+        // Every active movie of the branch, page after page, so the select is never cut off
+        const { items: movieItems } = await getAllMoviesForPicker({
           status: 'active',
           branch_id: editorBranch.id
         });
@@ -151,7 +150,7 @@ export default function ShowtimesContent({
   }, [editorBranch?.id, moviesReloadKey]);
 
   // The movie options: active movies of the branch, plus the movie of the slot being edited when it is not among them
-  // (a movie that was hidden or is beyond the first 200), so the select never shows empty for an existing slot.
+  // (a movie that was hidden or deleted), so the select never shows empty for an existing slot.
   const movieOptions = useMemo(() => {
     const options: Array<{ id: number; title: string; duration_min?: number; label_note?: string }> = movies.map((movie) => ({
       id: movie.id,

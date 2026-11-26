@@ -1,6 +1,7 @@
 import { eq, and, inArray, sql, gte, lte, or, desc, asc, count, SQL } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { vnRangeFromInputs, sqlListedInRange } from '../../lib/vn-time';
+import { isPaymentReceivedLate } from './booking/access';
 
 export async function updateUserProfileImpl(
   anyDb: any,
@@ -41,7 +42,15 @@ export async function updateUserProfileImpl(
   const updateData: any = {
     updated_at: formatDateForDb(new Date())
   };
-  if (typeof name === 'string') updateData.fullname = name;
+  if (typeof name === 'string') {
+    // Same rules as registration (registerSchema in userRouter.ts): no < or >, so a name can never carry HTML
+    // into an email or an admin page
+    const trimmedName = name.trim();
+    if (!trimmedName) return { status: 400, message: 'Tên không được để trống' };
+    if (trimmedName.length > 100) return { status: 400, message: 'Tên tối đa 100 ký tự' };
+    if (/[<>]/.test(trimmedName)) return { status: 400, message: 'Tên không được chứa ký tự < hoặc >' };
+    updateData.fullname = trimmedName;
+  }
   if (typeof phone === 'string') updateData.phone = phone;
   if (normalizedGender) updateData.gender = normalizedGender;
   if (dobDate) updateData.dob = formatDateForDb(dobDate);
@@ -112,10 +121,9 @@ export async function listUserTransactionsImpl(
   tables: {
     accounts: any;
     bookings: any;
-    movies: any;
-    ticket_packages: any;
     booking_vr_items?: any;
     vouchers?: any;
+    branches?: any;
   },
   args: {
     accountId?: number;
@@ -162,7 +170,13 @@ export async function listUserTransactionsImpl(
 
   const mainFilter = or(
     eq(tables.bookings.payment_status, 'paid'),
-    and(sql`lower(${tables.bookings.payment_status}) = 'pending'`, gte(tables.bookings.created_at, tenMinutesAgoStr))
+    and(sql`lower(${tables.bookings.payment_status}) = 'pending'`, gte(tables.bookings.created_at, tenMinutesAgoStr)),
+    // A closed order whose money arrived late stays in the list, so the customer sees it is awaiting confirmation
+    // (same rule as isPaymentReceivedLate in booking/access.ts)
+    and(
+      sql`lower(${tables.bookings.payment_status}) in ('failed', 'cancelled', 'expired')`,
+      sql`trim(coalesce(${tables.bookings.transaction_id}, '')) <> ''`
+    )
   );
 
   conditions.push(mainFilter);
@@ -185,15 +199,38 @@ export async function listUserTransactionsImpl(
   const sortCol = sort === 'paid_at' ? tables.bookings.paid_at : tables.bookings.created_at;
   const sortDir = dir === 'asc' ? asc(sortCol) : desc(sortCol);
 
+  // Only the booking columns the account page reads (the movie title, poster and package name are copied onto the
+  // booking when it is made, so no join is needed)
+  const bookings = tables.bookings;
   const rows = await anyDb
     .select({
-      booking: tables.bookings,
-      movie: tables.movies,
-      ticket_package: tables.ticket_packages
+      booking: {
+        id: bookings.id,
+        booking_code: bookings.booking_code,
+        pay_txt_code: bookings.pay_txt_code,
+        payment_expires_at: bookings.payment_expires_at,
+        branch_id: bookings.branch_id,
+        booking_type: bookings.booking_type,
+        movie_title: bookings.movie_title,
+        ticket_package_name: bookings.ticket_package_name,
+        ticket_count: bookings.ticket_count,
+        total_price: bookings.total_price,
+        original_total_price: bookings.original_total_price,
+        voucher_discount_amount: bookings.voucher_discount_amount,
+        voucher_code_snapshot: bookings.voucher_code_snapshot,
+        voucher_id: bookings.voucher_id,
+        payment_method: bookings.payment_method,
+        payment_status: bookings.payment_status,
+        transaction_id: bookings.transaction_id,
+        created_at: bookings.created_at,
+        updated_at: bookings.updated_at,
+        paid_at: bookings.paid_at,
+        expiry_date: bookings.expiry_date,
+        is_used: bookings.is_used,
+        combo: bookings.combo
+      }
     })
-    .from(tables.bookings)
-    .leftJoin(tables.movies, eq(tables.bookings.movie_id, tables.movies.id))
-    .leftJoin(tables.ticket_packages, eq(tables.bookings.ticket_package_id, tables.ticket_packages.id))
+    .from(bookings)
     .where(whereClause)
     .orderBy(sortDir)
     .offset(skip)
@@ -205,18 +242,44 @@ export async function listUserTransactionsImpl(
 
   if (bookingIds.length > 0 && tables.booking_vr_items) {
     try {
+      // The columns the ticket dialog and the payment page read (name, quantity, prices, package id)
       const vrRows = await anyDb
-        .select()
+        .select({
+          booking_id: tables.booking_vr_items.booking_id,
+          vr_ticket_package_id: tables.booking_vr_items.vr_ticket_package_id,
+          package_name: tables.booking_vr_items.package_name,
+          quantity: tables.booking_vr_items.quantity,
+          unit_price: tables.booking_vr_items.unit_price,
+          line_total: tables.booking_vr_items.line_total
+        })
         .from(tables.booking_vr_items)
         .where(inArray(tables.booking_vr_items.booking_id, bookingIds));
 
       for (const item of vrRows) {
         const bId = Number(item.booking_id);
         if (!vrItemsMap[bId]) vrItemsMap[bId] = [];
-        vrItemsMap[bId].push(item);
+        const { booking_id: _bookingId, ...line } = item;
+        vrItemsMap[bId].push(line);
       }
     } catch (e) {
       console.warn('[listUserTransactionsImpl] Could not batch load booking_vr_items:', e);
+    }
+  }
+
+  // 5b2. The branch of each order: a ticket is only good at the branch it was bought for, so the ticket shows it
+  const branchMap: Record<number, { name: string; address: string }> = {};
+  const branchIds = [...new Set(rows.map((r: any) => Number(r.booking.branch_id)).filter((id: number) => id > 0))];
+  if (branchIds.length > 0 && tables.branches) {
+    try {
+      const branchRows = await anyDb
+        .select({ id: tables.branches.id, name: tables.branches.name, address: tables.branches.address })
+        .from(tables.branches)
+        .where(inArray(tables.branches.id, branchIds));
+      for (const branch of branchRows) {
+        branchMap[Number(branch.id)] = { name: branch.name || '', address: branch.address || '' };
+      }
+    } catch (e) {
+      console.warn('[listUserTransactionsImpl] Could not load branches:', e);
     }
   }
 
@@ -229,22 +292,24 @@ export async function listUserTransactionsImpl(
         .map((id: any) => Number(id))
     )
   ];
-  const voucherMap: Record<
-    number,
-    { scope: string; description: string | null; applicable_ids: any }
-  > = {};
+  // Only what marks the discounted lines of the ticket: the voucher's scope and its packages. Its description is
+  // not sent (it is JSON that also holds the Sales person's id and email).
+  const voucherMap: Record<number, { scope: string; applicable_ids: any }> = {};
 
   if (voucherIds.length > 0 && tables.vouchers) {
     try {
       const voucherRows = await anyDb
-        .select()
+        .select({
+          id: tables.vouchers.id,
+          scope: tables.vouchers.scope,
+          applicable_ticket_package_ids: tables.vouchers.applicable_ticket_package_ids
+        })
         .from(tables.vouchers)
         .where(inArray(tables.vouchers.id, voucherIds));
 
       for (const v of voucherRows) {
         voucherMap[Number(v.id)] = {
           scope: v.scope || 'all',
-          description: v.description || null,
           applicable_ids: v.applicable_ticket_package_ids ?? null
         };
       }
@@ -269,15 +334,8 @@ export async function listUserTransactionsImpl(
   }
 
   // 6. Map lại dữ liệu về cấu trúc chuẩn
-  const now = new Date();
   const mapped = rows.map((row: any) => {
     const b = row.booking;
-    const movie = row.movie;
-    const pkg = row.ticket_package;
-
-    const expiryAt = b.expiry_date ? new Date(b.expiry_date) : null;
-    const expired = !!(expiryAt && now.getTime() > expiryAt.getTime());
-    const daysLeft = expiryAt ? Math.ceil((expiryAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
     const voucherDetails =
       b.voucher_id && voucherMap[Number(b.voucher_id)] ? voucherMap[Number(b.voucher_id)] : null;
 
@@ -288,8 +346,9 @@ export async function listUserTransactionsImpl(
       order_token: orderTokens.get(Number(b.id)) ?? null,
       payment_expires_at: b.payment_expires_at ?? null,
       branch_id: b.branch_id ?? null,
+      branch_name: branchMap[Number(b.branch_id)]?.name || null,
+      branch_address: branchMap[Number(b.branch_id)]?.address || null,
       booking_type: b.booking_type || 'movie',
-      user_id: b.user_id,
       movie: b.movie_title || '',
       ticket_package: b.ticket_package_name || '',
       quantity: Number(b.ticket_count || 0),
@@ -298,22 +357,15 @@ export async function listUserTransactionsImpl(
       discount_amount: Number(b.voucher_discount_amount || 0),
       voucher_code: b.voucher_code_snapshot || null,
       voucher_details: voucherDetails,
-      ticket_unit_price: Number(b.ticket_unit_price || 0),
       method: b.payment_method || '',
       payment_status: b.payment_status || '',
+      payment_received_late: isPaymentReceivedLate(b),
       created_at: b.created_at,
       updated_at: b.updated_at,
       paid_at: b.paid_at,
       expiry_date: b.expiry_date,
-      expired,
-      days_left: daysLeft,
       is_used: !!b.is_used,
-      name: b.name || '',
-      phone: b.phone || '',
-      email: b.email,
-      poster_url: b.movie_poster || '',
       combo: b.combo || '',
-      movie_duration: b.movie_duration || '',
       vr_items: vrItemsMap[b.id] || []
     };
   });

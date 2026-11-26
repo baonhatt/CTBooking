@@ -13,6 +13,7 @@ import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import { sendStaffPasswordChangeOTP, validateStaffOTP, deleteStaffOTP } from '../../lib/otp-utils';
 import { getGlobalSettingsImpl } from '../../lib/global-settings';
+import { makeStaffOtpChallenge, readStaffOtpChallenge } from '../../lib/otp-challenge';
 import {
   LOCKED_MESSAGE,
   OTP_DEFAULT_MAX_FAILS,
@@ -21,7 +22,13 @@ import {
   recordStaffOtpFailure
 } from '../../lib/login-throttle';
 
-export async function staffLoginImpl(db: any, tables: any, kv: any, body: { email: string; password: string }) {
+export async function staffLoginImpl(
+  db: any,
+  tables: any,
+  kv: any,
+  body: { email: string; password: string },
+  otpSecret: string = ''
+) {
   const { staffs, staffTokens } = tables;
   const { email, password } = body;
 
@@ -68,11 +75,13 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
     // A fresh OTP was issued after a correct password, so earlier wrong OTP guesses no longer count
     await clearStaffOtpFailures(kv, staff.id);
 
-    return { 
-      status: 'require_otp', 
+    // The browser gets a signed, short-lived challenge for this staff member, not the bare id:
+    // nobody can ask to try codes for a staff member whose password they do not know
+    return {
+      status: 'require_otp',
       message: 'Vui lòng xác thực bảo vệ bằng mã gửi qua Email.',
-      staffId: staff.id, 
-      email: staff.email 
+      otpChallenge: await makeStaffOtpChallenge(otpSecret, staff.id),
+      email: staff.email
     };
   }
 
@@ -123,15 +132,24 @@ export async function staffLoginImpl(db: any, tables: any, kv: any, body: { emai
   };
 }
 
-export async function staffVerifyLoginOtpImpl(db: any, tables: any, kv: any, body: { staffId: number; otp: string }) {
+export async function staffVerifyLoginOtpImpl(
+  db: any,
+  tables: any,
+  kv: any,
+  body: { otpChallenge: string; otp: string },
+  otpSecret: string = ''
+) {
   const { staffs, staffTokens } = tables;
-  const { staffId, otp } = body;
+  const { otp } = body;
 
   // One generic message for every rejection, so the reply does not reveal which check failed
   const rejected = { status: 'error' as const, message: 'OTP không hợp lệ hoặc đã hết hạn' };
 
+  // The staff id only comes from the challenge signed at the password step
+  const staffId = await readStaffOtpChallenge(otpSecret, body.otpChallenge);
+
   // Reject malformed input before touching the database
-  if (!Number.isInteger(staffId) || staffId <= 0 || typeof otp !== 'string' || !/^\d{4,8}$/.test(otp)) {
+  if (!staffId || typeof otp !== 'string' || !/^\d{4,8}$/.test(otp)) {
     return rejected;
   }
 
@@ -216,7 +234,10 @@ export async function staffLogoutImpl(db: any, tables: any, token: string) {
   const now = new Date().toISOString();
 
   // Soft revoke token
-  await db.update(staffTokens).set({ revokedAt: now, revokeReason: 'logout' }).where(eq(staffTokens.token, token));
+  await db
+    .update(staffTokens)
+    .set({ revokedAt: now, revokeReason: 'logout' })
+    .where(and(eq(staffTokens.token, token), eq(staffTokens.type, 'session')));
 
   return { status: 'success', message: 'Đăng xuất thành công' };
 }
@@ -232,6 +253,7 @@ export async function staffExtendSessionImpl(db: any, tables: any, token: string
     .where(
       and(
         eq(staffTokens.token, token),
+        eq(staffTokens.type, 'session'),
         isNull(staffTokens.revokedAt),
         gt(staffTokens.expiredAt, now)
       )
@@ -274,14 +296,18 @@ export async function staffExtendSessionImpl(db: any, tables: any, token: string
 export async function staffGetMeImpl(db: any, tables: any, kv: any, staffId: number) {
   const { staffs } = tables;
 
-  const [staff] = await db.select().from(staffs).where(eq(staffs.id, staffId)).limit(1);
+  const [staff] = await db
+    .select({ id: staffs.id, createdAt: staffs.createdAt })
+    .from(staffs)
+    .where(eq(staffs.id, staffId))
+    .limit(1);
   if (!staff) {
     return { status: 'error', message: 'Staff not found' };
   }
 
-  // Load permissions and branches
+  // The branches the staff member is assigned to
   const { loadStaffPermissions } = await import('../../lib/staff-auth');
-  const { permissions, branchIds, isSuperAdmin } = await loadStaffPermissions(db, tables, kv, staff.id);
+  const { branchIds } = await loadStaffPermissions(db, tables, kv, staff.id);
 
   // Names of the roles the staff member holds (shown on the profile page)
   let roleNames: string[] = [];
@@ -304,23 +330,13 @@ export async function staffGetMeImpl(db: any, tables: any, kv: any, staffId: num
     branchNames = branchRows.map((row: { name: string }) => row.name);
   }
 
+  // Only what the profile page reads. The signed-in staff member, the permissions and the branch ids come with the
+  // login reply and are kept by the staff store, so they are not sent again here.
   return {
     status: 'success',
     roleNames,
     branchNames,
-    staff: {
-      id: staff.id,
-      email: staff.email,
-      fullname: staff.fullname,
-      phone: staff.phone,
-      avatar: staff.avatar,
-      isSuperAdmin: staff.isSuperAdmin,
-      forcePasswordChange: Boolean(staff.forcePasswordChange),
-      lastLoginAt: staff.lastLoginAt,
-      createdAt: staff.createdAt
-    },
-    permissions,
-    branchIds
+    staff: { createdAt: staff.createdAt }
   };
 }
 

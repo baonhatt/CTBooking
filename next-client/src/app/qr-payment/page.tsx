@@ -219,7 +219,12 @@ export default function QRPaymentPage() {
         setShowExpiredDialog(true);
     };
 
-    /** The countdown reached zero. Runs once: it cancels the unpaid order, or finds out that it was paid after all. */
+    /**
+     * The countdown reached zero (15 seconds before the server's deadline). Runs once. The order is NOT cancelled
+     * here: "cancelled" means the customer gave up, while a transfer the bank made in time but reports a little late
+     * must still be confirmed. The server closes the order itself at the deadline. One last status check catches a
+     * payment that just arrived.
+     */
     const handleExpired = async () => {
         if (expiredHandledRef.current || finishedRef.current) return;
         expiredHandledRef.current = true;
@@ -227,9 +232,8 @@ export default function QRPaymentPage() {
 
         const { bookingId, orderToken } = orderIdentity();
         if (bookingId && orderToken) {
-            const { httpStatus } = await cancelBookingByToken(bookingId, orderToken);
-            // 409: the order was paid just before the deadline
-            if (httpStatus === 409) {
+            const result = await fetchBookingStatus(bookingId, orderToken);
+            if (result.ok && classifyPaymentStatus(result.data.payment_status) === 'paid') {
                 goToSuccess();
                 return;
             }
@@ -1016,8 +1020,9 @@ export default function QRPaymentPage() {
                                 <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-left space-y-2">
                                     <p className="text-amber-300 font-bold">Nếu bạn đã chuyển khoản</p>
                                     <p>
-                                        Liên hệ hotline <span className="font-bold text-blue-400">{HOTLINE}</span> và cung cấp thông tin
-                                        dưới đây, nhân viên sẽ kiểm tra và hỗ trợ bạn.
+                                        Đơn đã hết hạn nên hệ thống không tự xác nhận. Nhân viên sẽ đối chiếu khoản chuyển và xác nhận vé
+                                        (hoặc hoàn tiền) cho bạn. Cần hỗ trợ nhanh, liên hệ hotline{' '}
+                                        <span className="font-bold text-blue-400">{HOTLINE}</span> và cung cấp thông tin dưới đây.
                                     </p>
                                     <div className="flex items-center justify-between gap-2">
                                         <p className="min-w-0">

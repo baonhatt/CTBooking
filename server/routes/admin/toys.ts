@@ -1,4 +1,4 @@
-import { eq, desc, or, count, and, sql, isNotNull, like } from 'drizzle-orm';
+import { eq, desc, or, count, and, sql, isNotNull, isNull, like } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
@@ -9,7 +9,8 @@ export async function listToysImpl(
   args: { page: number; pageSize: number; q: string; status?: string }
 ) {
   const { page, pageSize, q, status } = args;
-  const conditions = [] as any[];
+  // Deleted toys are never listed here (they have their own list)
+  const conditions = [isNull(tables.toys.deleted_at)] as any[];
 
   if (q) {
     const lowerQ = q.toLowerCase();
