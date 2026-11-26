@@ -4,6 +4,16 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { request } from '@/lib/api/http';
 import { getAuditLogDetailApi } from '@/lib/api/admin-ops';
 import { formatVnDateTime } from '@/lib/format';
+import { getAdminBranchOptions } from '@/lib/api/branches';
+import {
+  auditChanges,
+  auditNote,
+  describeListChange,
+  formatAuditValue,
+  isAuditRecord,
+  readableAuditJson,
+  EMPTY_AUDIT_VALUE
+} from '@/lib/audit-diff';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
@@ -60,7 +70,21 @@ const ACTION_LABELS: Record<string, string> = {
   reset_password: 'Đặt lại mật khẩu',
   copy: 'Sao chép',
   lock: 'Khóa tài khoản',
-  unlock: 'Mở khóa tài khoản'
+  unlock: 'Mở khóa tài khoản',
+  restore: 'Khôi phục',
+  archive: 'Lưu trữ',
+  change_password: 'Đổi mật khẩu',
+  force_change_password: 'Đổi mật khẩu lần đầu',
+  confirm_payment: 'Xác nhận thanh toán',
+  cancel_payment: 'Hủy thanh toán',
+  resend_booking_email: 'Gửi lại email vé',
+  free_order_paid: 'Đơn 0đ được xác nhận',
+  sepay_duplicate: 'Chuyển trùng',
+  sepay_insufficient: 'Chuyển thiếu tiền',
+  sepay_late_payment: 'Tiền về sau hạn',
+  unmatched_transfer_matched: 'Gán chuyển khoản',
+  unmatched_transfer_ignored: 'Bỏ qua chuyển khoản',
+  action_item_resolved: 'Đã xử lý'
 };
 
 // Badge colour of each action (same five tones as every other status in the admin)
@@ -75,7 +99,21 @@ const ACTION_TONES: Record<string, StatusTone> = {
   reset_password: 'warning',
   copy: 'info',
   lock: 'danger',
-  unlock: 'success'
+  unlock: 'success',
+  restore: 'success',
+  archive: 'warning',
+  change_password: 'info',
+  force_change_password: 'info',
+  confirm_payment: 'success',
+  cancel_payment: 'danger',
+  resend_booking_email: 'info',
+  free_order_paid: 'success',
+  sepay_duplicate: 'info',
+  sepay_insufficient: 'warning',
+  sepay_late_payment: 'warning',
+  unmatched_transfer_matched: 'success',
+  unmatched_transfer_ignored: 'neutral',
+  action_item_resolved: 'success'
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -85,7 +123,16 @@ const ENTITY_LABELS: Record<string, string> = {
   role: 'Vai trò',
   ticket_package: 'Gói vé',
   showtimes: 'Lịch chiếu',
-  user: 'Khách hàng'
+  user: 'Khách hàng',
+  branch: 'Chi nhánh',
+  voucher: 'Mã giảm giá',
+  post: 'Bài viết',
+  site_media: 'Media trang chủ',
+  settings: 'Cài đặt',
+  toy: 'Đồ chơi',
+  unmatched_transfer: 'Chuyển khoản chưa khớp',
+  audit_log: 'Đơn cần xử lý',
+  email_log: 'Email gửi lỗi'
 };
 
 const FILTER_SELECT_CLASS =
@@ -93,20 +140,6 @@ const FILTER_SELECT_CLASS =
 
 const DATE_INPUT_CLASS =
   'h-10 w-[140px] cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-blue-600/20';
-
-// Fields to ignore for each module (auto-generated or system fields)
-const IGNORED_FIELDS: Record<string, string[]> = {
-  staff: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
-  movie: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
-  booking: ['id', 'created_at', 'updated_at'],
-  role: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
-  ticket_package: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
-  branch: ['id', 'created_at', 'updated_at', 'deleted_at', 'deleted_by_staff_id'],
-  site_media: ['id', 'created_at', 'updated_at', 'deleted_at'],
-  post: ['id', 'created_at', 'updated_at', 'deleted_at'],
-  toy: ['id', 'created_at', 'updated_at', 'deleted_at'],
-  user: ['id', 'created_at', 'updated_at']
-};
 
 export default function AuditLogsPage() {
   const navigate = useNavigate();
@@ -175,6 +208,17 @@ export default function AuditLogsPage() {
     }
   });
 
+  // Branch names, so branch ids in a change read as names (inactive branches included: old logs name them too)
+  const { data: branchOptions } = useQuery({
+    queryKey: ['audit-branch-names'],
+    queryFn: () => getAdminBranchOptions({ includeInactive: true }),
+    staleTime: 5 * 60 * 1000
+  });
+  const branchNames: Record<number, string> = Object.fromEntries(
+    (branchOptions?.items || []).map((branch) => [branch.id, branch.name])
+  );
+  const [showRawValues, setShowRawValues] = useState(false);
+
   // Fetch staff list for filter
   const { data: staffData } = useQuery({
     queryKey: ['staff-filter'],
@@ -186,15 +230,6 @@ export default function AuditLogsPage() {
   // Vietnam time, same format as the other admin screens
   const formatDate = (dateString: string) => formatVnDateTime(dateString);
 
-  // A value of the before/after table. Objects keep their indentation, so they go in a <pre>.
-  const renderValue = (value: unknown) => {
-    if (value === undefined) return <span className="text-gray-400">-</span>;
-    if (value !== null && typeof value === 'object') {
-      return <pre className="whitespace-pre-wrap font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>;
-    }
-    return String(value);
-  };
-
   const formatEntityLabel = (log: AuditLog) => {
     const entityLabel = ENTITY_LABELS[log.entityType] || log.entityType;
     const entityName = log.entity_name;
@@ -203,6 +238,7 @@ export default function AuditLogsPage() {
   };
 
   const openDetailDialog = (log: AuditLog) => {
+    setShowRawValues(false);
     setSelectedLog(log);
     setIsDetailDialogOpen(true);
   };
@@ -214,31 +250,6 @@ export default function AuditLogsPage() {
     setFilterEntityType('');
     setFilterFromDate('');
     setFilterToDate('');
-  };
-
-  const parseAuditJson = (value?: string | null) => {
-    if (!value) return {};
-    try {
-      return JSON.parse(value);
-    } catch {
-      return {};
-    }
-  };
-
-  const getDiffEntries = (entityType: string, detail: AuditLogDetail) => {
-    const oldData = parseAuditJson(detail.oldValues);
-    const newData = parseAuditJson(detail.newValues);
-    const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
-    const ignored = new Set(IGNORED_FIELDS[entityType] || ['id', 'created_at', 'updated_at']);
-
-    const normalize = (val: unknown) => (val === null ? undefined : val);
-
-    return Array.from(allKeys)
-      .filter((key) => {
-        if (ignored.has(key)) return false;
-        return JSON.stringify(normalize(oldData[key])) !== JSON.stringify(normalize(newData[key]));
-      })
-      .map((key) => ({ key, oldValue: oldData[key], newValue: newData[key] }));
   };
 
   const logs = (logsData as any)?.items || [];
@@ -439,31 +450,54 @@ export default function AuditLogsPage() {
     </div>
   );
 
-  const renderDiffTable = (log: AuditLog, detail: AuditLogDetail) => {
-    const diffEntries = getDiffEntries(log.entityType, detail);
+  // CHANGE TABLE: one row per changed field, nested JSON opened up and labelled (lib/audit-diff.ts)
+  const renderAuditValue = (field: string, value: unknown) => {
+    const text = formatAuditValue(field, value, branchNames);
+    return text === EMPTY_AUDIT_VALUE ? <span className="italic text-slate-400">{text}</span> : text;
+  };
+
+  const renderDiffTable = (detail: AuditLogDetail) => {
+    const changes = auditChanges(detail.oldValues, detail.newValues);
+    // A side that holds a sentence instead of a record (a new record has no "before") gets no column
+    const hasBefore = isAuditRecord(detail.oldValues);
+    const hasAfter = isAuditRecord(detail.newValues);
     return (
       <div className={`${ADMIN_CARD} overflow-hidden`}>
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead className={ADMIN_TABLE_HEAD}>
             <tr>
-              <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trường</th>
-              {detail.oldValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Trước</th>}
-              {detail.newValues && <th className={`${ADMIN_TH} w-1/3 p-3 text-left`}>Sau</th>}
+              <th className={`${ADMIN_TH} w-[34%] p-3 text-left`}>Trường</th>
+              {hasBefore && <th className={`${ADMIN_TH} p-3 text-left`}>Trước</th>}
+              {hasAfter && <th className={`${ADMIN_TH} p-3 text-left`}>Sau</th>}
             </tr>
           </thead>
           <tbody>
-            {diffEntries.length === 0 ? (
+            {changes.length === 0 ? (
               <tr>
                 <td colSpan={3} className="p-3 text-center text-sm text-slate-500">
                   Không có thay đổi
                 </td>
               </tr>
             ) : (
-              diffEntries.map(({ key, oldValue, newValue }) => (
-                <tr key={key} className="border-b border-slate-100 last:border-b-0">
-                  <td className="p-3 text-sm font-medium">{key}</td>
-                  {detail.oldValues && <td className="bg-red-50 p-3 text-sm">{renderValue(oldValue)}</td>}
-                  {detail.newValues && <td className="bg-emerald-50 p-3 text-sm">{renderValue(newValue)}</td>}
+              changes.map((change) => (
+                <tr key={change.path} className="border-b border-slate-100 align-top last:border-b-0">
+                  <td className="p-3 text-sm font-medium text-slate-700">{change.label}</td>
+                  {hasBefore && (
+                    <td className="whitespace-pre-wrap break-words bg-red-50 p-3 text-sm text-slate-800">
+                      {renderAuditValue(change.field, change.oldValue)}
+                    </td>
+                  )}
+                  {hasAfter && (
+                    <td className="whitespace-pre-wrap break-words bg-emerald-50 p-3 text-sm text-slate-900">
+                      {renderAuditValue(change.field, change.newValue)}
+                      {/* A list that changed also says what was added and removed */}
+                      {describeListChange(change.field, change.oldValue, change.newValue, branchNames) && (
+                        <div className="mt-1 text-xs text-slate-500">
+                          {describeListChange(change.field, change.oldValue, change.newValue, branchNames)}
+                        </div>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -472,6 +506,52 @@ export default function AuditLogsPage() {
       </div>
     );
   };
+
+  // NOTES: the sentence some logs keep instead of a record ("Tạo phim: Núi tuyết", "Xóa phim")
+  const renderNotes = (detail: AuditLogDetail) => {
+    const notes = [auditNote(detail.oldValues, branchNames), auditNote(detail.newValues, branchNames)].filter(Boolean);
+    if (notes.length === 0) return null;
+    return (
+      <div className={`${ADMIN_CARD} space-y-1 p-4`}>
+        <div className="text-xs font-medium text-slate-500">Ghi chú</div>
+        {notes.map((note) => (
+          <p key={note} className="text-sm text-slate-800">
+            {note}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
+  // RAW VIEW: the saved before/after as formatted JSON, for a technical check
+  const renderRawValues = (detail: AuditLogDetail) => (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setShowRawValues((shown) => !shown)}
+        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+      >
+        {showRawValues ? 'Ẩn dữ liệu gốc' : 'Xem dữ liệu gốc'}
+      </button>
+      {showRawValues && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {[
+            { title: 'Trước', text: detail.oldValues },
+            { title: 'Sau', text: detail.newValues }
+          ]
+            .filter((side) => side.text)
+            .map((side) => (
+              <div key={side.title} className={`${ADMIN_CARD} overflow-hidden`}>
+                <div className="border-b border-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-500">{side.title}</div>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-xs text-slate-700">
+                  {readableAuditJson(side.text)}
+                </pre>
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
 
   const renderDetailBody = () => {
     if (!selectedLog) return null;
@@ -487,7 +567,15 @@ export default function AuditLogsPage() {
         </div>
         {detailLoading && <TableSkeleton rows={3} />}
         {detailFailed && <p className="text-sm text-red-600">Không tải được chi tiết thay đổi.</p>}
-        {!detailLoading && selectedDetail && (selectedDetail.oldValues || selectedDetail.newValues) && renderDiffTable(selectedLog, selectedDetail)}
+        {!detailLoading && selectedDetail && renderNotes(selectedDetail)}
+        {!detailLoading &&
+          selectedDetail &&
+          (isAuditRecord(selectedDetail.oldValues) || isAuditRecord(selectedDetail.newValues)) && (
+            <>
+              {renderDiffTable(selectedDetail)}
+              {renderRawValues(selectedDetail)}
+            </>
+          )}
       </div>
     );
   };
