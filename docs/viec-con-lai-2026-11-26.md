@@ -11,37 +11,43 @@ Tài liệu liên quan:
 | A1 | Token đăng nhập của admin và khách | Server trả token trong JSON. Admin lưu ở `localStorage`, trang khách lưu ở cookie JS đọc được và `localStorage`. Nếu trang bị chèn script (XSS), token có thể bị lấy, dù server đã đặt cookie HttpOnly. | Chỉ dùng cookie HttpOnly, không trả token trong body. Cần đổi cách gọi API (cookie `credentials: 'include'`, cấu hình CORS và SameSite giữa domain admin, khách và API). Làm riêng một đợt. |
 | A2 | Media trang chủ (banner hero, ảnh công nghệ) | Media dùng chung mọi chi nhánh, nên chỉ **Super Admin** được thêm, sửa, xóa. Nhân viên chi nhánh có quyền "uploads" chỉ xem. | Đã chốt giữ nguyên. Nếu sau này muốn cho nhân viên chi nhánh sửa, mở lại theo quyền "uploads". |
 
-## B. Chưa thử trên trình duyệt (cần anh/chị đăng nhập admin)
+## B. Đã thử trên trình duyệt (admin, tài khoản Super Admin), 26/11
 
-Đã có test tự động (1000+ test) và đã gọi thử API local. Các màn admin dưới đây chưa được bấm thử bằng tay:
+Tất cả các màn sau mở được, không lỗi console, số liệu đúng:
+- dashboard, hồ sơ;
+- nhân viên:
+  - tạo mới: tick sẵn chi nhánh mặc định; bỏ trống thì bị chặn, không gửi request;
+  - chi tiết;
+  - danh sách đã xóa;
+- vai trò và chi tiết vai trò; nhật ký thay đổi (chi tiết tải dữ liệu cũ/mới khi mở);
+- phim: danh sách qua route admin mới, chi tiết có gói áp dụng;
+- lịch chiếu: chọn phim ở chế độ picker; gói vé: không còn ô nhóm, chọn phim combo;
+- voucher:
+  - danh sách, danh sách đã xóa, form có danh sách gói;
+  - voucher 100%: Sales là quản lý thì bị chặn (403); Sales là Super Admin thì tạo được;
+- chi nhánh:
+  - danh sách, chi tiết có người tạo/sửa;
+  - mã vé chưa dùng hiện khi mở hộp thoại đóng cửa (đã bấm Hủy, không đóng cửa);
+- thư viện media; giao dịch (danh sách, chi tiết, API xuất file);
+- soát vé:
+  - mã đủ, chữ thường, mã CS, 12 số, mã nằm trong chuỗi dài: đều tìm thấy;
+  - mã thiếu: không tìm thấy;
+- đơn cần xử lý; mẫu email (Super Admin thấy nút "Gửi thử", chưa bấm vì gửi mail thật); khách hàng; nhật ký email; bài viết;
+- gói "chỉ thành viên": bật thử cho 1 gói, khách chưa đăng nhập không thấy gói đó, rồi đã trả lại như cũ.
 
-1. Đăng nhập nhân viên có OTP 2FA: bước nhập OTP giờ gửi mã ký `otpChallenge`, không gửi id nhân viên.
-2. Nhân viên:
-   - tạo mới: có tick sẵn chi nhánh mặc định không, bỏ trống chi nhánh có bị chặn không;
-   - sửa;
-   - chi tiết: có hiện "người tạo / người sửa" không;
-   - danh sách nhân viên đã xóa.
-3. Phim: danh sách admin dùng route mới `/api/admin/movies`, lọc trạng thái, tìm kiếm.
-4. Chọn phim ở Suất chiếu và ở Gói vé (combo); danh sách gói trong form Voucher.
-5. Chi nhánh:
-   - danh sách chỉ hiện chi nhánh của mình;
-   - mã vé chưa dùng hiện khi mở hộp thoại "Đóng cửa";
-   - chi tiết hiện "người tạo / người sửa".
-6. Upload media bằng tài khoản Super Admin (thư mục Cloudinary đã giới hạn).
-7. Giao dịch: danh sách, chi tiết, xuất Excel. Soát vé. Trang "Đơn cần xử lý" (3 tab, số đếm đỏ ở sidebar).
-8. Nhật ký thay đổi: dữ liệu cũ/mới chỉ tải khi mở chi tiết. Vai trò: số quyền, ngày tạo/sửa ở trang chi tiết. Vai trò đã xóa.
-9. Hồ sơ admin: tên chi nhánh. Dashboard: các số liệu (đã so khớp 52/52 với code cũ trên dữ liệu local).
-10. Xem trước email: chỉ Super Admin thấy nút "Gửi thử"; tối đa 10 thư / 10 phút. **Gửi thư thật qua Brevo.**
-11. Voucher: tạo voucher 100%, chỉ Super Admin, Sales phải là Super Admin. Chi tiết voucher: nhân viên chi nhánh chỉ thấy lượt dùng ở chi nhánh mình.
+Lỗi tìm thấy khi thử và đã sửa:
+- trang voucher đã xóa mặc định lọc "Chỉ VR" nên trống;
+- tiêu đề các trang "đã xóa" hiện "Bảng điều khiển".
 
-Trang khách (đã mở thử trang chủ, đặt vé, danh sách bài viết, chi tiết bài viết; không lỗi console). Các luồng có **gửi mail thật**, chưa chạy bằng tay:
-- đăng ký tài khoản mới (mã OTP);
-- đặt vé bằng voucher 100% (đơn 0đ, mail vé);
-- gói "chỉ thành viên" khi chưa đăng nhập và khi đã đăng nhập.
+Chưa thử bằng tay vì cần tài khoản khác hoặc gửi mail thật:
+- đăng nhập bằng tài khoản quản lý chi nhánh (phạm vi chi nhánh đã có test tự động);
+- đăng ký khách mới;
+- gửi thư thử;
+- đặt vé 0đ bằng voucher 100% (đã chốt bỏ qua; luồng có test tự động). Voucher test đã xóa khỏi DB local.
 
 ## C. Khi đưa lên live
 
-1. `npm run db:migrate:prod`: migration `0002_unmatched_transfers.sql` và `0003_register_pending.sql`.
+1. `npm run db:migrate:prod`: migration `0002_unmatched_transfers.sql`, `0003_register_pending.sql`, `0004_bookings_status_index.sql`. Cron hết hạn đơn đổi sang mỗi 2 phút (`worker/wrangler.toml`), có hiệu lực khi deploy worker.
 2. Deploy **cùng lúc** worker (API), admin và next-client. API đã thay đổi:
    - bỏ các route công khai `/api/movies`, `/api/tickets`, `/api/tickets/:id`, `/api/toys*`, `/api/branches/options` (công khai) và `/sitemap.xml` của worker;
    - thêm route admin mới;
@@ -51,16 +57,16 @@ Trang khách (đã mở thử trang chủ, đặt vé, danh sách bài viết, c
 4. Trước khi deploy: gán chi nhánh cho nhân viên (không phải Super Admin) chưa có chi nhánh. Nếu không, họ bị chặn khỏi mọi trang admin, chỉ còn đăng xuất / đổi mật khẩu. Dữ liệu local hiện không có ai như vậy.
 5. Sau deploy: thử một đơn chuyển khoản thật (số tiền nhỏ) để xác nhận webhook SePay khớp mã và giờ ngân hàng.
 
-## D. Việc nhỏ, để sau (không gấp)
+## D. Việc nhỏ: kết quả (26/11)
 
-| # | Việc | Ghi chú |
+| # | Việc | Kết quả |
 |---|---|---|
-| D1 | Danh sách chi nhánh (admin): số phim / số gói đếm theo cột cũ `branch_id`, chưa theo `branch_ids` | Phim/gói gán nhiều chi nhánh có thể bị đếm thiếu. Chỉ ảnh hưởng con số hiển thị. |
-| D2 | Soát vé đọc `branch_id` từ danh sách chi nhánh (bí danh của `id`) | Đổi sang `id`, rồi bỏ bí danh. |
-| D3 | Hàm không còn dùng | `server/routes/user/movies.ts` (`listMovies`, `getMovie`), `server/routes/user/toys.ts` (`listActiveToys`), kiểu `ActiveMoviesTodayResponse` trong `shared/api.ts`; trong `client/lib/api`: `createBookingApi`, `validateBookingApi`, các hàm hồ sơ/lịch sử khách. Xóa khi dọn code. |
-| D4 | Suất chiếu (admin) gọi một request cho mỗi chi nhánh | Có thể gộp thành một request. |
-| D5 | Chi tiết voucher (admin) vẫn trả mô tả thô | Chỉ admin thấy; danh sách đã rút gọn. |
-| D6 | Hết giờ đếm ngược ở trang QR không hủy đơn nữa | Đơn vẫn "chờ thanh toán" tới khi server đóng (tối đa khoảng 5 phút sau hạn, do cron hoặc khi có ai xem trạng thái). Lượt voucher vì vậy được giữ thêm tối đa khoảng 5 phút. |
-| D7 | Đồ chơi | Phần đồ chơi đang ẩn trên trang khách và các route công khai của nó đã bỏ. Mở lại đồ chơi thì phải thêm lại route công khai. |
-| D8 | Chuyển dư tiền, hoàn tiền | Không có trạng thái "Đã hoàn tiền" riêng; nhân viên ghi bằng "Đã xử lý + ghi chú". |
-| D9 | Dashboard: "Top gói vé" | Vẫn đọc các đơn trong khoảng thời gian chọn (tuần / tháng / năm) và cộng trong code, vì tên gói lưu dạng JSON. Các số liệu khác đã tính trong SQL. |
+| D1 | Số phim / gói ở danh sách chi nhánh | Đã sửa: mỗi chi nhánh đếm phim/gói của nó cộng phim/gói áp dụng tất cả chi nhánh, giống trang khách. Đã đối chiếu số gói với trang khách ở cả 4 chi nhánh (11, 12, 7, 10). |
+| D2 | Soát vé đọc bí danh `branch_id` | Đã đổi sang `id` và bỏ bí danh. |
+| D3 | Hàm không còn dùng | Đã xóa: `listMovies`, `getMovie`, file `server/routes/user/toys.ts`, `ActiveMoviesTodayResponse`, 13 hàm client admin không ai gọi, route `/api/admin/revenue` không có màn nào gọi. |
+| D4 | Lịch chiếu gọi 1 request mỗi chi nhánh | Đã gộp thành 1 request (`/api/admin/showtimes?branch_id=all`, vẫn theo chi nhánh của nhân viên). |
+| D5 | Chi tiết voucher trả mô tả thô | Đã bỏ; chỉ gửi ghi chú và người Sales đã tách sẵn. |
+| D6 | Giữ đơn sau hạn | Đã chốt: cron mỗi 2 phút + index `idx_bookings_status_expires` (migration 0004). Mỗi lần chạy chỉ đọc các đơn đang chờ (đã kiểm tra query plan). Đơn và lượt voucher được trả trong tối đa khoảng 2 phút sau hạn. |
+| D7 | Đồ chơi | Không đổi. Phần đồ chơi đang ẩn; mở lại thì phải thêm lại route công khai. |
+| D8 | Trạng thái "Đã hoàn tiền" | Đã chốt chưa cần; dùng "Đã xử lý + ghi chú". |
+| D9 | "Top gói vé" trên dashboard cộng trong code | Đã chốt giữ nguyên: chỉ đọc đơn trong khoảng thời gian đang chọn. |

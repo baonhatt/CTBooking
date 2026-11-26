@@ -31,8 +31,6 @@ export async function getAdminBranchOptions(options?: {
   if (options?.onlyOpen) params.set('onlyOpen', 'true');
   return request<{
     items: Array<{
-      /** Same as id (kept for older readers) */
-      branch_id: number;
       id: number;
       name: string;
       code: string;

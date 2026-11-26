@@ -24,7 +24,7 @@ const getD1Tables = (schema: any) => ({
 
 import { getBookingEmailTemplate } from '../../../../server/lib/email-templates';
 import { logSystemError } from '../../utils';
-import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from '../../../../server/routes/admin/payments';
+import { listTransactionsImpl, getTransactionByIdImpl } from '../../../../server/routes/admin/payments';
 import { checkSepayTransactionImpl } from '../../../../server/routes/admin/sepay';
 import { confirmBookingImpl } from '../../../../server/routes/admin/confirm-booking';
 import {
@@ -45,29 +45,6 @@ import { resendBookingEmailImpl } from '../../../../server/routes/admin/resend-b
 import { confirmUseTicketImpl, getBookingByCodeImpl } from '../../../../server/routes/user/booking/query';
 type Variables = { staffId?: number; staffEmail?: string; staffFullname?: string; isSuperAdmin?: boolean; staffPermissions?: Array<{ module: string; action: string }>; staffBranchIds?: number[]; };
 const paymentsRouter = new Hono<{ Bindings: any; Variables: Variables }>();
-
-paymentsRouter.get('/api/admin/revenue', requireStaffAuth, requirePermission('dashboard', 'view_revenue'), async (c) => {
-  try {
-    const from = String(c.req.query('from') || '');
-
-    const to = String(c.req.query('to') || '');
-
-    const status = String(c.req.query('status') || 'paid');
-
-    const db = drizzle(c.env.cinema_db, { schema });
-    const restrictBranchIds = getRestrictBranchIds(c);
-
-    const r = await getRevenueImpl(
-      db,
-      { bookings: schema.bookings },
-      { from, to, status, restrictToBranchIds: restrictBranchIds }
-    );
-
-    return c.json(r);
-  } catch (err: any) {
-    return c.json({ status: 'error', message: String(err?.message || 'Internal error') }, 500);
-  }
-});
 
 paymentsRouter.get('/api/admin/sepay/check', requireStaffAuth, requirePermission('ticket_check', 'validate'), async (c) => {
   try {

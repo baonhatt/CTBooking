@@ -8,7 +8,7 @@ import {
   getRevenue7DaysImpl,
   topTicketsRange
 } from './dashboard';
-import { getRevenueImpl, listTransactionsImpl, getTransactionByIdImpl } from './payments';
+import { listTransactionsImpl, getTransactionByIdImpl } from './payments';
 
 // These tests run the real SQL on an in-memory SQLite database, so the WHERE clauses are really exercised.
 
@@ -88,17 +88,15 @@ describe('revenue by year: one definition everywhere', () => {
     expect(y2025.revenueTotal).toBe(0);
   });
 
-  it('the year card, the sum of the 12 months, the by-date total and /revenue all agree', async () => {
+  it('the year card, the sum of the 12 months and the by-date total all agree', async () => {
     const card = (await metrics(2026)).revenueTotal;
     const months: any = await getRevenueByMonthImpl(db, tables, { year: '2026' });
     const monthsTotal = months.data.reduce((sum: number, row: any) => sum + row.revenue, 0);
     const byDate: any = await getRevenueByDateImpl(db, tables, { year: 2026 });
-    const revenue: any = await getRevenueImpl(db, tables, { from: '2026-01-01', to: '2026-12-31' });
 
     expect(card).toBe(420000);
     expect(monthsTotal).toBe(card);
     expect(byDate.total).toBe(card);
-    expect(revenue.total).toBe(card);
   });
 
   it('puts the new-year order in January 2026, the old order by its creation day, and the last-minute order in December', async () => {

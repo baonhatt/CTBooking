@@ -21,25 +21,6 @@ export async function getPosts(options?: {
   );
 }
 
-// Public list posts (default: published-only on server)
-export async function getPublicPosts(options?: {
-  page?: number;
-  pageSize?: number;
-  q?: string;
-  status?: string; // optional override if server allows; defaults to published
-  signal?: AbortSignal;
-}) {
-  const params = new URLSearchParams();
-  if (options?.page) params.set('page', String(options.page));
-  if (options?.pageSize) params.set('pageSize', String(options.pageSize));
-  if (options?.q) params.set('q', options.q);
-  if (options?.status) params.set('status', options.status);
-
-  return request<{ items: any[]; page: number; pageSize: number; total: number }>(`/api/posts?${params.toString()}`, {
-    signal: options?.signal
-  });
-}
-
 export async function getPostById(id: number | string) {
   return request<{ post: any }>(`/api/admin/posts/${id}`);
 }

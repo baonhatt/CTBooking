@@ -40,19 +40,6 @@ export interface MoviesResponse {
   items: Movie[];
 }
 
-export interface ActiveMoviesTodayResponse {
-  id: number;
-  title: string;
-  description: string;
-  cover_image: string;
-  detail_images: string;
-  genres: string;
-  rating: string;
-  duration_min: number;
-  price: number;
-  release_date: Date;
-}
-
 export interface PaymentRequest {
   email: string;
   emailBook: string;

@@ -1,4 +1,4 @@
-import type { Movie, MoviesResponse, ActiveMoviesTodayResponse } from '@shared/api';
+import type { Movie, MoviesResponse } from '@shared/api';
 import { request } from './http';
 
 /** A row of the admin movie list (GET /api/admin/movies). */
@@ -162,4 +162,4 @@ export async function updateMovieStatus(id: number, isActive: boolean) {
   });
 }
 
-export type { Movie, MoviesResponse, ActiveMoviesTodayResponse };
+export type { Movie, MoviesResponse };

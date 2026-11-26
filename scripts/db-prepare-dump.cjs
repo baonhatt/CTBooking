@@ -1,8 +1,12 @@
-// Reorders a D1 export so it can be imported into the LOCAL database.
+// Reorders a D1 export so it can be imported into the LOCAL database, or into the remote PREVIEW database
+// (docs/huong-dan-migrate-live-va-clone-preview.md).
 //
 // The export lists each table followed by its rows, so a table that points to another table (a foreign key)
 // can get rows before that other table exists, and the local import stops with "no such table".
 // This puts every PRAGMA / CREATE statement first and all the rows after them, keeping the order inside each group.
+// The rows are also put parent table first (users before accounts, bookings before booking_vr_items...): a remote D1
+// import runs in batches and does not keep `PRAGMA defer_foreign_keys` across them, so a child row before its parent
+// failed with "FOREIGN KEY constraint failed".
 // Input: cinema_db_prod.sql   Output: cinema_db_prod.local.sql   (both are git-ignored: they hold customer data)
 const fs = require('fs');
 
@@ -53,7 +57,33 @@ function shrink(statement) {
 
 const isSchema = (statement) => /^(PRAGMA|CREATE)\b/i.test(statement);
 const schemaStatements = statements.filter(isSchema);
-const dataStatements = statements.filter((statement) => !isSchema(statement)).map(shrink);
+const unorderedData = statements.filter((statement) => !isSchema(statement)).map(shrink);
+
+// Parent tables first: each table's foreign keys come from its CREATE TABLE statement
+const parentsOf = new Map();
+for (const statement of schemaStatements) {
+  const created = statement.match(/^CREATE TABLE (?:IF NOT EXISTS )?[`"]?(\w+)[`"]?/i);
+  if (!created) continue;
+  const parents = [...statement.matchAll(/REFERENCES\s+[`"]?(\w+)/gi)].map((match) => match[1]);
+  parentsOf.set(created[1], new Set(parents.filter((parent) => parent !== created[1])));
+}
+const tableOrder = [];
+while (tableOrder.length < parentsOf.size) {
+  const ready = [...parentsOf.keys()]
+    .filter((table) => !tableOrder.includes(table))
+    .filter((table) => [...parentsOf.get(table)].every((parent) => tableOrder.includes(parent) || !parentsOf.has(parent)))
+    .sort();
+  if (ready.length === 0) throw new Error('Foreign keys form a cycle; cannot order the rows');
+  tableOrder.push(...ready);
+}
+const rowsByTable = new Map(tableOrder.map((table) => [table, []]));
+const otherData = []; // sqlite_sequence and anything else: after all rows
+for (const statement of unorderedData) {
+  const inserted = statement.match(/^INSERT INTO [`"]?(\w+)[`"]?/i);
+  if (inserted && rowsByTable.has(inserted[1])) rowsByTable.get(inserted[1]).push(statement);
+  else otherData.push(statement);
+}
+const dataStatements = [...tableOrder.flatMap((table) => rowsByTable.get(table)), ...otherData];
 
 fs.writeFileSync(output, [...schemaStatements, ...dataStatements].join('\n') + '\n');
 if (truncated.length) console.log('Shortened ' + truncated.length + ' oversized rows: ' + truncated.join(' | '));

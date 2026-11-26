@@ -19,8 +19,9 @@ preview_urls = true
 # Cron Triggers
 # -----------------------------------------------------------------------------
 [triggers]
-# Chạy mỗi 5 phút: tự động hủy booking pending quá hạn & trả lại slot voucher
-crons = ["*/5 * * * *"]
+# Chạy mỗi 2 phút: tự động chuyển booking pending quá hạn sang expired & trả lại slot voucher
+# (index idx_bookings_status_expires, migration 0004, giữ mỗi lần chạy chỉ đọc các đơn đang chờ)
+crons = ["*/2 * * * *"]
 
 # -----------------------------------------------------------------------------
 # Environment Variables (default / production build-time vars)

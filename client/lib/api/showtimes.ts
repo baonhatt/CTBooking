@@ -14,6 +14,11 @@ export type ShowtimeItem = {
   movie_deleted?: boolean;
 };
 
+/** Every branch's schedule in one request (only the staff member's branches); rows carry branch_id */
+export async function getAllBranchShowtimesAdmin() {
+  return request<{ items: ShowtimeItem[] }>('/api/admin/showtimes?branch_id=all');
+}
+
 export async function getShowtimesAdmin(branchId: number) {
   return request<{ items: ShowtimeItem[] }>(`/api/admin/showtimes?branch_id=${branchId}`);
 }

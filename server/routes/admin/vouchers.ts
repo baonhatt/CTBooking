@@ -484,7 +484,15 @@ export async function getVoucherImpl(
     .orderBy(desc(tables.auditLogs.createdAt))
     .limit(1);
 
-  const { applicable_user_ids: _unusedUserIds, ...voucherFields } = voucher;
+  // The raw description is the stored JSON (note + Sales person); the screen gets them parsed below
+  const {
+    applicable_user_ids: _unusedUserIds,
+    description: _rawDescription,
+    excluded_ticket_package_ids: _unusedExcluded,
+    deleted_at: _deletedAt,
+    deleted_by_staff_id: _deletedBy,
+    ...voucherFields
+  } = voucher;
   return {
     ...voucherFields,
     note: meta.note,

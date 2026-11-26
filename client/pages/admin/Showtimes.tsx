@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import AdminLayout from '@/admin/layouts/AdminLayout';
 import ShowtimesContent, { type BranchesStatus } from '@/components/admin/content/ShowtimesContent';
-import { getShowtimesAdmin, getAdminBranchOptions } from '@/lib/api';
+import { getShowtimesAdmin, getAllBranchShowtimesAdmin, getAdminBranchOptions } from '@/lib/api';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { notify } from '@/components/admin/common/notify';
@@ -24,16 +24,19 @@ export default function ShowtimesPage() {
   const loadSchedules = useCallback(async (branchList: any[]) => {
     setIsLoading(true);
     try {
-      const results = await Promise.all(
-        branchList.map(async (branch) => {
-          try {
-            const { items } = await getShowtimesAdmin(branch.id);
-            return { branchId: branch.id as number, items: items || [], failed: false };
-          } catch {
-            return { branchId: branch.id as number, items: [] as ShowtimeItem[], failed: true };
-          }
-        })
-      );
+      // One request for every branch, then grouped by branch (it used to be one request per branch)
+      let allItems: ShowtimeItem[] = [];
+      let failed = false;
+      try {
+        allItems = (await getAllBranchShowtimesAdmin()).items || [];
+      } catch {
+        failed = true;
+      }
+      const results = branchList.map((branch) => ({
+        branchId: branch.id as number,
+        items: allItems.filter((item) => Number(item.branch_id) === Number(branch.id)),
+        failed
+      }));
       // A failed branch keeps whatever was loaded before; it is only marked as failed
       setSchedules((prev) => {
         const next = { ...prev };

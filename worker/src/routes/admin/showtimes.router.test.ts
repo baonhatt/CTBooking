@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import showtimesRouter from './showtimes.router';
-import { copyShowtimesImpl } from '../../../../server/routes/admin/showtimes';
+import { copyShowtimesImpl, listShowtimesForAllBranchesImpl } from '../../../../server/routes/admin/showtimes';
 
 // Permissions come from a test header like "showtimes:create,showtimes:delete". requirePermission really checks them.
 vi.mock('../../middleware', () => ({
@@ -21,7 +21,8 @@ vi.mock('../../middleware', () => ({
 
 vi.mock('../../../../server/routes/admin/showtimes', async (importOriginal) => ({
   ...(await importOriginal<any>()),
-  copyShowtimesImpl: vi.fn(async () => ({ status: 'success', copied: 1 }))
+  copyShowtimesImpl: vi.fn(async () => ({ status: 'success', copied: 1 })),
+  listShowtimesForAllBranchesImpl: vi.fn(async () => ({ items: [] }))
 }));
 
 const env = { cinema_db: {} };
@@ -66,5 +67,18 @@ describe('POST /api/admin/showtimes/copy needs both showtimes.create and showtim
     const call = (copyShowtimesImpl as any).mock.calls[0];
     expect(call[1]).toHaveProperty('movies');
     expect(call[3]).toEqual([1, 2]);
+  });
+});
+
+describe('GET /api/admin/showtimes?branch_id=all', () => {
+  it('loads every branch of the staff member in one request (scoped to their branches)', async () => {
+    const response = await showtimesRouter.request(
+      '/api/admin/showtimes?branch_id=all',
+      { headers: { 'x-test-permissions': 'showtimes:view' } },
+      env,
+      executionContext
+    );
+    expect(response.status).toBe(200);
+    expect((listShowtimesForAllBranchesImpl as any).mock.calls[0][2]).toEqual([1, 2]);
   });
 });

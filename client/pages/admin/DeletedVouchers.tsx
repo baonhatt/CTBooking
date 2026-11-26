@@ -53,7 +53,8 @@ export default function DeletedVouchersPage() {
   const [total, setTotal] = useState(0);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const [scopeFilter, setScopeFilter] = useState<VoucherListFilters['scope']>('vr');
+  // Same default as the voucher list: every scope ("vr" hid the deleted movie vouchers)
+  const [scopeFilter, setScopeFilter] = useState<VoucherListFilters['scope']>('all');
   const [searchText, setSearchText] = useState('');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);

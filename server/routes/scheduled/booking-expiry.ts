@@ -5,7 +5,7 @@ import { formatDateForDb } from '../../lib/date-utils';
  * Auto-expire pending bookings that have passed their payment_expires_at deadline.
  * For each expired booking that used a voucher, atomically decrement used_count back.
  *
- * Called by the Cloudflare Cron Trigger every 5 minutes.
+ * Called by the Cloudflare Cron Trigger every 2 minutes (index idx_bookings_status_expires, migration 0004).
  */
 export async function expireStaleBookingsImpl(
   anyDb: any,

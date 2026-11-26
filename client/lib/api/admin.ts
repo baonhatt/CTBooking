@@ -1,23 +1,5 @@
 import { request } from './http';
 
-// Note: adminLoginApi removed - login is handled via AdminGate.tsx using /api/admin/auth/login
-
-export async function getAdminRevenue(options?: {
-  from?: string;
-  to?: string;
-  status?: 'all' | 'paid';
-  signal?: AbortSignal;
-}) {
-  const params = new URLSearchParams();
-  if (options?.from) params.set('from', options.from);
-  if (options?.to) params.set('to', options.to);
-  if (options?.status) params.set('status', options.status);
-  const path = `/api/admin/revenue${params.toString() ? `?${params.toString()}` : ''}`;
-  return request<{ total: number; count: number }>(path, {
-    signal: options?.signal
-  });
-}
-
 export async function getTransactions(options?: {
   page?: number;
   pageSize?: number;
@@ -268,10 +250,6 @@ export async function listVouchersApi(filters: VoucherListFilters = {}) {
     pageSize: number;
     total: number;
   }>(`/api/admin/vouchers${qs ? `?${qs}` : ''}`);
-}
-
-export async function getVoucherApi(id: number) {
-  return request<any>(`/api/admin/vouchers/${id}`);
 }
 
 export async function createVoucherApi(payload: Record<string, any>) {

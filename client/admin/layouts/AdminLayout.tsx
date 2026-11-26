@@ -290,6 +290,16 @@ export default function AdminLayout({
   const currentTabLabel = useMemo(() => {
     if (active === 'settings') return 'Cấu hình hệ thống';
     if (active === 'profile') return 'Hồ sơ cá nhân';
+    // The "deleted" pages are not in the menu: name them after their list
+    const deletedPageLabels: Record<string, string> = {
+      'deleted-vouchers': 'Voucher đã xóa',
+      'deleted-staff': 'Nhân viên đã xóa',
+      'deleted-roles': 'Vai trò đã xóa',
+      'deleted-movies': 'Phim đã xóa',
+      'deleted-tickets': 'Gói vé đã xóa',
+      'deleted-branches': 'Chi nhánh đã xóa'
+    };
+    if (deletedPageLabels[active as string]) return deletedPageLabels[active as string];
     for (const group of menuGroups) {
       const item = group.items.find((i) => i.key === active);
       if (item) return item.label;

@@ -9,7 +9,7 @@ Tài liệu mô tả cách web **thực sự chạy**. Bản 26/11: **ràng bu�
 | `pending` | Đã đặt, đang chờ chuyển khoản (tối đa 10 phút) | Lúc tạo đơn |
 | `paid` | Đã thanh toán, có mã vé, đã gửi mail vé | Webhook SePay / nhân viên xác nhận |
 | `cancelled` | Khách bấm **Hủy** khi còn trong 10 phút | Khách (trang QR, trang Tài khoản) |
-| `expired` | Hết 10 phút mà chưa trả | Cron 5 phút / lúc có người kiểm tra đơn / trang QR hết giờ / webhook (tiền về sau 10 phút) |
+| `expired` | Hết 10 phút mà chưa trả | Cron 2 phút / lúc có người kiểm tra đơn / webhook (tiền về sau hạn) |
 | `failed` | Lỗi khi tạo đơn, hoặc nhân viên hủy trong admin | Hệ thống / nhân viên |
 
 Admin hiện cả `failed` và `cancelled` là "Đã hủy", còn `expired` là "Đã hết hạn". Phía khách: `failed`/`cancelled` hiện "Đã hủy thanh toán", `expired` hiện "Hết hạn thanh toán".
@@ -51,7 +51,7 @@ Khách chọn gói → trang Đặt vé
 | Khách chuyển **thiếu** | Đơn giữ nguyên, audit log ghi `sepay_insufficient`, nhân viên xử lý |
 | Khách bấm **Hủy** | `cancelled`, trả lại 1 lượt voucher |
 | Hết giờ đếm ngược trên trang QR (15 giây trước hạn thật) | Trang **không hủy đơn** (`cancelled` chỉ dành cho khách tự bấm Hủy). Trang hỏi trạng thái lần cuối: đã trả thì sang trang kết quả, chưa thì hiện popup hết hạn. Đơn được server đóng thành `expired` đúng hạn (mục dưới) |
-| Khách đóng trang, không trả | Đơn hết hạn bằng một trong hai cách: **(1)** có ai kiểm tra trạng thái đơn (trang QR / checkout) thì chuyển `expired` **ngay**; **(2)** nếu không, cron mỗi 5 phút chuyển `expired`. Cả hai đều trả lượt voucher |
+| Khách đóng trang, không trả | Đơn hết hạn bằng một trong hai cách: **(1)** có ai kiểm tra trạng thái đơn (trang QR / checkout) thì chuyển `expired` **ngay**; **(2)** nếu không, cron mỗi 2 phút chuyển `expired`. Cả hai đều trả lượt voucher |
 
 Mọi việc chuyển trạng thái đều dùng câu UPDATE có điều kiện (chỉ khi đơn còn `pending`), nên cron, webhook và thao tác của khách không ghi đè lên nhau, và lượt voucher không bị trả hai lần. Riêng webhook chuyển `paid` còn thêm điều kiện **`payment_expires_at` chưa qua** (`only_open_pending` trong `update.ts`): tiền về đúng lúc đơn vừa hết hạn hoặc vừa bị hủy thì thua, và đi sang nhân viên.
 
@@ -142,7 +142,7 @@ Popup hết hạn ghi rõ: đơn đã hết hạn, hệ thống **không tự x�
 | Tạo đơn, trừ lượt voucher | `server/routes/user/booking/create.ts`, `server/routes/user/vr-bookings.ts` |
 | Kiểm tra voucher (gồm lượt mỗi khách) | `server/routes/user/vouchers.ts` |
 | Đổi trạng thái thanh toán | `server/routes/user/booking/update.ts` |
-| Cron hết hạn + hết hạn ngay khi kiểm tra | `server/routes/scheduled/booking-expiry.ts` (cron `*/5 * * * *` trong `worker/wrangler.toml`) |
+| Cron hết hạn + hết hạn ngay khi kiểm tra | `server/routes/scheduled/booking-expiry.ts` (cron `*/2 * * * *` trong `worker/wrangler.toml`, index migration 0004) |
 | API trạng thái / hủy đơn | `worker/src/routes/publicRouter.ts` (`/api/bookings/:id`, `/api/cancel-booking`) |
 | Webhook SePay | `server/routes/webhook/sepay.ts` |
 | Chuyển khoản chưa khớp | `server/routes/admin/unmatched-transfers.ts`, `client/components/admin/content/UnmatchedTransfersContent.tsx`, migration `worker/migrations/0002_unmatched_transfers.sql` |

@@ -291,6 +291,24 @@ describe('vouchers', () => {
 describe('branches', () => {
   const branchTables = { branches: S.branches, movies: S.movies, ticket_packages: S.ticket_packages, bookings: S.bookings };
 
+  it('movie and package counts: items for this branch plus items for all branches (as the customer site shows them)', async () => {
+    insertRows(raw, 'movies', [
+      movie(1),
+      movie(2, { branch_ids: '[1]', branch_id: 1 }),
+      movie(3, { branch_ids: '[1,2]', branch_id: 1 }),
+      movie(4, { branch_ids: '[2]', branch_id: 2, is_active: 0 }),
+      movie(5, { branch_ids: '[2]', branch_id: 2, deleted_at: NOW })
+    ]);
+    insertRows(raw, 'ticket_packages', [
+      { id: 1, name: 'All', price: 1, type: 'movie', is_active: 1, branch_ids: null, created_at: NOW, updated_at: NOW },
+      { id: 2, name: 'Old single branch 2', price: 1, type: 'movie', is_active: 1, branch_ids: '[2]', branch_id: 2, created_at: NOW, updated_at: NOW },
+      { id: 3, name: 'Not configured', price: 1, type: 'movie', is_active: 1, branch_ids: '[]', created_at: NOW, updated_at: NOW }
+    ]);
+    const r = await listBranchesImpl(db, branchTables, { page: 1, pageSize: 10, q: '', includeInactive: true });
+    const counts = Object.fromEntries(r.items.map((b: any) => [b.id, [b.movie_count, b.package_count]]));
+    expect(counts).toEqual({ 1: [3, 1], 2: [2, 2], 3: [1, 1] });
+  });
+
   it('the admin list shows staff their own branches only, without ticket codes', async () => {
     const all = await listBranchesImpl(db, branchTables, { page: 1, pageSize: 10, q: '', includeInactive: true });
     expect(all.items.map((b: any) => b.id)).toEqual([1, 2, 3]);
@@ -321,7 +339,7 @@ describe('branches', () => {
   it('admin options: only the picker fields, scoped', async () => {
     const r = await listAdminBranchOptionsImpl(db, { branches: S.branches }, { includeInactive: true, restrictToBranchIds: [1, 3] });
     expect(r.items.map((b: any) => b.id)).toEqual([1, 3]);
-    expect(Object.keys(r.items[0]).sort()).toEqual(['address', 'branch_id', 'code', 'id', 'is_active', 'is_default', 'is_open', 'name'].sort());
+    expect(Object.keys(r.items[0]).sort()).toEqual(['address', 'code', 'id', 'is_active', 'is_default', 'is_open', 'name'].sort());
     expect((await listAdminBranchOptionsImpl(db, { branches: S.branches }, { restrictToBranchIds: [] })).items).toEqual([]);
   });
 

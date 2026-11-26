@@ -1,35 +1,7 @@
-import { eq, and, or, gte, lte, inArray, desc, asc, sum, count, sql } from 'drizzle-orm';
+import { eq, and, or, inArray, desc, asc, count, sql } from 'drizzle-orm';
 import { formatDateForDb } from '../../../server/lib/date-utils';
 import { vnRangeFromInputs, sqlPaidInRange, sqlListedInRange, sqlCreatedInRange } from '../../../server/lib/vn-time';
 import { chunk } from '../../../server/lib/paging';
-
-export async function getRevenueImpl(
-  anyDb: any,
-  tables: { bookings: any },
-  args: { from?: string; to?: string; status?: string; restrictToBranchIds?: number[] | null }
-) {
-  const status = String(args.status || 'paid').toLowerCase();
-  const whereParts: any[] = [];
-  if (args.restrictToBranchIds !== null && args.restrictToBranchIds !== undefined) {
-    if (args.restrictToBranchIds.length === 0) {
-      whereParts.push(sql`1 = 0`);
-    } else {
-      whereParts.push(inArray(tables.bookings.branch_id, args.restrictToBranchIds));
-    }
-  }
-  // Paid orders count on the day they were paid (Vietnam time). Status "all" lists every status: paid ones by the day
-  // paid, the others by the day created.
-  const range = vnRangeFromInputs(args.from, args.to);
-  const dateCondition = status === 'all' ? sqlListedInRange(tables.bookings, range) : sqlPaidInRange(tables.bookings, range);
-  const finalWhere = and(...whereParts, dateCondition);
-  const [agg] = await anyDb
-    .select({ total: sum(tables.bookings.total_price), count: count() })
-    .from(tables.bookings)
-    .where(finalWhere);
-  const total = Number(agg?.total || 0);
-  const countVal = agg?.count || 0;
-  return { total, count: countVal };
-}
 
 export async function listTransactionsImpl(
   anyDb: any,

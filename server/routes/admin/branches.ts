@@ -78,38 +78,22 @@ export async function listBranchesImpl(
 
   // Tối ưu hóa triệt để: Gom 6N queries riêng lẻ thành 3 truy vấn batch GROUP BY
   // (the unused ticket codes are read on demand, when the close-branch dialog opens)
-  const [movieStats, packageStats, bookingStats] = await Promise.all([
-    // 1. Movie stats theo branch
+  // The outer branch row, written out in full: drizzle prints a column of the single table of a select without its
+  // table name, and inside the sub-select a bare "id" would mean the movie's / package's own id
+  const outerBranchId = sql.raw('"branches"."id"');
+  const [catalogStats, bookingStats] = await Promise.all([
+    // 1-2. Active movies and packages each branch shows: the ones listing this branch in branch_ids, plus the ones for
+    // all branches (branch_ids empty), the same rule as the customer site (sqlBranchIdsMatchFilter)
     anyDb
       .select({
-        branch_id: tables.movies.branch_id,
-        count: count()
+        branch_id: tables.branches.id,
+        movie_count: sql<number>`(select count(*) from ${tables.movies} m where m.is_active = 1 and m.deleted_at is null
+          and (m.branch_ids is null or exists (select 1 from json_each(m.branch_ids) where cast(value as integer) = ${outerBranchId})))`,
+        package_count: sql<number>`(select count(*) from ${tables.ticket_packages} p where p.is_active = 1 and p.deleted_at is null
+          and (p.branch_ids is null or exists (select 1 from json_each(p.branch_ids) where cast(value as integer) = ${outerBranchId})))`
       })
-      .from(tables.movies)
-      .where(
-        and(
-          inArray(tables.movies.branch_id, branchIds),
-          eq(tables.movies.is_active, true),
-          isNull(tables.movies.deleted_at)
-        )
-      )
-      .groupBy(tables.movies.branch_id),
-
-    // 2. Package stats theo branch
-    anyDb
-      .select({
-        branch_id: tables.ticket_packages.branch_id,
-        count: count()
-      })
-      .from(tables.ticket_packages)
-      .where(
-        and(
-          inArray(tables.ticket_packages.branch_id, branchIds),
-          eq(tables.ticket_packages.is_active, true),
-          isNull(tables.ticket_packages.deleted_at)
-        )
-      )
-      .groupBy(tables.ticket_packages.branch_id),
+      .from(tables.branches)
+      .where(inArray(tables.branches.id, branchIds)),
 
     // 3. Tổng hợp toàn bộ số liệu booking trong 1 truy vấn duy nhất
     anyDb
@@ -124,8 +108,8 @@ export async function listBranchesImpl(
       .groupBy(tables.bookings.branch_id)
   ]);
 
-  const movieMap = new Map<number, number>(movieStats.map((r: any) => [r.branch_id, Number(r.count || 0)]));
-  const packageMap = new Map<number, number>(packageStats.map((r: any) => [r.branch_id, Number(r.count || 0)]));
+  const movieMap = new Map<number, number>(catalogStats.map((r: any) => [r.branch_id, Number(r.movie_count || 0)]));
+  const packageMap = new Map<number, number>(catalogStats.map((r: any) => [r.branch_id, Number(r.package_count || 0)]));
   const bookingMap = new Map<number, any>(bookingStats.map((r: any) => [r.branch_id, r]));
 
   const itemsWithStats = branches.map((branch: any) => {
@@ -246,8 +230,6 @@ export async function listAdminBranchOptionsImpl(
 
   const items = await anyDb
     .select({
-      // branch_id repeats id: TicketCheckContent still reads it as a fallback
-      branch_id: tables.branches.id,
       id: tables.branches.id,
       name: tables.branches.name,
       code: tables.branches.code,

@@ -1,53 +1,5 @@
 import { request } from './http';
 
-export async function createBookingApi(body: {
-  email: string;
-  emailBook: string;
-  phone: string;
-  name: string;
-  movieId?: number;
-  ticketCount: number;
-  paymentMethod: 'vietqr' | 'cash';
-  totalPrice?: number;
-  ticketPackageId?: number;
-  pay_txt_code: string;
-  combo: string[];
-}) {
-  return request<{ message: string; booking: any }>('/api/create-booking', {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
-}
-
-export async function validateBookingApi(body: {
-  email: string;
-  emailBook: string;
-  phone: string;
-  name: string;
-  movieId?: number;
-  ticketCount: number;
-  ticketPackageId?: number;
-  combo: string[];
-}) {
-  return request<{
-    status: string;
-    message?: string;
-    user?: { id: number; email: string; fullname?: string; phone?: string };
-    movie?: {
-      id: number;
-      title: string;
-      is_active?: boolean | null;
-      duration_min?: number | null;
-    };
-    ticketPackage?: { id: number; name: string; price: number };
-    unitPrice?: number;
-    totalPrice?: number;
-  }>('/api/validate-booking', {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
-}
-
 export async function confirmBookingApi(body: {
   user_id: number;
   payment_id: number;

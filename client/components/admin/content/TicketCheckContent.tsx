@@ -155,7 +155,7 @@ export default function TicketCheckContent() {
         const items = res?.items || [];
         setBranches(items);
         if (items.length > 0) {
-          setCurrentBranchId(items[0].id || items[0].branch_id);
+          setCurrentBranchId(items[0].id);
         }
       } catch (e) {
         console.error('Failed to load branch options:', e);
@@ -328,7 +328,7 @@ export default function TicketCheckContent() {
     }
   };
 
-  const selectedBranchObj = branches.find((b) => Number(b.id || b.branch_id) === Number(currentBranchId));
+  const selectedBranchObj = branches.find((b) => Number(b.id) === Number(currentBranchId));
   const currentBranchName = selectedBranchObj?.name || 'Chi nhánh';
   const isBranchMismatch = Boolean(
     ticketInfo &&
@@ -354,7 +354,7 @@ export default function TicketCheckContent() {
                   className="cursor-pointer bg-transparent pr-2 text-xs font-bold text-slate-800 focus:outline-none"
                 >
                   {branches.map((b) => {
-                    const bId = b.id || b.branch_id;
+                    const bId = b.id;
                     return (
                       <option key={bId} value={bId}>
                         {b.name}

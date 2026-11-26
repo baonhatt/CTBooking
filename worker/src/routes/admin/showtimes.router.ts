@@ -6,6 +6,7 @@ import { getRestrictBranchIds } from './admin-helpers';
 
 import {
   listShowtimesImpl,
+  listShowtimesForAllBranchesImpl,
   createShowtimeImpl,
   copyShowtimesImpl,
   updateShowtimeImpl,
@@ -17,8 +18,14 @@ const showtimesRouter = new Hono<{ Bindings: any; Variables: Variables }>();
 
 showtimesRouter.get('/api/admin/showtimes', requireStaffAuth, requirePermission('showtimes', 'view'), async (c) => {
   try {
-    const branchId = Number(c.req.query('branch_id') || 0);
     const db = drizzle(c.env.cinema_db, { schema });
+    // ?branch_id=all: every branch of the staff member in one request (overview page)
+    if (c.req.query('branch_id') === 'all') {
+      return c.json(
+        await listShowtimesForAllBranchesImpl(db, { showtimes: schema.showtimes, movies: schema.movies }, getRestrictBranchIds(c))
+      );
+    }
+    const branchId = Number(c.req.query('branch_id') || 0);
     const r = await listShowtimesImpl(
       db,
       { showtimes: schema.showtimes, movies: schema.movies },

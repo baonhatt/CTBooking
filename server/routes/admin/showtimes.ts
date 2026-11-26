@@ -1,4 +1,4 @@
-import { eq, and, ne, asc, sql, isNull } from 'drizzle-orm';
+import { eq, and, ne, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { formatDateForDb } from '../../lib/date-utils';
 import { isValidTime, normalizeTime } from '../../lib/showtime-utils';
@@ -84,6 +84,37 @@ export async function listShowtimesImpl(
     .where(eq(tables.showtimes.branch_id, branchId))
     .orderBy(asc(tables.showtimes.start_time));
 
+  return { items: rows.map(mapShowtimeRow) };
+}
+
+/**
+ * The schedules of every branch the staff member works at (null = Super Admin, every branch), in one query, for the
+ * overview page. Each row carries its branch_id; the page groups them.
+ */
+export async function listShowtimesForAllBranchesImpl(
+  db: any,
+  tables: { showtimes: any; movies: any },
+  restrictToBranchIds: number[] | null
+) {
+  if (restrictToBranchIds && restrictToBranchIds.length === 0) return { items: [] };
+  const rows = await db
+    .select({
+      id: tables.showtimes.id,
+      branch_id: tables.showtimes.branch_id,
+      movie_id: tables.showtimes.movie_id,
+      start_time: tables.showtimes.start_time,
+      end_time: tables.showtimes.end_time,
+      created_at: tables.showtimes.created_at,
+      updated_at: tables.showtimes.updated_at,
+      movie_title: tables.movies.title,
+      movie_duration_min: tables.movies.duration_min,
+      movie_cover_image: tables.movies.cover_image,
+      movie_deleted_at: tables.movies.deleted_at
+    })
+    .from(tables.showtimes)
+    .leftJoin(tables.movies, eq(tables.showtimes.movie_id, tables.movies.id))
+    .where(restrictToBranchIds ? inArray(tables.showtimes.branch_id, restrictToBranchIds) : undefined)
+    .orderBy(asc(tables.showtimes.branch_id), asc(tables.showtimes.start_time));
   return { items: rows.map(mapShowtimeRow) };
 }
 
