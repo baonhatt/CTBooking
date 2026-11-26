@@ -8,8 +8,10 @@ export const API_BASE_URL = (() => {
 
     if (h === 'localhost' || h === '127.0.0.1') return '';
 
-    if (h.endsWith('pages.dev') && h !== 'cinema-pages.pages.dev') {
-      return 'https://cinema-worker-preview.baonhat20.workers.dev';
+    // Preview admin (admin-preview.cinesphere.com.vn, or its *.pages.dev address) talks to the preview API.
+    // Same site as the admin, so the login cookie is sent; from *.pages.dev it is not.
+    if (h === 'admin-preview.cinesphere.com.vn' || (h.endsWith('pages.dev') && h !== 'cinema-pages.pages.dev')) {
+      return 'https://api-preview.cinesphere.com.vn';
     }
 
     if (h === 'cinesphere.com.vn' || h === 'www.cinesphere.com.vn' || h === 'cinema-pages.pages.dev') {
@@ -34,8 +36,8 @@ export const SERVER_BASE_URL = (() => {
 
     if (h === 'localhost' || h === '127.0.0.1') return base;
 
-    if (h.endsWith('pages.dev') && h !== 'cinema-pages.pages.dev') {
-      const url = 'https://cinema-worker-preview.baonhat20.workers.dev';
+    if (h === 'admin-preview.cinesphere.com.vn' || (h.endsWith('pages.dev') && h !== 'cinema-pages.pages.dev')) {
+      const url = 'https://api-preview.cinesphere.com.vn';
 
       return url;
     }

@@ -12,7 +12,7 @@
     "build": "npm run build:client",
     "build:next": "cd next-client && npm run build:cf",
     "build:client": "cross-env VITE_SERVER_BASE_URL=https://api.cinesphere.com.vn vite build",
-    "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://cinema-worker-preview.baonhat20.workers.dev vite build --mode preview",
+    "build:client:preview": "cross-env VITE_SERVER_BASE_URL=https://api-preview.cinesphere.com.vn vite build --mode preview",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
     "deploy:preview": "npx wrangler deploy --env preview --config worker/wrangler.toml",

@@ -493,6 +493,7 @@ userRouter.post('/api/forget-password', async (c) => {
     const allowHost = (host: string) =>
       host === 'cinesphere.com.vn' ||
       host === 'www.cinesphere.com.vn' ||
+      host === 'preview.cinesphere.com.vn' ||
       host === 'cinema-pages.pages.dev' ||
       host.endsWith('.cinema-pages.pages.dev');
 

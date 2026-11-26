@@ -10,9 +10,9 @@ pages_build_output_dir = ".vercel/output/static"
 
 [env.preview]
 [env.preview.vars]
-NEXT_PUBLIC_API_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
-NEXT_PUBLIC_SERVER_BASE_URL = "https://cinema-worker-preview.baonhat20.workers.dev"
-NEXT_PUBLIC_CLIENT_BASE_URL = "https://preview.cinema-next.pages.dev"
+NEXT_PUBLIC_API_URL = "https://api-preview.cinesphere.com.vn"
+NEXT_PUBLIC_SERVER_BASE_URL = "https://api-preview.cinesphere.com.vn"
+NEXT_PUBLIC_CLIENT_BASE_URL = "https://preview.cinesphere.com.vn"
 
 NEXT_PUBLIC_BACKDROP_DARK_BASE = "0.5"
 NEXT_PUBLIC_BACKDROP_DARK_MIN = "0.4"

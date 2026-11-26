@@ -102,8 +102,8 @@ SUPER_ADMIN_FULLNAME = "Super Admin"
 #   wrangler secret put SUPER_ADMIN_PASSWORD --env preview --config worker/wrangler.toml
 # KHÔNG đặt password ở đây.
 
-VITE_SERVER_BASE_URL = "https://api.cinesphere.com.vn"
-VITE_CLIENT_BASE_URL = "https://preview.cinema-pages.pages.dev"
+VITE_SERVER_BASE_URL = "https://api-preview.cinesphere.com.vn"
+VITE_CLIENT_BASE_URL = "https://preview.cinesphere.com.vn"
 
 # --- Payment gateways (VietQR/SePay) ---
 
