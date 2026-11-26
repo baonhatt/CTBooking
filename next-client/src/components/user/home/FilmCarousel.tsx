@@ -4,10 +4,10 @@ import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Film as FilmIcon, Play, Clock, Star, Ticket } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getMovieById, getActiveMoviesToday } from '@/lib/api/movies';
-import { getActiveTickets } from '@/lib/api/products';
 import { useBranch } from '@/hooks/useBranch';
+import { goToPackageSection } from '@/lib/package-choice';
 import { optimizeCloudinaryUrl, generateCloudinarySrcSet, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -134,10 +134,6 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
     setCanScrollNext(emblaApi.canScrollNext());
   }, []);
 
-  // Prefetch booking page để tránh lag khi user bấm đặt vé
-  useEffect(() => {
-    router.prefetch('/booking');
-  }, [router]);
 
   // Setup Embla event listeners
   useEffect(() => {
@@ -191,91 +187,15 @@ export default function FilmCarousel({ initialFilms = [], initialBranchId, onSel
     return movieStore.getMovie(selectedMovieId);
   }, [selectedMovieId, storeUpdateTrigger]);
 
-  const queryClient = useQueryClient();
-
-  // The package used by "Đặt vé ngay" in the film popup: the first one in display order (the 1-person ticket)
-  // among the branch's packages that include this film. The packages are read only when the button is pressed
-  // (from the cache the price section already filled, or the API). Subscribing to that query while rendering
-  // would take the price section's server data away from it and break hydration.
-  const findPackageForFilm = async (filmId: number) => {
-    let packages: any[] = [];
-    try {
-      const ticketsRes: any = await queryClient.fetchQuery({
-        queryKey: ['activeTickets', selectedBranch?.id],
-        queryFn: () => getActiveTickets(selectedBranch?.id),
-        staleTime: 60 * 1000
-      });
-      packages = Array.isArray(ticketsRes?.items) ? ticketsRes.items : [];
-    } catch {
-      packages = [];
-    }
-    return (
-      packages
-        .filter((pkg) => Array.isArray(pkg.movies) && pkg.movies.some((movie: any) => Number(movie?.id) === filmId))
-        .sort((first, second) => (first.display_order || 0) - (second.display_order || 0) || Number(first.price) - Number(second.price))[0] ||
-      null
-    );
-  };
-
-  const handleBookTicket = async () => {
+  // "Đặt vé ngay" in the film popup: the visitor has not chosen a package yet (a film is in several packages: 1 person,
+  // groups, combos), so the button takes them to the package section to choose one, instead of picking one for them.
+  const handleBookTicket = () => {
     setIsModalOpen(false);
 
-    // Open the booking page with the 1-person package of this film already chosen
-    const filmPackage = movieDetails ? await findPackageForFilm(Number(movieDetails.id)) : null;
-    if (filmPackage) {
-      try {
-        sessionStorage.setItem(
-          'directBookingItem',
-          JSON.stringify({
-            packageId: filmPackage.id,
-            type: 'movie',
-            name: filmPackage.name,
-            price: Number(filmPackage.price || 0),
-            movies: filmPackage.movies || [],
-            quantity: 1,
-            branchId: selectedBranch?.id
-          })
-        );
-        const params = new URLSearchParams();
-        if (selectedBranch?.id) params.set('branch_id', String(selectedBranch.id));
-        params.set('direct', '1');
-        router.push(`/booking?${params.toString()}`);
-        return;
-      } catch {
-        // No session storage (private mode): fall back to the price section below
-      }
-    }
-
-    if (movieDetails) {
-      try {
-        localStorage.setItem(
-          'selectedFilm',
-          JSON.stringify({
-            id: movieDetails.id,
-            title: movieDetails.title,
-            cover_image: movieDetails.cover_image
-          })
-        );
-      } catch (error) {
-        console.error('Failed to save selected film:', error);
-      }
-    }
-
-    setTimeout(() => {
-      const packageSection = document.getElementById('promotions');
-      if (packageSection) {
-        const headerEl = document.querySelector('header') as HTMLElement | null;
-        const headerOffset = headerEl?.offsetHeight || 72;
-        const rect = packageSection.getBoundingClientRect();
-        const absoluteTop = window.scrollY + rect.top;
-        window.scrollTo({ top: Math.max(0, absoluteTop - headerOffset), behavior: 'smooth' });
-      } else {
-        router.push('/#promotions');
-      }
-    }, 100);
+    // After the popup has closed (its scroll lock is released), go to the packages; the film is remembered for the order
+    const movieId = movieDetails?.id;
+    setTimeout(() => goToPackageSection((url) => router.push(url), movieId), 100);
   };
-
-
 
   return (
     <section

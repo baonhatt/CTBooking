@@ -38,6 +38,7 @@ import BranchSelector from '@/components/user/header/BranchSelector';
 import { useCart } from '@/store/cartStore';
 import { useQuery } from '@tanstack/react-query';
 import { getVRPackages } from '@/lib/api/vr-packages';
+import { getPublicSchedule } from '@/lib/api/schedule';
 const LoginDialog = dynamic(() => import('@/components/LoginDialog'), { ssr: false });
 const RegisterDialog = dynamic(() => import('@/components/RegisterDialog'), { ssr: false });
 const ForgetPasswordDialog = dynamic(() => import('@/components/ForgetPasswordDialog'), { ssr: false });
@@ -79,6 +80,15 @@ export default function Header({
         staleTime: 60 * 1000
     });
     const hasVRPackages = vrRes?.items && vrRes.items.length > 0;
+
+    // Same query (and cache) as the home schedule section; a branch without showtimes gets no "Lịch chiếu" link
+    const { data: scheduleRes } = useQuery({
+        queryKey: ['publicSchedule', selectedBranch?.id],
+        queryFn: () => getPublicSchedule(selectedBranch?.id),
+        enabled: !!selectedBranch?.id,
+        staleTime: 60 * 1000
+    });
+    const hasShowtimes = (scheduleRes?.items?.length || 0) > 0;
 
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -249,7 +259,10 @@ export default function Header({
         setShowBranchConfirm(false);
     };
 
-    const navItems = hasVRPackages ? NAV_ITEMS : NAV_ITEMS.filter((item: any) => item.target !== 'vr');
+    // VR and the schedule are only linked when the branch has them
+    const navItems = NAV_ITEMS.filter(
+        (item: any) => (item.target !== 'vr' || hasVRPackages) && (item.target !== 'schedule' || hasShowtimes)
+    );
 
     return (
         <header

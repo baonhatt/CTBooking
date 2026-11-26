@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, MapPin, ChevronRight, Sparkles, Film, Compass, Ticket } from 'lucide-react';
 import { formatDurationMinutes } from '@shared/duration';
 import { getPublicSchedule, type PublicShowtime } from '@/lib/api/schedule';
-import { getActiveTickets } from '@/lib/api/products';
+import { goToPackageSection } from '@/lib/package-choice';
 import { useBranch } from '@/hooks/useBranch';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -54,20 +54,17 @@ export default function MovieScheduleSection() {
     return () => window.clearInterval(timer);
   }, []);
 
-  // Fetch Public Schedule
-  const { data: scheduleData, isLoading: isLoadingSchedule } = useQuery({
+  // Fetch Public Schedule. The header reads the same query and may already hold the answer when this section hydrates,
+  // so until mounted the section always draws the loading box, exactly as the server did (no hydration mismatch).
+  // Only a finished, empty answer after mount removes the section.
+  const { data: scheduleData, isPending: isSchedulePending } = useQuery({
     queryKey: ['publicSchedule', selectedBranch?.id],
     queryFn: () => getPublicSchedule(selectedBranch?.id),
     staleTime: 60 * 1000
   });
 
-  // Fetch Active Tickets for direct booking append
-  const { data: ticketsData } = useQuery({
-    queryKey: ['activeTickets', selectedBranch?.id],
-    queryFn: ({ signal }) => getActiveTickets(selectedBranch?.id, { signal }),
-    staleTime: 60 * 1000
-  });
 
+  const isLoadingSchedule = !isMounted || isSchedulePending;
   const allItems: PublicShowtime[] = scheduleData?.items || [];
   const opensAt = scheduleData?.opens_at;
   const closesAt = scheduleData?.closes_at;
@@ -252,65 +249,14 @@ export default function MovieScheduleSection() {
     return { x: 140 + r * Math.cos(rad), y: 140 + r * Math.sin(rad) };
   }, [activeSlot]);
 
-  // Handle Book Ticket: Append movie item to booking flow
+  // "Đặt vé xem phim này": the ticket is not tied to the time, and the film is sold in several packages, so the
+  // visitor goes to the package section to choose one; the film is remembered for the order (lib/package-choice.ts)
   const handleBookSlot = (slot: PublicShowtime) => {
-    const rawPackages = ticketsData?.items || [];
-    // Find ticket package matching this movie or default to first package
-    const matchedPackage =
-      rawPackages.find((pkg: any) => (pkg.movies || []).some((m: any) => Number(m.id) === Number(slot.movie_id))) ||
-      rawPackages[0];
-
-    const branchId = selectedBranch?.id;
-
-    const branchPkgMovies = (matchedPackage?.movies || []).filter((m: any) => {
-      if (!branchId) return true;
-      if (m.branch_id && m.branch_id !== branchId) return false;
-      return true;
-    });
-
-    const finalSlotMovies =
-      branchPkgMovies.length > 0
-        ? branchPkgMovies
-        : [{ id: slot.movie_id, title: slot.movie_title, duration_min: slot.movie_duration_min, cover_image: slot.movie_cover_image }];
-
-    // Save direct booking item into sessionStorage
-    try {
-      sessionStorage.setItem(
-        'directBookingItem',
-        JSON.stringify({
-          packageId: matchedPackage?.id || 1,
-          type: 'movie',
-          name: matchedPackage?.name || 'Vé Phim Cinesphere',
-          price: Number(matchedPackage?.price || 0),
-          movies: finalSlotMovies,
-          quantity: 1,
-          branchId,
-          preferredMovieId: slot.movie_id,
-          showtime: slot.start_time
-        })
-      );
-    } catch {}
-
-    // Also store selected film for seamless compatibility
-    try {
-      localStorage.setItem(
-        'selectedFilm',
-        JSON.stringify({
-          id: slot.movie_id,
-          title: slot.movie_title,
-          cover_image: slot.movie_cover_image
-        })
-      );
-    } catch {}
-
-    const params = new URLSearchParams();
-    if (branchId) params.set('branch_id', String(branchId));
-    params.set('direct', '1');
-    params.set('movie_id', String(slot.movie_id));
-    if (matchedPackage?.id) params.set('package_id', String(matchedPackage.id));
-
-    router.push(`/booking?${params.toString()}`);
+    goToPackageSection((url) => router.push(url), slot.movie_id);
   };
+
+  // A branch without showtimes has no schedule: the section is left out (the header hides its link the same way)
+  if (!isLoadingSchedule && allItems.length === 0) return null;
 
   return (
     <section
@@ -342,7 +288,7 @@ export default function MovieScheduleSection() {
             </span>
             <span className="flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-white/5 border border-white/10 font-medium">
               <Clock className="w-3 h-3 text-purple-400" />
-              {opensAt && closesAt ? `Mở cửa: ${opensAt} – ${closesAt}` : 'Mở cửa hàng ngày'}
+              {!isLoadingSchedule && opensAt && closesAt ? `Mở cửa: ${opensAt} – ${closesAt}` : 'Mở cửa hàng ngày'}
             </span>
           </div>
         </div>
@@ -352,15 +298,6 @@ export default function MovieScheduleSection() {
           <div className="flex items-center justify-center py-16 sm:py-20 text-slate-400 gap-3 text-xs sm:text-sm bg-[#1a2744] rounded-2xl sm:rounded-3xl border border-white/[0.22]">
             <Clock className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-cyan-400" />
             <span>Đang nạp đồng hồ lịch chiếu...</span>
-          </div>
-        ) : allItems.length === 0 ? (
-          <div className="text-center py-12 sm:py-16 px-4 bg-[#1a2744] rounded-2xl sm:rounded-3xl border border-white/[0.22]">
-            <p className="text-base sm:text-lg font-bold text-cyan-200">Chưa có lịch chiếu hôm nay</p>
-            <p className="text-xs text-slate-400 mt-1">
-              {selectedBranch?.name
-                ? `${selectedBranch.name} chưa cấu hình lịch chiếu.`
-                : 'Vui lòng chọn chi nhánh để xem lịch chiếu.'}
-            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-8 items-center bg-[#0b1226] border border-white/[0.22] rounded-2xl sm:rounded-3xl p-3.5 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.8)]">

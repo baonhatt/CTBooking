@@ -1034,13 +1034,16 @@ export default function BookingPage() {
                           <p className="text-sm font-bold text-white">
                             Phim trong gói <span className="text-cyan-300 font-semibold">· {availableMovies.length} phim</span>
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => window.dispatchEvent(new CustomEvent('open-movie-schedule'))}
-                            className="text-xs text-slate-300 hover:text-cyan-300 transition-colors font-medium"
-                          >
-                            Xem lịch chiếu đầy đủ &rarr;
-                          </button>
+                          {/* Opening hours come from the showtimes, so a branch without showtimes has no schedule to show */}
+                          {branchHours && (
+                            <button
+                              type="button"
+                              onClick={() => window.dispatchEvent(new CustomEvent('open-movie-schedule'))}
+                              className="text-xs text-slate-300 hover:text-cyan-300 transition-colors font-medium"
+                            >
+                              Xem lịch chiếu đầy đủ &rarr;
+                            </button>
+                          )}
                         </div>
                         <div className={`${isMoviesOpen ? 'flex' : 'hidden'} lg:flex gap-3 overflow-x-auto pb-2 snap-x`}>
                           {availableMovies.map((m: any) => (

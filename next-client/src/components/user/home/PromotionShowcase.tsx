@@ -20,6 +20,7 @@ import { useBranch } from '@/hooks/useBranch';
 import { useQuery } from '@tanstack/react-query';
 import { getActiveTickets } from '@/lib/api/products';
 import { cartStore } from '@/store/cartStore';
+import { preferredMovieIn } from '@/lib/package-choice';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -96,7 +97,9 @@ export default function PromotionShowcase({
           price: combo.price,
           movies: combo.movies,
           quantity: 1,
-          branchId: selectedBranch?.id
+          branchId: selectedBranch?.id,
+          // The film the visitor came from (film popup or showtime list), when this package includes it
+          preferredMovieId: preferredMovieIn(combo.movies)
         })
       );
     } catch {}
