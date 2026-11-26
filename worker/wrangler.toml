@@ -12,8 +12,10 @@ main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 send_metrics = false
-workers_dev = true
-preview_urls = true
+# No *.workers.dev address and no per-version preview URLs: the API is reached only through api.cinesphere.com.vn
+# (live) and api-preview.cinesphere.com.vn (preview). The SePay webhook points at api.cinesphere.com.vn.
+workers_dev = false
+preview_urls = false
 
 # -----------------------------------------------------------------------------
 # Cron Triggers
@@ -27,7 +29,6 @@ crons = ["*/2 * * * *"]
 # Environment Variables (default / production build-time vars)
 # -----------------------------------------------------------------------------
 [vars]
-VITE_SERVER_BASE_URL = "https://cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://cinesphere.com.vn"
 
 # --- Payment gateways (VietQR/SePay) ---
@@ -93,8 +94,6 @@ mode = "smart"
 # Environment Variables (preview)
 # -----------------------------------------------------------------------------
 [env.preview.vars]
-IS_PREVIEW = "true"
-
 # --- Super Admin bootstrap ---
 SUPER_ADMIN_EMAIL = "admin@cinesphere.com"
 SUPER_ADMIN_FULLNAME = "Super Admin"
@@ -102,7 +101,6 @@ SUPER_ADMIN_FULLNAME = "Super Admin"
 #   wrangler secret put SUPER_ADMIN_PASSWORD --env preview --config worker/wrangler.toml
 # KHÔNG đặt password ở đây.
 
-VITE_SERVER_BASE_URL = "https://api-preview.cinesphere.com.vn"
 VITE_CLIENT_BASE_URL = "https://preview.cinesphere.com.vn"
 
 # --- Payment gateways (VietQR/SePay) ---
@@ -114,7 +112,7 @@ BREVO_SENDER_NAME = "CINESPHERE"
 
 
 # --- SEO ---
-INDEXNOW_KEY = "a7f3c2e1b5d8f4a9c6e2d1b8f5a3c7e4"
+# No INDEXNOW_KEY on preview: preview pages (real customer data) must never be submitted to search engines.
 
 # --- Media upload (Cloudinary) ---
 CLOUDINARY_CLOUD_NAME = "dzp3rbeix"
@@ -142,9 +140,11 @@ remote = true
 # LƯU Ý: block KV này phải đặt SAU block D1 ở trên. Đặt trước D1 từng gây lỗi
 # 500 hàng loạt do thứ tự khai báo trong TOML ảnh hưởng tới cách wrangler dev
 # resolve nhiều remote binding trong cùng 1 environment.
+# Preview has its own namespace (SETTINGS_KV_PREVIEW), not the live one: it holds the admin settings (2FA, OTP) and the
+# login/OTP failure counters, so sharing it let a settings change or failed logins on preview affect live.
 [[env.preview.kv_namespaces]]
 binding = "SETTINGS_KV"
-id = "10ffca8eeea440a0bc47527fd05fd93f"
+id = "5bc75c326020423689b30349a2b8783a"
 # =============================== END: preview ===============================
 
 

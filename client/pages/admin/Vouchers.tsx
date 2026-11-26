@@ -242,7 +242,6 @@ export default function VouchersPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

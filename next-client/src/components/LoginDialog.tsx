@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { Lock, Mail } from 'lucide-react';
 import { EMAIL_PATTERN } from '@/components/constants';
 import { OTPDialog } from './OTPDialog';
-import { setCookie } from '@/lib/cookies';
+import { saveCustomerProfile } from '@/lib/customer-session';
 import { useTurnstile } from '@/hooks/useTurnstile';
 
 interface LoginDialogProps {
@@ -23,20 +23,9 @@ interface LoginDialogProps {
   setErrorModal: (modal: { open: boolean; title: string; message: string }) => void;
 }
 
-// Keeps the signed-in customer's token and profile where the header and the guarded pages look for them
-function saveSignedInUser(user: any, token: string) {
-  try {
-    setCookie('userToken', token, 86400);
-    localStorage.setItem('userToken', token);
-    const derivedName = user.username || (user.email || '').split('@')[0];
-    const profile = {
-      email: user.email,
-      name: derivedName,
-      phone: user.phone || ''
-    };
-    setCookie('userProfile', JSON.stringify(profile), 86400);
-    localStorage.setItem('userProfile', JSON.stringify(profile));
-  } catch {}
+// The API has set the HttpOnly session cookie; only the profile the header shows is kept on this site
+function saveSignedInUser(user: any) {
+  saveCustomerProfile(user);
 }
 
 export function LoginDialog({
@@ -123,7 +112,7 @@ export function LoginDialog({
       }
 
       if (data?.status === 'success') {
-        saveSignedInUser(data.user, data.token);
+        saveSignedInUser(data.user);
         finishSignIn(data.user);
       } else {
         const msg = data?.message || 'Đăng nhập thất bại';
@@ -213,7 +202,7 @@ export function LoginDialog({
 
           {submitError && <AuthAlert>{submitError}</AuthAlert>}
 
-          <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} />
+          <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} skipped={turnstile.skipped} />
 
           <AuthSubmitButton
             label="Đăng nhập"
@@ -244,8 +233,8 @@ export function LoginDialog({
           }}
           otpChallenge={otpChallenge}
           email={otpEmail}
-          onSuccess={(userData, token) => {
-            saveSignedInUser(userData, token);
+          onSuccess={(userData) => {
+            saveSignedInUser(userData);
             finishSignIn(userData);
           }}
           auth={auth}

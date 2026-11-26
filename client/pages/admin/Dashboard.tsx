@@ -242,7 +242,6 @@ export default function DashboardPage() {
   }, [selectedYear, refreshKey, selectedBranchId, canViewRevenue]);
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

@@ -10,6 +10,8 @@ export async function getActiveTickets(branchId?: number, options?: { signal?: A
   // Vô hiệu hóa cache: luôn lấy danh sách vé mới nhất (tickets-active hỗ trợ branch_id)
   const res = await fetch(url, {
     cache: 'no-store',
+    // In the browser, send the session cookie so a signed-in customer also gets the member-only packages
+    ...(typeof window !== 'undefined' && { credentials: 'include' as RequestCredentials }),
     headers: {
       ...(typeof window === 'undefined' && {
         'User-Agent': `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})`

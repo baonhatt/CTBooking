@@ -108,7 +108,7 @@ export function ForgetPasswordDialog({ isOpen, onOpenChange, onBackToLogin, auth
 
           {submitError && <AuthAlert>{submitError}</AuthAlert>}
 
-          <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} />
+          <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} skipped={turnstile.skipped} />
 
           <AuthSubmitButton
             label="Gửi email đặt lại mật khẩu"

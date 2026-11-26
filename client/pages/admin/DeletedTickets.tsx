@@ -60,7 +60,6 @@ export default function DeletedTicketsPage() {
   const fetchDeletedTickets = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('staffToken');
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
@@ -69,11 +68,7 @@ export default function DeletedTicketsPage() {
         sort: sortField === 'deleted_at' ? 'deleted_at' : 'name',
         dir: sortDir
       });
-      const response = await fetch(buildUrl(`/api/admin/deleted/tickets?${params}`), {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await fetch(buildUrl(`/api/admin/deleted/tickets?${params}`), { credentials: 'include' });
       if (!response.ok) throw new Error('request failed');
       const data = await response.json();
       const sortedItems = data.items || [];
@@ -99,12 +94,9 @@ export default function DeletedTicketsPage() {
     if (!ticketToRestore) return;
     setIsRestoring(true);
     try {
-      const token = localStorage.getItem('staffToken');
       const response = await fetch(buildUrl(`/api/admin/tickets/${ticketToRestore}/restore`), {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
@@ -128,7 +120,6 @@ export default function DeletedTicketsPage() {
       adminEmailState={staffStore.staff?.email || 'admin@email.com'}
       handleLogout={() => {
         staffStore.clearStaff();
-        localStorage.removeItem('staffToken');
         navigate('/login');
       }}
     >

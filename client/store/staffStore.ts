@@ -16,14 +16,14 @@ interface StaffState {
   staff: Staff | null;
   permissions: Array<{ module: string; action: string }>;
   branchIds: number[];
-  token: string | null;
+  // No token here: the session is the HttpOnly staff_session cookie, which page scripts cannot read.
+  // This store only remembers who is signed in (for the screens) and when the session ends.
   sessionExpiresAt: string | null;
   isAuthenticated: boolean;
   setStaff: (
     staff: Staff,
     permissions: Array<{ module: string; action: string }>,
     branchIds: number[],
-    token: string,
     expiresAt?: string | null
   ) => void;
   setSessionExpiresAt: (expiresAt: string | null) => void;
@@ -37,17 +37,15 @@ export const useStaffStore = create<StaffState>()(
       staff: null,
       permissions: [],
       branchIds: [],
-      token: null,
       sessionExpiresAt: null,
       isAuthenticated: false,
-      setStaff: (staff, permissions, branchIds, token, expiresAt) => {
+      setStaff: (staff, permissions, branchIds, expiresAt) => {
         // If expiresAt not provided, default to now + 24 hours
         const defaultExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
         set({
           staff,
           permissions,
           branchIds,
-          token,
           sessionExpiresAt: expiresAt || defaultExpiry,
           isAuthenticated: true
         });
@@ -58,7 +56,6 @@ export const useStaffStore = create<StaffState>()(
           staff: null,
           permissions: [],
           branchIds: [],
-          token: null,
           sessionExpiresAt: null,
           isAuthenticated: false
         }),

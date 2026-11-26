@@ -318,7 +318,6 @@ export default function RoleDetailPage() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

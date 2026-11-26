@@ -57,7 +57,6 @@ export default function DeletedStaffPage() {
   const fetchDeletedStaff = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('staffToken');
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
@@ -66,11 +65,7 @@ export default function DeletedStaffPage() {
         sort: sortField === 'deleted_at' ? 'deleted_at' : 'name',
         dir: sortDir
       });
-      const response = await fetch(buildUrl(`/api/admin/deleted/staff?${params}`), {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await fetch(buildUrl(`/api/admin/deleted/staff?${params}`), { credentials: 'include' });
       if (!response.ok) throw new Error('request failed');
       const data = await response.json();
       const sortedItems = data.items || [];
@@ -96,12 +91,9 @@ export default function DeletedStaffPage() {
     if (!staffToRestore) return;
     setIsRestoring(true);
     try {
-      const token = localStorage.getItem('staffToken');
       const response = await fetch(buildUrl(`/api/admin/staff/${staffToRestore}/restore`), {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
@@ -125,7 +117,6 @@ export default function DeletedStaffPage() {
       adminEmailState={staffStore.staff?.email || 'admin@email.com'}
       handleLogout={() => {
         staffStore.clearStaff();
-        localStorage.removeItem('staffToken');
         navigate('/login');
       }}
     >

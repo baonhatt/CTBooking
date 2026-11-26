@@ -70,3 +70,41 @@ Chưa thử bằng tay vì cần tài khoản khác hoặc gửi mail thật:
 | D7 | Đồ chơi | Không đổi. Phần đồ chơi đang ẩn; mở lại thì phải thêm lại route công khai. |
 | D8 | Trạng thái "Đã hoàn tiền" | Đã chốt chưa cần; dùng "Đã xử lý + ghi chú". |
 | D9 | "Top gói vé" trên dashboard cộng trong code | Đã chốt giữ nguyên: chỉ đọc đơn trong khoảng thời gian đang chọn. |
+
+## E. Biến môi trường của worker (live và preview), 26/11
+
+Preview đã chuyển sang `preview.`, `admin-preview.` và `api-preview.cinesphere.com.vn`. Biến thường nằm trong
+`worker/wrangler.toml` (deploy là ghi đè dashboard); secret chỉ xem được tên, không đọc được giá trị.
+
+Đã dọn trên preview:
+- bỏ `IS_PREVIEW` (chỉ dùng để trả stack trace khi lỗi 500; giờ chỉ localhost mới trả);
+- bỏ `INDEXNOW_KEY` ở preview, để trang preview không bị gửi cho công cụ tìm kiếm;
+- bỏ `VITE_SERVER_BASE_URL` ở cả hai (code không đọc; live mất biến này ở lần deploy tới);
+- xóa 10 secret không dùng: `GMAIL_PASS`, `GMAIL_USER`, `MAILTRAP_API_TOKEN`, `MAILTRAP_INBOX_ID`, `RESEND_API_KEY`,
+  `VITE_MOMO_ACCESS_KEY`, `VITE_MOMO_PARTNER_CODE`, `VITE_MOMO_SECRET_KEY`, `VITE_VNPAY_HASH_SECRET`, `VITE_VNPAY_TMN_CODE`.
+
+Secret hiện có ở cả hai: `BREVO_API_KEY`, `CLOUDINARY_API_SECRET`, `ORDER_TOKEN_SECRET`, `SEPAY_API_KEY`, `SEPAY_API_TOKEN` (đặt 26/11).
+
+KV: preview trước dùng chung namespace `SETTINGS_KV` với live (cài đặt 2FA/OTP, bộ đếm đăng nhập và OTP sai). Từ 26/11
+preview dùng namespace riêng `SETTINGS_KV_PREVIEW` (`5bc75c32...`), đã chép `global_settings` từ live sang. Đã xóa 2
+namespace không worker nào dùng: `cinesphere`, `KV_BINDING_DEV`.
+
+Cần thêm:
+
+| Biến | Live | Preview | Ghi chú |
+|---|---|---|---|
+| `SEPAY_API_TOKEN` (secret) | Đã đặt 26/11 | Đã đặt 26/11 | API Token trong SePay (Cấu hình công ty, API Access). Thiếu thì nút kiểm tra SePay ở màn Kiểm tra vé luôn báo lỗi. Khác `SEPAY_API_KEY` (khóa webhook SePay gửi vào). |
+| `TURNSTILE_SECRET` | Chuyển thành secret | Chuyển thành secret | Đang là biến thường trong `wrangler.toml`, đã nằm trong git. Tạo khóa mới bên Turnstile, `wrangler secret put`, rồi xóa khỏi file. |
+
+Secret của preview so với live (không đọc được giá trị, chỉ đối chiếu được ý nghĩa):
+
+| Secret | Nên | Ghi chú |
+|---|---|---|
+| `CLOUDINARY_API_SECRET` | Giống live | Cùng cloud `dzp3rbeix`. Lưu ý: preview clone dữ liệu live nên dùng chung file ảnh; xóa ảnh/phim trên preview có thể xóa luôn file live đang dùng. |
+| `BREVO_API_KEY` | Giống live hoặc key riêng | Preview có email khách thật (clone từ live), mọi mail preview gửi đi là tới khách thật. |
+| `ORDER_TOKEN_SECRET` | Khác live | Ký token đơn hàng; khác nhau để token bên này không dùng được bên kia. |
+| `SEPAY_API_KEY` | Tùy | Chỉ có tác dụng nếu SePay có webhook trỏ vào `api-preview`; nếu không, đơn chuyển khoản trên preview không tự xác nhận. |
+
+Muốn chắc giá trị đúng thì đặt lại từ nguồn gốc (`wrangler secret put ... --env preview`), hoặc thử chức năng trên
+admin-preview: upload ảnh (Cloudinary), gửi mail thử (Brevo, chỉ khi Super Admin đăng nhập).
+

@@ -74,10 +74,13 @@ interface TurnstileBoxProps {
   containerRef: RefObject<HTMLDivElement>;
   hasToken: boolean;
   loadFailed: boolean;
+  // True on a local dev server, where no widget is drawn (see useTurnstile)
+  skipped?: boolean;
 }
 
 // Keeps a fixed height, so the dialog does not jump when the widget appears; says what the grey button is waiting for
-export function TurnstileBox({ containerRef, hasToken, loadFailed }: TurnstileBoxProps) {
+export function TurnstileBox({ containerRef, hasToken, loadFailed, skipped }: TurnstileBoxProps) {
+  if (skipped) return null;
   return (
     <div className="space-y-1.5">
       <div className="flex min-h-[65px] items-center justify-center">

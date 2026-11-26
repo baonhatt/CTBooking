@@ -19,7 +19,7 @@ import { UserMenu } from '@/components/UserMenu';
 import { NAV_ITEMS } from '@/components/constants';
 import { HeaderProps, ErrorModalState } from '@/components/filetypes/IType.model';
 import { MobileMenu } from '@/components/MobileMenu';
-import { getCookie } from '@/lib/cookies';
+import { hasStoredProfile } from '@/lib/customer-session';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -116,9 +116,8 @@ export default function Header({
     const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     useEffect(() => {
-        const token = getCookie('userToken') || getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('userToken') : null);
-        const hasProfile = getCookie('userProfile') || (typeof window !== 'undefined' ? localStorage.getItem('userProfile') : null);
-        setIsLoggedIn(!!(token || hasProfile || userName));
+        // The session cookie is HttpOnly; the saved profile says who signed in (an expired session clears it)
+        setIsLoggedIn(hasStoredProfile() || !!userName);
     }, [userName]);
 
     // Dialog states

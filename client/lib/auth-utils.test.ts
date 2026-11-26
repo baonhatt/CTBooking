@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const requestMock = vi.fn();
 vi.mock('@/lib/api/http', () => ({ request: (...args: any[]) => requestMock(...args) }));
 
-import { clearSessionStorage, handleAutoLogout, performLogout } from './auth-utils';
+import { clearSessionStorage, handleAutoLogout, performLogout, removeLegacyTokens } from './auth-utils';
 
 const STAFF_KEYS = [
   'userToken',
@@ -101,18 +101,31 @@ describe('performLogout', () => {
     expect(location.href).toBe('/login');
   });
 
-  it('calls the server before clearing, so the request still carries the token', async () => {
+  it('calls the server before clearing the browser, so a failed call still leaves a clean browser', async () => {
     const { store } = installBrowser('/ticket-check');
-    let tokenSeenByRequest: string | undefined | null;
+    let staffStoreSeenByRequest: string | undefined | null;
     requestMock.mockImplementation(async () => {
-      tokenSeenByRequest = store.get('staffToken');
+      staffStoreSeenByRequest = store.get('staff-storage');
       return {};
     });
 
     await performLogout();
 
-    expect(tokenSeenByRequest).toBe('value');
-    expect(store.has('staffToken')).toBe(false);
+    // The server revokes the session and clears the HttpOnly cookie; the browser then forgets who was signed in
+    expect(staffStoreSeenByRequest).toBe('value');
+    expect(store.has('staff-storage')).toBe(false);
+  });
+});
+
+describe('removeLegacyTokens', () => {
+  it('removes every token the old login kept, and nothing else', () => {
+    const { store } = installBrowser('/dashboard');
+
+    removeLegacyTokens();
+
+    for (const legacyKey of ['staffToken', 'userToken', 'adminToken']) expect(store.has(legacyKey)).toBe(false);
+    expect(store.has('staff-storage')).toBe(true);
+    expect(store.get('unrelated-setting')).toBe('keep');
   });
 });
 

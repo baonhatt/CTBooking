@@ -3,7 +3,6 @@ export * from './api/auth';
 export * from './api/movies';
 export * from './api/showtimes';
 export * from './api/booking';
-export * from './api/payments';
 export * from './api/tickets';
 export * from './api/toys';
 export * from './api/posts';

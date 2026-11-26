@@ -19,8 +19,7 @@ export function uploadAdminImage(
     const baseUrl = SERVER_BASE_URL || '';
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${baseUrl}/api/admin/uploads/image`);
-    const staffToken = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
-    if (staffToken) xhr.setRequestHeader('Authorization', `Bearer ${staffToken}`);
+    // Signed in by the HttpOnly staff_session cookie, which withCredentials sends
     xhr.withCredentials = true;
     xhr.responseType = 'json';
     xhr.upload.onprogress = (e) => {
@@ -55,8 +54,7 @@ export function uploadAdminVideo(
     const baseUrl = SERVER_BASE_URL || '';
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${baseUrl}/api/admin/uploads/video`);
-    const staffToken = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
-    if (staffToken) xhr.setRequestHeader('Authorization', `Bearer ${staffToken}`);
+    // Signed in by the HttpOnly staff_session cookie, which withCredentials sends
     xhr.withCredentials = true;
     xhr.responseType = 'json';
     xhr.upload.onprogress = (e) => {

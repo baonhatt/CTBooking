@@ -1,49 +1,28 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getCookie, deleteCookie } from '@/lib/cookies';
+import { readStoredProfile } from '@/lib/customer-session';
+
+/** The name shown in the header. The session is the HttpOnly cookie; the saved profile says who signed in. */
+function readProfileName(): string | null {
+  const userProfile = readStoredProfile();
+  if (!userProfile) return null;
+  try {
+    return JSON.parse(userProfile).name || null;
+  } catch (error) {
+    console.error('Failed to parse userProfile:', error);
+    return null;
+  }
+}
 
 export function useAuthState(shouldCheck: boolean = false) {
   const [userName, setUserName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Load from cookie first, localStorage as fallback
-    const token = getCookie('userToken') || localStorage.getItem('userToken');
-    const userProfile = getCookie('userProfile') || localStorage.getItem('userProfile');
+    setUserName(readProfileName());
 
-    if (userProfile && !token) {
-      // Inconsistent state: token expired but profile remained. Clear it.
-      localStorage.removeItem('userProfile');
-      deleteCookie('userProfile');
-      setUserName(null);
-    } else if (userProfile) {
-      try {
-        const parsed = JSON.parse(userProfile);
-        setUserName(parsed.name || null);
-      } catch (e) {
-        console.error('Failed to parse userProfile:', e);
-      }
-    }
-
-    // Listen for auth changes (login/logout)
-    const handleAuthChange = () => {
-      const token = getCookie('userToken') || localStorage.getItem('userToken');
-      const userProfile = getCookie('userProfile') || localStorage.getItem('userProfile');
-      if (userProfile && !token) {
-        localStorage.removeItem('userProfile');
-        deleteCookie('userProfile');
-        setUserName(null);
-      } else if (userProfile) {
-        try {
-          const parsed = JSON.parse(userProfile);
-          setUserName(parsed.name || null);
-        } catch (e) {
-          console.error('Failed to parse userProfile:', e);
-        }
-      } else {
-        setUserName(null);
-      }
-    };
+    // Login, logout, or an expired session found by a request (each clears or saves the profile first)
+    const handleAuthChange = () => setUserName(readProfileName());
 
     window.addEventListener('user-auth-changed', handleAuthChange);
     return () => window.removeEventListener('user-auth-changed', handleAuthChange);

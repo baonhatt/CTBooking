@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { buildUrl } from '@/lib/api/http';
-import { setCookie } from '@/lib/cookies';
 import { useTurnstile } from '@/hooks/useTurnstile';
 
 interface OTPDialogProps {
@@ -16,7 +15,7 @@ interface OTPDialogProps {
   onOpenChange: (open: boolean) => void;
   otpChallenge: string;
   email: string;
-  onSuccess: (userData: any, token: string) => void;
+  onSuccess: (userData: any) => void;
   auth: any;
   // 'login': the 2-step login code. 'register': the code that proves the email before the account is created.
   purpose?: 'login' | 'register';
@@ -154,8 +153,10 @@ export function OTPDialog({ isOpen, onOpenChange, otpChallenge, email, onSuccess
       setIsLoading(true);
       setError('');
 
+      // credentials: 'include' so the browser stores the HttpOnly session cookie the API sets on success
       const response = await fetch(buildUrl(endpoints.verify), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -168,11 +169,8 @@ export function OTPDialog({ isOpen, onOpenChange, otpChallenge, email, onSuccess
       const data = await response.json();
 
       if (data.status === 'success' || data.status === 200) {
-        // Mirror cookie để frontend check nhanh
-        setCookie('userToken', data.token, 86400);
-        localStorage.setItem('userToken', data.token);
         toast.success(purpose === 'register' ? 'Đăng ký thành công!' : 'Xác thực OTP thành công!');
-        onSuccess(data.user, data.token);
+        onSuccess(data.user);
         onOpenChange(false);
       } else {
         setError(data.message || 'OTP không hợp lệ');
@@ -219,6 +217,7 @@ export function OTPDialog({ isOpen, onOpenChange, otpChallenge, email, onSuccess
 
       const response = await fetch(buildUrl(endpoints.resend), {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -306,7 +305,7 @@ export function OTPDialog({ isOpen, onOpenChange, otpChallenge, email, onSuccess
 
         {error && <AuthAlert>{error}</AuthAlert>}
 
-        <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} />
+        <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} skipped={turnstile.skipped} />
 
         <AuthSubmitButton
           label="XÁC THỰC"

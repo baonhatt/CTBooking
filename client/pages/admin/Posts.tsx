@@ -27,7 +27,6 @@ export default function PostsPage() {
   >('posts');
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

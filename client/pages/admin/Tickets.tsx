@@ -234,7 +234,6 @@ export default function TicketsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

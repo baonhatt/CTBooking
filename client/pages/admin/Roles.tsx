@@ -167,7 +167,6 @@ export default function RolesPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

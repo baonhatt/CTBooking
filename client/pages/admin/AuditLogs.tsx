@@ -247,7 +247,6 @@ export default function AuditLogsPage() {
   const staffList = (staffData as any)?.items || [];
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

@@ -67,31 +67,13 @@ export function buildUrl(path: string) {
 export async function request<T>(path: string, init: RequestInit = {}) {
   const url = buildUrl(path);
 
-  // Get token from localStorage (user token or staff token)
-  const userToken = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null;
-  const staffToken = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
-  const token = staffToken || userToken;
-
-  // Build headers
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((init.headers as Record<string, string>) || {})
   };
 
-  // Send staff token via Authorization header for admin routes
-  // Middleware supports both cookie and Authorization header
-  const needsStaffAuth =
-    path.startsWith('/api/admin') ||
-    path.startsWith('/api/admin/showtimes') ||
-    path.startsWith('/api/admin/bookings-code/') ||
-    path === '/api/admin/bookings-use' ||
-    path === '/api/admin/confirm-booking';
-  if (staffToken && needsStaffAuth) {
-    headers['Authorization'] = `Bearer ${staffToken}`;
-  } else if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
+  // The staff session is the HttpOnly staff_session cookie set by the API at login. The browser sends it by itself
+  // (credentials: 'include'); page scripts never see or send the token.
   const res = await fetch(url, {
     ...init,
     credentials: 'include',

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import React, { useEffect, useState } from 'react';
-import { getCookie } from '@/lib/cookies';
+import { checkCustomerSession, clearCustomerProfile, hasStoredProfile, removeLegacyTokens } from '@/lib/customer-session';
 
 export default function Providers({ children }: React.PropsWithChildren) {
   const [queryClient] = useState(
@@ -27,7 +27,19 @@ export default function Providers({ children }: React.PropsWithChildren) {
       queryClient.invalidateQueries({ queryKey: ['activeTickets'] });
       queryClient.invalidateQueries({ queryKey: ['vrPackages'] });
     };
-    if (getCookie('userToken')) reloadPackageLists();
+    // Token copies kept by the old login are removed. A saved profile is checked once against the API: a session that
+    // ended while the site was closed signs the header out; a valid one reloads the lists with member-only packages.
+    removeLegacyTokens();
+    if (hasStoredProfile()) {
+      checkCustomerSession().then((sessionState) => {
+        if (sessionState === 'invalid') {
+          clearCustomerProfile();
+          window.dispatchEvent(new Event('user-auth-changed'));
+        } else if (sessionState === 'valid') {
+          reloadPackageLists();
+        }
+      });
+    }
     window.addEventListener('user-auth-changed', reloadPackageLists);
     return () => window.removeEventListener('user-auth-changed', reloadPackageLists);
   }, [queryClient]);

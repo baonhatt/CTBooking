@@ -87,7 +87,6 @@ export default function ShowtimesPage() {
   }, [loadBranches]);
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

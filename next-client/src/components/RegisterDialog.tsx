@@ -14,7 +14,7 @@ import {
 import { ArrowLeft, Lock, Mail, User } from 'lucide-react';
 import { PASSWORD_PATTERN, EMAIL_PATTERN, PASSWORD_RULE_TEXT } from '@/components/constants';
 import { Checkbox } from '@/components/ui/checkbox';
-import { setCookie } from '@/lib/cookies';
+import { saveCustomerProfile } from '@/lib/customer-session';
 import { useTurnstile } from '@/hooks/useTurnstile';
 import { OTPDialog } from './OTPDialog';
 
@@ -174,14 +174,9 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
   };
 
   // The right email code creates the account and signs the customer in (same storage as a normal login)
-  const finishRegistration = (user: any, token: string) => {
-    try {
-      setCookie('userToken', token, 86400);
-      localStorage.setItem('userToken', token);
-      const profile = { email: user.email, name: user.username || (user.email || '').split('@')[0], phone: user.phone || '' };
-      setCookie('userProfile', JSON.stringify(profile), 86400);
-      localStorage.setItem('userProfile', JSON.stringify(profile));
-    } catch {}
+  const finishRegistration = (user: any) => {
+    // The API has set the HttpOnly session cookie; only the profile the header shows is kept on this site
+    saveCustomerProfile(user);
     setUserName(user.username);
     window.dispatchEvent(new Event('user-auth-changed'));
     setOtpChallenge(null);
@@ -314,7 +309,7 @@ export function RegisterDialog({ isOpen, onOpenChange, onLogin, auth, setUserNam
             {termsError && <AuthAlert tone="warning">{termsError}</AuthAlert>}
             {submitError && <AuthAlert>{submitError}</AuthAlert>}
 
-            <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} />
+            <TurnstileBox containerRef={turnstile.containerRef} hasToken={!!turnstile.token} loadFailed={turnstile.loadFailed} skipped={turnstile.skipped} />
 
             <div className="flex gap-2">
               <Button

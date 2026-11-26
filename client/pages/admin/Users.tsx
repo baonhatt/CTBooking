@@ -58,7 +58,6 @@ export default function UsersPage() {
   const usersTotalPages = useMemo(() => Math.max(1, Math.ceil(totalUsers / PAGE_SIZE)), [totalUsers]);
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

@@ -124,7 +124,6 @@ export default function DeletedVouchersPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

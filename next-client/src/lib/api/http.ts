@@ -1,5 +1,5 @@
 import { siteConfig } from '@/config/site';
-import { getCookie } from '@/lib/cookies';
+import { clearCustomerProfile } from '@/lib/customer-session';
 
 // Sử dụng biến môi trường Next.js thay vì Vite syntax
 // Trong SSR (Server-Side Rendering), luôn dùng NEXT_PUBLIC_API_URL để gọi API
@@ -30,19 +30,13 @@ export function buildUrl(path: string) {
 export async function request<T>(path: string, init: RequestInit = {}) {
   const url = buildUrl(path);
 
-  // Get token from cookie (user token or staff token)
-  const userToken = typeof window !== 'undefined' ? getCookie('userToken') : null;
-  const staffToken = typeof window !== 'undefined' ? getCookie('staffToken') : null;
-  const token = staffToken || userToken;
-
+  // The customer session is the HttpOnly session_token cookie set by the API at login. The browser sends it by itself
+  // (credentials: 'include'); page scripts never see or send the token.
   const res = await fetch(url, {
     ...init,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      // Send staff token via Authorization header for admin routes
-      ...(staffToken && path.startsWith('/api/admin') && { Authorization: `Bearer ${staffToken}` }),
-      ...(token && !path.startsWith('/api/admin') && { Authorization: `Bearer ${token}` }),
       // Thêm User-Agent để giúp SEO bot nhận diện request
       ...(typeof window === 'undefined' && {
         'User-Agent': `Mozilla/5.0 (compatible; CinesphereBot/1.0; +${siteConfig.domain})`
@@ -67,18 +61,8 @@ export async function request<T>(path: string, init: RequestInit = {}) {
         const isAuthApi = authPaths.some((p) => path.includes(p));
 
         if (!isAuthApi) {
-          // Xóa token và profile ở client (cookie + localStorage)
-          // Không gọi /api/logout vì 401 tức là token đã hết hạn trên server rồi
-          // Gọi rườm rà thêm request là không cần thiết
-          localStorage.removeItem('userToken');
-          localStorage.removeItem('userProfile');
-          
-          // Import dynamic deleteCookie để đảm bảo an toàn nếu run-time khác
-          // Tuy nhiên hàm getCookie được import tĩnh ở trên rồi.
-          import('@/lib/cookies').then(({ deleteCookie }) => {
-            deleteCookie('userToken');
-            deleteCookie('userProfile');
-          });
+          // The session has ended on the server: forget the profile shown in the header. No /api/logout call is needed.
+          clearCustomerProfile();
 
           // Dispatch event để UI cập nhật (ví dụ useAuthState)
           window.dispatchEvent(new Event('user-auth-changed'));

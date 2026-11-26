@@ -1,17 +1,33 @@
+/**
+ * Tokens the old login kept in browser storage. The session is now only the HttpOnly staff_session cookie, which page
+ * scripts cannot read, so these keys are never written any more and are removed wherever they are still found.
+ */
+const LEGACY_TOKEN_KEYS = ['staffToken', 'userToken', 'authToken', 'adminToken'];
+
 /** Browser storage keys that belong to a signed-in staff session or hold per-person screen settings. */
 const SESSION_STORAGE_KEYS = [
-  'userToken',
+  ...LEGACY_TOKEN_KEYS,
   'userProfile',
-  'staffToken',
   'staff-storage',
-  // Keys from the old admin login. Some pages still clear them, so clear them here too.
-  'adminToken',
+  // Key from the old admin login
   'adminEmail',
   // Saved screen filters belong to the person who set them, not to the next person using this browser
   'admin_transactions_filters',
   'dashboard_selected_branch_id',
   'dashboard_selected_year'
 ];
+
+/** Removes tokens left in browser storage by the old login (they gave anyone who could run script on the page the session). */
+export function removeLegacyTokens() {
+  if (typeof window === 'undefined') return;
+  for (const storageKey of LEGACY_TOKEN_KEYS) {
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // Storage can be blocked (private window); nothing more to do
+    }
+  }
+}
 
 /** Removes the staff session and the per-person screen settings from this browser. */
 export function clearSessionStorage() {

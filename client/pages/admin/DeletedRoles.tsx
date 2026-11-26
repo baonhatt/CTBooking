@@ -53,7 +53,6 @@ export default function DeletedRolesPage() {
   const fetchDeletedRoles = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('staffToken');
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
@@ -62,11 +61,7 @@ export default function DeletedRolesPage() {
         sort: sortField === 'deleted_at' ? 'deleted_at' : 'name',
         dir: sortDir
       });
-      const response = await fetch(buildUrl(`/api/admin/deleted/roles?${params}`), {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const response = await fetch(buildUrl(`/api/admin/deleted/roles?${params}`), { credentials: 'include' });
       if (!response.ok) throw new Error('request failed');
       const data = await response.json();
       const sortedItems = data.items || [];
@@ -92,12 +87,9 @@ export default function DeletedRolesPage() {
     if (!roleToRestore) return;
     setIsRestoring(true);
     try {
-      const token = localStorage.getItem('staffToken');
       const response = await fetch(buildUrl(`/api/admin/roles/${roleToRestore}/restore`), {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
@@ -121,7 +113,6 @@ export default function DeletedRolesPage() {
       adminEmailState={staffStore.staff?.email || 'admin@email.com'}
       handleLogout={() => {
         staffStore.clearStaff();
-        localStorage.removeItem('staffToken');
         navigate('/login');
       }}
     >

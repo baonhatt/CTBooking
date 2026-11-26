@@ -21,7 +21,6 @@ export default function ProfilePage() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

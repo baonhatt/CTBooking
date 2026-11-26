@@ -1,6 +1,7 @@
 // Main API server setup using Hono framework
 
 import { Hono } from 'hono';
+import { csrfRefusal, isAllowedOrigin } from './origin-policy';
 import publicRouter from './routes/publicRouter';
 import userRouter from './routes/userRouter';
 import adminRouter from './routes/adminRouter';
@@ -51,7 +52,6 @@ type Bindings = {
 
   CLOUDINARY_UPLOAD_FOLDER: string;
 
-  VITE_SERVER_BASE_URL: string;
 
   VITE_CLIENT_BASE_URL: string;
 
@@ -61,39 +61,11 @@ type Bindings = {
 
   BREVO_SENDER_NAME: string;
 
-  IS_PREVIEW?: string;
 
   SUPER_ADMIN_EMAIL: string;
   SUPER_ADMIN_PASSWORD: string;
   SUPER_ADMIN_FULLNAME: string;
 };
-
-// CORS: only our own sites may call the API with the customer's cookie (credentials: true).
-// Any other origin gets no Access-Control-Allow-Origin header, so the browser blocks the reply.
-// Before, every *.pages.dev / *.workers.dev site and finally any origin at all was echoed back.
-const ALLOWED_PAGES_PROJECTS = [
-  'cinema-pages', // admin (Vite), preview: preview.cinema-pages.pages.dev
-  'cinema-admin-pages', // admin, "npm run pages:deploy:*"
-  'cinema-next' // customer site (next-client), preview: preview.cinema-next.pages.dev
-];
-
-function isAllowedOrigin(origin: string | undefined): origin is string {
-  if (!origin) return false;
-  let hostname = '';
-  try {
-    hostname = new URL(origin).hostname;
-  } catch {
-    return false;
-  }
-  // Local development
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost')) return true;
-  // cinesphere.com.vn and its subdomains (www, admin, api)
-  if (hostname === 'cinesphere.com.vn' || hostname.endsWith('.cinesphere.com.vn')) return true;
-  // Our Cloudflare Pages projects and their branch/preview deployments, e.g. preview.cinema-next.pages.dev
-  return ALLOWED_PAGES_PROJECTS.some(
-    (project) => hostname === `${project}.pages.dev` || hostname.endsWith(`.${project}.pages.dev`)
-  );
-}
 
 const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
 
@@ -101,7 +73,8 @@ const app = new Hono<{ Variables: Variables; Bindings: Bindings }>();
 app.use(
   '*',
   cors({
-    origin: (origin) => (isAllowedOrigin(origin) ? origin : null),
+    // Each API trusts only the sites of its own environment (origin-policy.ts)
+    origin: (origin, c) => (isAllowedOrigin(origin, c.req.url) ? origin : null),
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
     allowHeaders: [
       'Content-Type',
@@ -123,6 +96,22 @@ app.use(
     credentials: true
   })
 );
+
+// 1b. CSRF: a signed-in request that changes something must come from one of our sites (origin-policy.ts).
+// Runs after CORS, so preflight (OPTIONS) requests are already answered.
+app.use('*', async (c, next) => {
+  const refusal = csrfRefusal({
+    method: c.req.method,
+    url: c.req.url,
+    origin: c.req.header('Origin'),
+    cookie: c.req.header('cookie')
+  });
+  if (refusal) {
+    console.warn(`[CSRF] refused ${c.req.method} ${new URL(c.req.url).pathname}: ${refusal}`);
+    return c.json({ status: 'error', message: 'Yêu cầu không hợp lệ (nguồn gửi không được phép).' }, 403);
+  }
+  await next();
+});
 
 // API NAMESPACE LOCKS
 // Prevents any accidental exposition of admin or user endpoints due to missing trailing middlewares
@@ -231,7 +220,8 @@ app.onError((err, c) => {
 
       message: err.message || 'Internal Server Error',
 
-      stack: isLocal || c.env.IS_PREVIEW === 'true' ? err.stack : undefined
+      // Stack traces only on a local dev server; preview and live are public sites, their errors go to the logs
+      stack: isLocal ? err.stack : undefined
     },
 
     500

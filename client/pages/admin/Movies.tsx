@@ -238,7 +238,6 @@ export default function MoviesPage() {
     }
   };
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

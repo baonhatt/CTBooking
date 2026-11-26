@@ -463,7 +463,6 @@ export default function StaffPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   const handleLogout = () => {
-    localStorage.removeItem('staffToken');
     clearStaff();
     navigate('/login');
   };

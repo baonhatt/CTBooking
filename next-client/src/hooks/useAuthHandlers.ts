@@ -2,7 +2,7 @@
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './useAuth';
-import { deleteCookie } from '@/lib/cookies';
+import { clearCustomerProfile } from '@/lib/customer-session';
 
 export function useAuthHandlers(setUserName: (name: string | null) => void) {
   const router = useRouter();
@@ -10,11 +10,9 @@ export function useAuthHandlers(setUserName: (name: string | null) => void) {
 
   const handleLogout = async () => {
     try {
+      // The API revokes the session and clears the HttpOnly cookie; this browser then forgets the profile
       await logout();
-      localStorage.removeItem('userToken');
-      localStorage.removeItem('userProfile');
-      deleteCookie('userToken');
-      deleteCookie('userProfile');
+      clearCustomerProfile();
       setUserName(null);
       window.dispatchEvent(new Event('user-auth-changed'));
       router.push('/');

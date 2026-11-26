@@ -11,10 +11,10 @@ import { loginApi } from '@/lib/api/auth';
 import { request } from '@/lib/api/http';
 import { checkSuperAdminSetup } from '@/lib/api/admin';
 import { ShieldAlert, Lock, Mail, Eye, EyeOff, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
-import { forceChangePasswordApi, verifyAdminLoginOtpApi } from '@/lib/api/auth';
+import { checkStaffSessionApi, forceChangePasswordApi, verifyAdminLoginOtpApi } from '@/lib/api/auth';
 import { SessionTimeoutModal } from '@/components/admin/SessionTimeoutModal';
-import { performLogout } from '@/lib/auth-utils';
-import { useStaffTokenSync } from '@/hooks/useStaffTokenSync';
+import { clearSessionStorage, performLogout, removeLegacyTokens } from '@/lib/auth-utils';
+import { useStaffSessionSync } from '@/hooks/useStaffSessionSync';
 import AdminIndex from '@/pages/admin/AdminIndex';
 import DashboardPage from '@/pages/admin/Dashboard';
 import UsersPage from '@/pages/admin/Users';
@@ -157,8 +157,8 @@ const AdminLoginView = () => {
       const data = await loginApi({ email, password, turnstileToken });
 
       if (data.status === 'success') {
-        localStorage.setItem('staffToken', data.token);
-        setStaff(data.staff, data.permissions, data.branchIds, data.token, data.expiresAt);
+        // The API has set the HttpOnly session cookie; only who is signed in is kept here
+        setStaff(data.staff, data.permissions, data.branchIds, data.expiresAt);
         navigate('/', { replace: true });
       } else if (data.status === 'require_otp') {
         setRequireOtp(true);
@@ -189,8 +189,7 @@ const AdminLoginView = () => {
       const data = await verifyAdminLoginOtpApi({ otpChallenge: pendingOtpChallenge, otp: otpCode });
 
       if (data.status === 'success') {
-        localStorage.setItem('staffToken', data.token);
-        setStaff(data.staff, data.permissions, data.branchIds, data.token, data.expiresAt);
+        setStaff(data.staff, data.permissions, data.branchIds, data.expiresAt);
         navigate('/', { replace: true });
       } else {
         setError(data.message || 'Mã OTP không hợp lệ hoặc đã hết hạn');
@@ -318,20 +317,35 @@ export const AdminGate = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Follow sign-out and sign-in done in another tab
-  useStaffTokenSync();
+  useStaffSessionSync();
 
-  // ĐẢM BẢO isAuthenticated ĐÚNG (Token đồng bộ với Store)
-  // Fix lỗi flicker khi staff-storage vẫn còn isAuthenticated=true nhưng staffToken đã mất
+  // The store only remembers who signed in; the session itself is the HttpOnly cookie. Before showing the screens,
+  // ask the API whether that cookie is still valid, so an expired or revoked session goes straight to the login form.
   const [actuallyAuth, setActuallyAuth] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('staffToken') : null;
-    if (isAuthenticated && !token) {
-      clearStaff();
+    // Tokens kept by the old login (before the cookie-only session) are removed from this browser
+    removeLegacyTokens();
+
+    if (!isAuthenticated) {
       setActuallyAuth(false);
-    } else {
-      setActuallyAuth(isAuthenticated);
+      return;
     }
+    let cancelled = false;
+    setActuallyAuth(null);
+    checkStaffSessionApi().then((sessionState) => {
+      if (cancelled) return;
+      if (sessionState === 'invalid') {
+        clearSessionStorage();
+        clearStaff();
+        setActuallyAuth(false);
+        return;
+      }
+      setActuallyAuth(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, clearStaff]);
 
   // Hiển thị thông báo nếu bị kick ra do hết hạn session
@@ -656,7 +670,6 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
   const setStaff = useStaffStore((state) => state.setStaff);
   const permissions = useStaffStore((state) => state.permissions);
   const branchIds = useStaffStore((state) => state.branchIds);
-  const token = useStaffStore((state) => state.token);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -675,10 +688,8 @@ const ForcePasswordChangeView = ({ staff }: { staff: any }) => {
       const res = await forceChangePasswordApi({ newPassword });
       if (res.status === 'success') {
         toast.success('Đổi mật khẩu thành công!');
-        // Cập nhật store để clear forcePasswordChange
-        if (token) {
-          setStaff({ ...staff, forcePasswordChange: false }, permissions, branchIds, token);
-        }
+        // Cập nhật store để clear forcePasswordChange (the session cookie stays as it is)
+        setStaff({ ...staff, forcePasswordChange: false }, permissions, branchIds);
       } else {
         setError(res.message || 'Có lỗi xảy ra');
       }
