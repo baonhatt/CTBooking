@@ -3,6 +3,7 @@
 // returns staff ids, audit dates, deleted rows or admin-only fields. The admin screens use server/routes/admin/*.
 
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { customerBranchId, sqlServesBranch } from '../../lib/catalog-scope';
 
 // ===== BRANCHES =====
 
@@ -114,14 +115,19 @@ export async function getPublicMovieDetail(anyDb: any, tables: { movies: any }, 
 
 // ===== SITE MEDIA =====
 
-/** The videos and images of the home page (hero, technology section): active and not deleted only. */
+/**
+ * The videos and images of the home page (hero, technology section): active, not deleted, shown at the branch
+ * (without a branch: the default branch).
+ */
 export async function listPublicSiteMedia(
   anyDb: any,
   tables: { site_media: any },
-  filters: { section?: string; type?: string } = {}
+  filters: { section?: string; type?: string; branch_id?: unknown } = {}
 ) {
   const media = tables.site_media;
-  const conditions: any[] = [eq(media.is_active, true), isNull(media.deleted_at)];
+  const branchId = await customerBranchId(anyDb, filters.branch_id);
+  if (!branchId) return [];
+  const conditions: any[] = [eq(media.is_active, true), isNull(media.deleted_at), sqlServesBranch('media', branchId)];
   if (filters.section) conditions.push(eq(media.section, filters.section));
   if (filters.type) conditions.push(eq(media.type, filters.type));
   return anyDb
@@ -141,15 +147,13 @@ export async function listPublicSiteMedia(
 // ===== TICKET AND VR PACKAGES =====
 // The route first hides member-only packages from visitors (it needs is_member_only), then sends these trimmed copies.
 
-/** A movie inside a ticket package: title and poster, and its branches (the booking page filters on them). */
+/** A movie inside a ticket package: title and poster (already the movies of the package at the asked branch). */
 export function toPublicPackageMovie(movie: any) {
   return {
     id: movie?.id,
     title: movie?.title,
     cover_image: movie?.cover_image,
-    duration_min: movie?.duration_min,
-    branch_id: movie?.branch_id ?? null,
-    branch_ids: movie?.branch_ids ?? null
+    duration_min: movie?.duration_min
   };
 }
 

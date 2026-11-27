@@ -1,38 +1,22 @@
 import { eq, and, or, count, isNull, sql, inArray } from 'drizzle-orm';
-import { matchesBranchFilter } from '../../lib/branch-ids';
+import { customerBranchId, readVoucherScope, voucherServesBranch } from '../../lib/catalog-scope';
 import type { VoucherValidateResponse, VRPackageItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
 import { parseVoucherMetadata } from '../admin/vouchers';
 import { isFullDiscountVoucher, isSuperAdminStaff } from '../../lib/free-voucher';
 import { staffs as staffsTable } from '../../../shared/schema';
 
-function parseNullableJsonArray(val: any): number[] {
-  if (val === null || val === undefined) return [];
-  if (Array.isArray(val)) return val;
-  if (typeof val === 'string') {
-    try {
-      const parsed = JSON.parse(val);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
 /**
- * Whether a ticket / VR package is sold at a branch, with the same rule as the package lists shown to customers
- * (matchesBranchFilter): branch_ids lists the branches, no list means every branch.
+ * The package ids an invoice line reads to know which lines the voucher discounts. The invoice code reads an empty
+ * list as "every package of the voucher's type", so:
+ *   - every package          -> []
+ *   - the chosen packages    -> their ids
+ *   - no package chosen yet  -> [0] (no package has id 0: no line is discounted, never "every package")
  */
-export function packageServesBranch(pkg: { branch_ids?: any; branch_id?: number | null }, branchId: number): boolean {
-  return matchesBranchFilter(pkg?.branch_ids ?? null, pkg?.branch_id ?? null, branchId);
-}
-
-export function matchesBranch(branchIdsJson: any, targetBranchId?: number): boolean {
-  if (!targetBranchId) return true; // No branch specified, assume matches
-  const branchIds = parseNullableJsonArray(branchIdsJson);
-  if (branchIds.length === 0) return true; // NULL / empty = all branches
-  return branchIds.includes(targetBranchId);
+export function voucherInvoicePackageIds(scope: { all_packages: boolean; package_ids: number[] } | null): number[] {
+  if (!scope) return [0];
+  if (scope.all_packages) return [];
+  return scope.package_ids.length ? scope.package_ids : [0];
 }
 
 /**
@@ -94,6 +78,10 @@ export async function validateVoucherForVRImpl(
   if (!voucher.is_active) {
     return { valid: false, message: 'Mã giảm giá chưa được kích hoạt', error_code: 'VOUCHER_INACTIVE' };
   }
+
+  // Where and on which packages the voucher applies (server/lib/catalog-scope.ts)
+  const voucherScope = await readVoucherScope(anyDb, voucher.id);
+  const orderBranchId = await customerBranchId(anyDb, branch_id);
 
   // 1. DATE validity (Timestamp numerical comparison)
   const nowMs = Date.now();
@@ -276,8 +264,9 @@ export async function validateVoucherForVRImpl(
   // EXCLUDED (hard block): if any item in cart is in excluded list → reject entire voucher
   // APPLICABLE (soft whitelist): voucher discount only applies to the subtotal of packages in the list.
   //   Packages NOT in the list remain at full price and are NOT blocked from booking.
-  const applicable = parseNullableJsonArray(voucher.applicable_ticket_package_ids);
-  // EXCLUDED LOGIC REMOVED
+  const applicable = voucherInvoicePackageIds(voucherScope);
+  // Limited to a list of packages (an empty list = no package yet: the voucher discounts nothing)
+  const limitedToPackages = Boolean(voucherScope && !voucherScope.all_packages);
 
   // --- Soft whitelist: applicable packages → narrow eligible_subtotal ---
   // If applicable list is set, recalculate eligible_subtotal as only the sum of packages in the list.
@@ -291,7 +280,7 @@ export async function validateVoucherForVRImpl(
   let dynamicDescription = meta.note || '';
   const appliedPackageIds: number[] = [];
   
-  if (applicable.length > 0) {
+  if (limitedToPackages) {
     let partial_eligible = 0;
 
     // VR items eligible (only if scope allows VR)
@@ -334,7 +323,7 @@ export async function validateVoucherForVRImpl(
   }
 
   // Fetch package names for dynamic UI description
-  if (applicable.length > 0 && appliedPackageIds.length > 0) {
+  if (limitedToPackages && appliedPackageIds.length > 0) {
     try {
       const pkgs = await anyDb
         .select({ name: tables.ticket_packages.name })
@@ -352,7 +341,7 @@ export async function validateVoucherForVRImpl(
   }
 
   // 8. Branch match
-  if (!matchesBranch(voucher.branch_ids, branch_id)) {
+  if (!voucherScope || !orderBranchId || !voucherServesBranch(voucherScope, orderBranchId)) {
     return {
       valid: false,
       message: 'Mã giảm giá này không áp dụng tại chi nhánh bạn đang chọn',
@@ -416,8 +405,10 @@ export async function validateVoucherForVRImpl(
       is_active: voucher.is_active ? true : false,
       valid_from: voucher.valid_from,
       valid_until: voucher.valid_until,
-      applicable_ticket_package_ids: voucher.applicable_ticket_package_ids,
-      branch_ids: voucher.branch_ids
+      // Packages the discount covers (empty = every package of the scope) and the branches it is valid at
+      applicable_ids: applicable,
+      all_branches: voucherScope?.all_branches ?? false,
+      branch_ids: voucherScope?.branch_ids ?? []
     }
   };
 }

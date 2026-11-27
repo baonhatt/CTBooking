@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as schema from '../../../shared/schema';
+import { makeSqliteDb, insertRows } from '../../test-utils/sqlite-db';
 import { copyShowtimesImpl } from './showtimes';
 
 const tables: any = {
@@ -13,7 +14,7 @@ const slot = (movieId: number, start: string, end: string, branch = 1) => ({ id:
 
 /**
  * Fake database. select() answers by table: the source schedule (branch 1), the old schedule of the target (branch 2) and
- * the movies. delete() and insert() only build a statement; db.batch() runs them, so a failing batch changes nothing.
+ * the movies shown at the target branch (the branch filter itself is SQL; see the SQLite tests below). delete() and insert() only build a statement; db.batch() runs them, so a failing batch changes nothing.
  */
 function makeDb(options: { source: any[]; target?: any[]; movies?: any[]; failBatch?: boolean }) {
   const audit: any[] = [];
@@ -53,7 +54,41 @@ function makeDb(options: { source: any[]; target?: any[]; movies?: any[]; failBa
   return { db, audit, ran };
 }
 
-const movie = (id: number, overrides: Record<string, unknown> = {}) => ({ id, branch_ids: null, branch_id: null, ...overrides });
+const movie = (id: number) => ({ id, title: `Movie ${id}`, cover_image: null, duration_min: 90 });
+
+/**
+ * A real in-memory database for the branch rule: movies of every branch (all_branches = 1) or of the branches listed
+ * in movie_branches, active and not deleted.
+ */
+function makeRealDb(options: { source: any[]; target?: any[] }) {
+  const { db, raw } = makeSqliteDb(['showtimes', 'movies', 'movie_branches', 'auditLogs']);
+  const NOW = '2026-11-20T03:00:00.000Z';
+  const realMovie = (id: number, overrides: Record<string, unknown> = {}) => ({
+    id,
+    title: `Movie ${id}`,
+    is_active: 1,
+    all_branches: 0,
+    created_at: NOW,
+    updated_at: NOW,
+    ...overrides
+  });
+  insertRows(raw, 'movies', [
+    realMovie(1, { all_branches: 1 }), // every branch
+    realMovie(2), // only branch 1
+    realMovie(3), // branches 1 and 2
+    realMovie(4, { all_branches: 1, is_active: 0 }), // hidden
+    realMovie(5, { all_branches: 1, deleted_at: NOW }) // deleted
+  ]);
+  insertRows(raw, 'movie_branches', [
+    { movie_id: 2, branch_id: 1 },
+    { movie_id: 3, branch_id: 1 },
+    { movie_id: 3, branch_id: 2 }
+  ]);
+  insertRows(raw, 'showtimes', [...options.source, ...(options.target || [])].map((row, index) => ({ ...row, id: index + 1 })));
+  const showtimesOf = (branchId: number) =>
+    raw.prepare('SELECT movie_id, start_time FROM showtimes WHERE branch_id = ? ORDER BY start_time').all(branchId) as any[];
+  return { db, showtimesOf };
+}
 
 describe('copyShowtimesImpl', () => {
   it('replaces the target schedule with the source one in ONE batch: the delete first, then the inserts', async () => {
@@ -72,30 +107,30 @@ describe('copyShowtimesImpl', () => {
   });
 
   it('copies only movies that can be shown at the target branch, and says how many it skipped', async () => {
-    const { db, ran } = makeDb({
-      source: [slot(1, '09:00', '11:00'), slot(2, '12:00', '14:00'), slot(3, '15:00', '17:00'), slot(4, '18:00', '20:00')],
-      movies: [
-        movie(1),
-        movie(2, { branch_ids: '[1]' }), // only branch 1
-        movie(3, { branch_ids: '[1,2]' }), // both
-        movie(5) // movie 4 is hidden or deleted: it is not in the list at all
+    const { db, showtimesOf } = makeRealDb({
+      source: [
+        slot(1, '09:00', '11:00'),
+        slot(2, '12:00', '14:00'),
+        slot(3, '15:00', '17:00'),
+        slot(4, '18:00', '20:00'),
+        slot(5, '21:00', '23:00')
       ]
     });
 
     const result: any = await copyShowtimesImpl(db, tables, { from_branch_id: 1, to_branch_id: 2 }, null, staff);
 
-    expect(result).toMatchObject({ copied: 2, skipped: 2 });
-    expect(ran.filter((statement) => statement.kind === 'insert').map((statement) => statement.values.movie_id)).toEqual([1, 3]);
+    expect(result).toMatchObject({ copied: 2, skipped: 3 });
+    expect(showtimesOf(2).map((row) => row.movie_id)).toEqual([1, 3]);
   });
 
   it('removes nothing when no slot can be copied', async () => {
-    const { db } = makeDb({ source: [slot(2, '12:00', '14:00')], target: [slot(1, '08:00', '10:00', 2)], movies: [movie(2, { branch_ids: '[1]' })] });
+    const { db, showtimesOf } = makeRealDb({ source: [slot(2, '12:00', '14:00')], target: [slot(1, '08:00', '10:00', 2)] });
 
     const result: any = await copyShowtimesImpl(db, tables, { from_branch_id: 1, to_branch_id: 2 }, null, staff);
 
     expect(result.status).toBe('error');
     expect(result.statusCode).toBe(400);
-    expect(db.batch).not.toHaveBeenCalled();
+    expect(showtimesOf(2)).toEqual([{ movie_id: 1, start_time: '08:00' }]);
   });
 
   it('a failing batch leaves the old schedule alone: nothing ran', async () => {

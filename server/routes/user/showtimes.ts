@@ -1,4 +1,5 @@
 import { eq, and, asc, isNull } from 'drizzle-orm';
+import { sqlServesBranch } from '../../lib/catalog-scope';
 
 export async function getPublicScheduleImpl(db: any, tables: { showtimes: any; movies: any }, branchId: number) {
   if (!branchId) {
@@ -18,7 +19,15 @@ export async function getPublicScheduleImpl(db: any, tables: { showtimes: any; m
     })
     .from(tables.showtimes)
     .innerJoin(tables.movies, eq(tables.showtimes.movie_id, tables.movies.id))
-    .where(and(eq(tables.showtimes.branch_id, branchId), isNull(tables.movies.deleted_at)))
+    // Only showtimes of movies that are active, not deleted and still shown at this branch
+    .where(
+      and(
+        eq(tables.showtimes.branch_id, branchId),
+        eq(tables.movies.is_active, true),
+        isNull(tables.movies.deleted_at),
+        sqlServesBranch('movie', branchId)
+      )
+    )
     .orderBy(asc(tables.showtimes.start_time));
 
   const items = rows.map((row: any) => ({

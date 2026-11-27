@@ -1,4 +1,5 @@
 import { Hono, Context } from 'hono';
+import { assertStaffMayAssign, readScopeChange, readScopeInput } from '../../../../server/lib/catalog-scope';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
@@ -261,11 +262,7 @@ sitemediaRouter.post('/api/admin/site-media', requireStaffAuth, requirePermissio
 
     const body = await c.req.json().catch(() => ({}));
 
-    // A new media row is for all branches (the form has no branch choice), which only the Super Admin may add
-    if (!staffCanModifySiteMedia(null, getRestrictBranchIds(c))) {
-      return c.json({ status: 'error', message: GLOBAL_MEDIA_MESSAGE }, 403);
-    }
-
+    // The branches are checked inside createSiteMediaImpl (staff: their own branches only)
     const staffId = c.get('staffId');
     const staffEmail = c.get('staffEmail');
     const staffFullname = c.get('staffFullname');
@@ -276,12 +273,37 @@ sitemediaRouter.post('/api/admin/site-media', requireStaffAuth, requirePermissio
       { site_media: schema.site_media, auditLogs: schema.auditLogs },
       body as any,
       deleter,
-      { id: staffId, email: staffEmail, fullname: staffFullname }
+      { id: staffId, email: staffEmail, fullname: staffFullname },
+      getRestrictBranchIds(c)
     );
 
     return c.json(r, 201);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  } catch (err: any) {
+    const status = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: status === 500 ? 'Lỗi máy chủ nội bộ' : String(err.message) }, status as any);
+  }
+});
+
+// Asked by the upload screen BEFORE a file is sent to the cloud: may this staff member add media for these branches
+// ({ all_branches, branch_ids }), or replace the file of media `target_id` (which keeps its own branches)?
+sitemediaRouter.post('/api/admin/site-media/check', requireStaffAuth, requirePermission('uploads', 'upload'), async (c) => {
+  try {
+    const db = drizzle(c.env.cinema_db, { schema });
+    const body: any = await c.req.json().catch(() => ({}));
+    const restrict = getRestrictBranchIds(c);
+    if (Number(body?.target_id) > 0) {
+      const existing = await findSiteMediaBranchIdsImpl(db, { site_media: schema.site_media }, Number(body.target_id));
+      if (!existing) return c.json({ status: 'error', message: 'Không tìm thấy media' }, 404);
+      if (!staffCanModifySiteMedia(existing, restrict)) {
+        return c.json({ status: 'error', message: existing.all_branches ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE }, 403);
+      }
+      return c.json({ ok: true });
+    }
+    assertStaffMayAssign(readScopeInput(body), restrict, 'ảnh/video');
+    return c.json({ ok: true });
+  } catch (err: any) {
+    const status = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: status === 500 ? 'Lỗi máy chủ nội bộ' : String(err.message) }, status as any);
   }
 });
 
@@ -293,9 +315,12 @@ sitemediaRouter.put('/api/admin/site-media', requireStaffAuth, requirePermission
 
     const existing = await findSiteMediaBranchIdsImpl(db, { site_media: schema.site_media }, Number(body?.id));
     if (!existing) return c.json({ status: 'error', message: 'Không tìm thấy media' }, 404);
-    if (!staffCanModifySiteMedia(existing.branch_ids, getRestrictBranchIds(c))) {
-      return c.json({ status: 'error', message: existing.branch_ids === null ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE }, 403);
+    if (!staffCanModifySiteMedia(existing, getRestrictBranchIds(c))) {
+      return c.json({ status: 'error', message: existing.all_branches ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE }, 403);
     }
+    // New branches sent by staff of some branches: only their own, at least one
+    const newScope = readScopeChange(body || {});
+    if (newScope) assertStaffMayAssign(newScope, getRestrictBranchIds(c), 'ảnh/video');
 
     const staffId = c.get('staffId');
     const staffEmail = c.get('staffEmail');
@@ -319,8 +344,9 @@ sitemediaRouter.put('/api/admin/site-media', requireStaffAuth, requirePermission
     };
 
     return c.json(payload as any, status);
-  } catch {
-    return c.json({ status: 'error', message: 'Lỗi máy chủ nội bộ' }, 500);
+  } catch (err: any) {
+    const status = Number(err?.statusCode) || 500;
+    return c.json({ status: 'error', message: status === 500 ? 'Lỗi máy chủ nội bộ' : String(err.message) }, status as any);
   }
 });
 
@@ -332,9 +358,9 @@ sitemediaRouter.delete('/api/admin/site-media/:id', requireStaffAuth, requirePer
 
     const existing = await findSiteMediaBranchIdsImpl(db, { site_media: schema.site_media }, id);
     if (!existing) return c.json({ ok: false, status: 'error', message: 'Không tìm thấy media' }, 404);
-    if (!staffCanModifySiteMedia(existing.branch_ids, getRestrictBranchIds(c))) {
+    if (!staffCanModifySiteMedia(existing, getRestrictBranchIds(c))) {
       return c.json(
-        { ok: false, status: 'error', message: existing.branch_ids === null ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE },
+        { ok: false, status: 'error', message: existing.all_branches ? GLOBAL_MEDIA_MESSAGE : OTHER_BRANCH_MEDIA_MESSAGE },
         403
       );
     }

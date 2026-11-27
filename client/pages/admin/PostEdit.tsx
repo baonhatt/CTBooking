@@ -21,6 +21,7 @@ import { PostRichTextEditor } from '@/components/admin/content/PostRichTextEdito
 import { updatePostApi, getPostById, getAdminBranchOptions } from '@/lib/api';
 import { formatVnDateTime } from '@/lib/format';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
+import { branch_scope_of, branch_scope_payload } from '@/lib/branch-scope';
 
 interface PostData {
   id: number;
@@ -41,8 +42,9 @@ interface PostData {
   og_image?: string;
   canonical_url?: string;
   schema_type?: string;
-  // null = all branches
-  branch_ids?: number[] | null;
+  // all_branches = every branch (also branches opened later); otherwise the branches in branch_ids
+  all_branches?: boolean;
+  branch_ids?: number[];
 }
 
 interface SectionState {
@@ -176,7 +178,8 @@ export default function PostEditPage() {
       status: data.status ?? 'draft',
       is_featured: Boolean(data.is_featured),
       published_at: data.published_at ?? '',
-      branch_ids: data.branch_ids ?? null,
+      all_branches: branch_scope_of(data).all_branches,
+      branch_ids: branch_scope_of(data).branch_ids,
       meta_description: data.meta_description ?? '',
       meta_keywords: data.meta_keywords ?? '',
       seo_title: data.seo_title ?? '',
@@ -219,6 +222,7 @@ export default function PostEditPage() {
       'og_image',
       'canonical_url',
       'schema_type',
+      'all_branches',
       'branch_ids'
     ];
     fields.forEach((field) => {
@@ -299,6 +303,12 @@ export default function PostEditPage() {
       notify.error('Vui lòng nhập nội dung');
       return;
     }
+    // A branch staff member picks at least one of their branches; a Super Admin may leave the post without a branch
+    const postBranches = branch_scope_of(editData);
+    if (!isSuperAdmin && (postBranches.all_branches || postBranches.branch_ids.length === 0)) {
+      notify.error('Vui lòng chọn ít nhất một chi nhánh bạn quản lý');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -338,7 +348,7 @@ export default function PostEditPage() {
         status: nextStatus,
         is_featured: editData.is_featured || false,
         published_at: editData.published_at,
-        branch_ids: editData.branch_ids ?? null,
+        ...branch_scope_payload(branch_scope_of(editData)),
         meta_description: editData.meta_description,
         meta_keywords: editData.meta_keywords,
         seo_title: editData.seo_title,
@@ -586,8 +596,9 @@ export default function PostEditPage() {
                 >
                   <BranchMultiSelect
                     branches={branchOptions}
-                    value={editData.branch_ids ?? null}
-                    onChange={(ids) => setEditData({ ...editData, branch_ids: ids })}
+                    value={branch_scope_of(editData)}
+                    allowAll={isSuperAdmin}
+                    onChange={(scope) => setEditData({ ...editData, ...scope })}
                     disabled={!isEditMode}
                     className="rounded-xl text-xs"
                   />

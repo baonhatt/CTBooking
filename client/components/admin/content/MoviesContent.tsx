@@ -46,7 +46,7 @@ import { optimizeCloudinaryUrl } from '@/lib/utils';
 
 import { useNavigate } from 'react-router-dom';
 import { useStaffPermissions, useIsSuperAdmin, useStaffBranchIds } from '@/hooks/useStaffPermission';
-import { parseBranchIdsFromApi } from '@/lib/branch-ids';
+import { branch_scope_of } from '@/lib/branch-scope';
 
 interface MovieData {
   id: string | number;
@@ -60,8 +60,8 @@ interface MovieData {
   cover_image?: string;
   created_by_staff_name?: string;
   updated_by_staff_name?: string;
-  branch_id?: number | null;
-  branch_ids?: number[] | null;
+  all_branches?: boolean;
+  branch_ids?: number[];
 }
 
 interface Props {
@@ -131,10 +131,10 @@ export default function MoviesContent({
   const canModifyMovie = (movie: any) => {
     if (isSuperAdmin) return true;
     if (!staffBranchIds.length) return false;
-    const parsed = parseBranchIdsFromApi(movie.branch_ids ?? movie.branch_id);
-    if (parsed === null) return false; // Global records cannot be modified by branch staff
-    if (parsed.length === 0) return false;
-    return parsed.every((id: number) => staffBranchIds.includes(id));
+    const scope = branch_scope_of(movie);
+    if (scope.all_branches) return false; // Global records cannot be modified by branch staff
+    if (scope.branch_ids.length === 0) return false;
+    return scope.branch_ids.every((id: number) => staffBranchIds.includes(id));
   };
 
   const hasPermission = (module: string, action: string) => {
@@ -163,9 +163,8 @@ export default function MoviesContent({
       posterUrl: movieDetails.cover_image,
       is_active: movieDetails.is_active,
       release_date: movieDetails.release_date,
-      // Without the branches the form would save this movie as "all branches"
-      branch_id: movieDetails.branch_id,
-      branch_ids: movieDetails.branch_ids
+      // Without the branches the form would save this movie with the wrong branches
+      ...branch_scope_of(movieDetails)
     });
   };
 
@@ -401,7 +400,7 @@ export default function MoviesContent({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <BranchIdsBadge branch_ids={movie.branch_ids} branch_id={movie.branch_id} branches={branches || []} />
+                      <BranchIdsBadge all_branches={movie.all_branches} branch_ids={movie.branch_ids} branches={branches || []} />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-2 py-2">
@@ -636,7 +635,7 @@ export default function MoviesContent({
                             <span className={`text-xs font-semibold ${isVip ? 'text-indigo-700' : 'text-emerald-700'}`}>
                               {pkg.name} ({formatVnd(pkg.price)})
                             </span>
-                            <BranchTag branch_ids={pkg.branch_ids} branch_id={pkg.branch_id} branches={branches || []} />
+                            <BranchTag all_branches={pkg.all_branches} branch_ids={pkg.branch_ids} branches={branches || []} />
                           </div>
                         );
                       })
@@ -688,8 +687,8 @@ export default function MoviesContent({
                     <div className="flex items-start justify-between gap-2 text-[11px]">
                       <span className="shrink-0 text-slate-400">Chi nhánh:</span>
                       <BranchIdsBadge
+                        all_branches={movieDetails.all_branches}
                         branch_ids={movieDetails.branch_ids}
-                        branch_id={movieDetails.branch_id}
                         branches={branches || []}
                       />
                     </div>

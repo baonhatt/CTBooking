@@ -1,4 +1,6 @@
 import { eq, and, inArray, sql, gte, lte, or, desc, asc, count, SQL } from 'drizzle-orm';
+import { withVoucherScope } from '../../lib/catalog-scope';
+import { voucherInvoicePackageIds } from './vouchers';
 import { formatDateForDb } from '../../lib/date-utils';
 import { vnRangeFromInputs, sqlListedInRange } from '../../lib/vn-time';
 import { isPaymentReceivedLate } from './booking/access';
@@ -302,15 +304,16 @@ export async function listUserTransactionsImpl(
         .select({
           id: tables.vouchers.id,
           scope: tables.vouchers.scope,
-          applicable_ticket_package_ids: tables.vouchers.applicable_ticket_package_ids
+          all_packages: tables.vouchers.all_packages
         })
         .from(tables.vouchers)
         .where(inArray(tables.vouchers.id, voucherIds));
 
-      for (const v of voucherRows) {
+      const scopedVouchers: any[] = await withVoucherScope(anyDb, voucherRows.map((row: any) => ({ ...row, all_branches: true })));
+      for (const v of scopedVouchers) {
         voucherMap[Number(v.id)] = {
           scope: v.scope || 'all',
-          applicable_ids: v.applicable_ticket_package_ids ?? null
+          applicable_ids: voucherInvoicePackageIds(v)
         };
       }
     } catch (e) {

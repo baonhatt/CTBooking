@@ -7,6 +7,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { notify } from '@/components/admin/common/notify';
 import { ConfirmDeleteDialog } from '@/components/admin/dialogs/ConfirmDeleteDialog';
+import { branch_scope_of, default_branch_scope } from '@/lib/branch-scope';
 
 interface TicketPackage {
   id: number;
@@ -16,15 +17,16 @@ interface TicketPackage {
   price: number;
   features?: string[];
   type?: string;
-  combo?: number[];
+  movie_scope?: 'selected' | 'all_at_branch';
+  movie_ids?: number[];
   movies?: any[];
   min_group_size?: number;
   max_group_size?: number;
   is_member_only?: boolean;
   is_active?: boolean;
   display_order?: number;
-  branch_id?: number;
-  branch_ids?: number[] | null;
+  all_branches?: boolean;
+  branch_ids?: number[];
   branch_name?: string;
   cover_image?: string;
   duration_min?: number;
@@ -131,7 +133,8 @@ export default function TicketsPage() {
           description: t.description || undefined,
           price: Number(t.price),
           features: Array.isArray(t.features) ? t.features : [],
-          combo: Array.isArray(t.combo) ? t.combo : [],
+          movie_scope: t.movie_scope === 'all_at_branch' ? 'all_at_branch' : 'selected',
+          movie_ids: Array.isArray(t.movie_ids) ? t.movie_ids.map(Number) : [],
           movies: Array.isArray(t.movies) ? t.movies : [],
           type: t.type || undefined,
           min_group_size: t.min_group_size ?? undefined,
@@ -139,8 +142,7 @@ export default function TicketsPage() {
           is_member_only: !!t.is_member_only,
           is_active: t.is_active ?? true,
           display_order: t.display_order ?? 0,
-          branch_id: t.branch_id || undefined,
-          branch_ids: Array.isArray(t.branch_ids) ? t.branch_ids : (t.branch_ids ?? null),
+          ...branch_scope_of(t),
           cover_image: t.cover_image || undefined,
           duration_min: t.duration_min !== null && t.duration_min !== undefined ? Number(t.duration_min) : undefined,
           vr_genre: t.vr_genre || undefined,
@@ -173,7 +175,7 @@ export default function TicketsPage() {
   const openCreate = () => {
     const defaultType = typeFilter === 'vr' ? 'vr' : 'movie';
     // A branch staff member starts with their own branch(es); a Super Admin starts with "all branches"
-    const defaultBranchIds = !isSuperAdmin && staffBranchIds.length > 0 ? staffBranchIds : undefined;
+    const defaultScope = default_branch_scope(isSuperAdmin, staffBranchIds);
     setEditData({
       id: 0,
       name: '',
@@ -182,11 +184,10 @@ export default function TicketsPage() {
       is_active: true,
       features: [],
       type: defaultType,
-      ...(defaultBranchIds
-        ? { branch_ids: defaultBranchIds, branch_id: defaultBranchIds.length === 1 ? defaultBranchIds[0] : undefined }
-        : {}),
-      // Tell the form to tick every movie the branch rule allows (new packages only, not edit or clone)
-      auto_select_combo: true
+      ...defaultScope,
+      // A new movie package offers every movie shown at the order's branch until movies are chosen
+      movie_scope: 'all_at_branch',
+      movie_ids: []
     });
     setIsCodeEditable(false);
     setIsEditOpen(true);

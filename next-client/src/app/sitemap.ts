@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { getPublicPosts } from '@/lib/api/posts';
 import { buildPostHref } from '@/lib/utils';
+import { isPostAssigned } from '@/lib/post-branch';
 
 export const runtime = 'edge';
 
@@ -42,7 +43,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       allPosts.push(...items);
       if (items.length < PAGE_SIZE || allPosts.length >= Number(res.total ?? 0)) break;
     }
-    const posts = allPosts.filter((p) => p.status === 'published');
+    // A post not assigned to any branch yet is not available anywhere
+    const posts = allPosts.filter((p) => p.status === 'published' && isPostAssigned(p));
     postPages = posts.map((post) => ({
       url: `${SITE_URL}${buildPostHref(post)}`,
       lastModified: new Date(post.updated_at ?? post.published_at ?? post.created_at ?? Date.now()),

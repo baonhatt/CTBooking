@@ -4,7 +4,7 @@ import * as schema from '../../../../shared/schema';
 import { requireStaffAuth, requirePermission } from '../../middleware';
 import { getCloudHelpers, getRestrictBranchIds } from './admin-helpers';
 import { eq } from 'drizzle-orm';
-import { staffCanAccessBranchIds, staffCanModifyBranchRecord } from '../../../../server/lib/branch-ids';
+import { readBranchScope, readScopeChange, readScopeInput, staffMayModify, staffMaySee } from '../../../../server/lib/catalog-scope';
 import { parseMediaUrl, pingIndexNow } from '../../utils';
 import { clampPage } from '../../../../server/lib/paging';
 
@@ -29,7 +29,7 @@ async function postScopeError(
   db: any,
   action: 'view' | 'modify',
   postId: number | string | null,
-  newBranchIds?: unknown
+  newScopeInput?: { all_branches?: unknown; branch_ids?: unknown }
 ): Promise<string | null> {
   const restrictBranchIds = getRestrictBranchIds(c);
   if (restrictBranchIds === null) return null;
@@ -37,20 +37,25 @@ async function postScopeError(
   if (postId !== null) {
     const column = /^\d+$/.test(String(postId)) ? schema.posts.id : schema.posts.slug;
     const value = /^\d+$/.test(String(postId)) ? Number(postId) : String(postId);
-    const post = await db.query.posts.findFirst({ where: eq(column as any, value as any), columns: { branch_ids: true } });
+    const post = await db.query.posts.findFirst({ where: eq(column as any, value as any), columns: { id: true } });
     if (post) {
-      const allowed =
-        action === 'view'
-          ? staffCanAccessBranchIds(post.branch_ids, restrictBranchIds, false)
-          : staffCanModifyBranchRecord(post.branch_ids, restrictBranchIds, false);
+      const scope = await readBranchScope(db, 'post', Number(post.id));
+      const allowed = action === 'view' ? staffMaySee(scope, restrictBranchIds) : staffMayModify(scope, restrictBranchIds);
       if (!allowed) return 'Bài viết thuộc chi nhánh khác hoặc tất cả chi nhánh, bạn không có quyền thao tác';
     }
   }
 
-  if (newBranchIds !== undefined) {
-    const ids = Array.isArray(newBranchIds) ? newBranchIds.map((id) => Number(id)) : null;
-    if (!ids || ids.some((id) => !restrictBranchIds.includes(id))) {
-      return 'Chỉ Super Admin được đăng bài cho tất cả chi nhánh hoặc chi nhánh khác';
+  if (newScopeInput !== undefined) {
+    // A choice that is missing or malformed is refused with 400 by the save itself (createPostImpl / updatePostImpl)
+    let scope: { all_branches: boolean; branch_ids: number[] } | undefined;
+    try {
+      scope = postId === null ? readScopeInput(newScopeInput) : readScopeChange(newScopeInput);
+    } catch {
+      return null;
+    }
+    // Staff of some branches: only their own branches, at least one (every branch / no branch is for the Super Admin)
+    if (scope && (scope.all_branches || !scope.branch_ids.length || scope.branch_ids.some((id) => !restrictBranchIds.includes(id)))) {
+      return 'Chỉ Super Admin được đăng bài cho tất cả chi nhánh, chưa gắn chi nhánh hoặc chi nhánh khác';
     }
   }
   return null;
@@ -114,7 +119,7 @@ postsRouter.post('/api/admin/posts', requireStaffAuth, requirePermission('posts'
     const body = await c.req.json().catch(() => ({}));
 
     // A new post always names its branches; leaving them out means "all branches"
-    const createScopeError = await postScopeError(c, db, 'modify', null, (body as any)?.branch_ids ?? null);
+    const createScopeError = await postScopeError(c, db, 'modify', null, (body as any) || {});
     if (createScopeError) return c.json({ status: 'error', message: createScopeError }, 403);
 
     const staffId = c.get('staffId');
@@ -155,7 +160,7 @@ postsRouter.put('/api/admin/posts/:id', requireStaffAuth, requirePermission('pos
 
     const body = await c.req.json().catch(() => ({}));
 
-    const updateScopeError = await postScopeError(c, db, 'modify', id, (body as any)?.branch_ids);
+    const updateScopeError = await postScopeError(c, db, 'modify', id, (body as any) || {});
     if (updateScopeError) return c.json({ status: 'error', message: updateScopeError }, 403);
 
     const helpers = getCloudHelpers(c, c.env);

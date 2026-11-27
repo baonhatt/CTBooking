@@ -46,9 +46,9 @@ export const movies = sqliteTable('movies', {
   genres: text('genres'), // JSON string in SQLite
   rating: real('rating'),
   duration_min: integer('duration_min'),
-  branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
-  // NULL => all branches; JSON array => specific branches; "[]" => not configured
-  branch_ids: text('branch_ids'),
+  // Shown at every branch, also the ones opened later. Otherwise the branches are the rows of movie_branches.
+  // (The old columns branch_id / branch_ids stay in the database but are no longer read: migration 0005.)
+  all_branches: integer('all_branches', { mode: 'boolean' }).notNull().default(false),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
   is_active: integer('is_active', { mode: 'boolean' }).default(true),
@@ -65,15 +65,16 @@ export const ticket_packages = sqliteTable('ticket_packages', {
   price: real('price').notNull(),
   features: text('features'), // JSON
   type: text('type'),
-  combo: text('combo'),
   min_group_size: integer('min_group_size'),
   max_group_size: integer('max_group_size'),
   is_member_only: integer('is_member_only', { mode: 'boolean' }).default(false),
   is_active: integer('is_active', { mode: 'boolean' }).default(true),
   display_order: integer('display_order').default(0),
-  branch_id: integer('branch_id').references(() => branches.id, { onDelete: 'restrict' }),
-  // NULL => all branches; JSON array => specific branches; "[]" => not configured
-  branch_ids: text('branch_ids'),
+  // Sold at every branch, also the ones opened later. Otherwise the branches are the rows of package_branches.
+  // (The old columns branch_id / branch_ids / combo stay in the database but are no longer read: migration 0005.)
+  all_branches: integer('all_branches', { mode: 'boolean' }).notNull().default(false),
+  // 'selected' = the movies of package_movies; 'all_at_branch' = every movie shown at the branch of the order
+  movie_scope: text('movie_scope').notNull().default('selected'),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
   deleted_at: text('deleted_at'),
@@ -165,10 +166,8 @@ export const site_media = sqliteTable('site_media', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   section: text('section').notNull(),
   type: text('type').notNull(),
-  // Branch targeting (v2 JSON approach)
-  // - NULL => applicable to all branches
-  // - JSON array string => applicable to selected branches only
-  branch_ids: text('branch_ids'),
+  // Shown at every branch; otherwise the branches are the rows of site_media_branches
+  all_branches: integer('all_branches', { mode: 'boolean' }).notNull().default(false),
   title: text('title'),
   description: text('description'),
   public_id: text('public_id'),
@@ -221,10 +220,8 @@ export const posts = sqliteTable('posts', {
   title: text('title').notNull(),
   slug: text('slug').unique(),
   content: text('content').notNull(),
-  // Branch targeting (v2 JSON approach)
-  // - NULL => applicable to all branches
-  // - JSON array string => applicable to selected branches only
-  branch_ids: text('branch_ids'),
+  // Shown at every branch; otherwise the branches are the rows of post_branches
+  all_branches: integer('all_branches', { mode: 'boolean' }).notNull().default(false),
   excerpt: text('excerpt'),
   featured_image: text('featured_image'),
   meta_description: text('meta_description'),
@@ -260,10 +257,10 @@ export const vouchers = sqliteTable('vouchers', {
   is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   valid_from: text('valid_from'),
   valid_until: text('valid_until'),
-  applicable_ticket_package_ids: text('applicable_ticket_package_ids'), // JSON array of package IDs | NULL = all
-  applicable_user_ids: text('applicable_user_ids'), // JSON array | NULL = all
-  excluded_ticket_package_ids: text('excluded_ticket_package_ids'), // JSON array
-  branch_ids: text('branch_ids'),
+  // Valid at every branch / for every package of its scope; otherwise the rows of voucher_branches / voucher_packages.
+  // (The old JSON columns stay in the database but are no longer read: migration 0005.)
+  all_branches: integer('all_branches', { mode: 'boolean' }).notNull().default(false),
+  all_packages: integer('all_packages', { mode: 'boolean' }).notNull().default(false),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
   deleted_at: text('deleted_at'),
@@ -305,6 +302,73 @@ export const booking_vr_items = sqliteTable('booking_vr_items', {
   created_at: text('created_at')
 });
 
+// ==================== BRANCH LINKS (migration 0005) ====================
+// One row per record and branch = offered at that branch (taking it off deletes the row).
+// Read and written only through server/lib/catalog-scope.ts.
+
+export const movie_branches = sqliteTable('movie_branches', {
+  movie_id: integer('movie_id')
+    .notNull()
+    .references(() => movies.id, { onDelete: 'cascade' }),
+  branch_id: integer('branch_id')
+    .notNull()
+    .references(() => branches.id, { onDelete: 'restrict' })
+});
+
+export const package_branches = sqliteTable('package_branches', {
+  package_id: integer('package_id')
+    .notNull()
+    .references(() => ticket_packages.id, { onDelete: 'cascade' }),
+  branch_id: integer('branch_id')
+    .notNull()
+    .references(() => branches.id, { onDelete: 'restrict' })
+});
+
+export const package_movies = sqliteTable('package_movies', {
+  package_id: integer('package_id')
+    .notNull()
+    .references(() => ticket_packages.id, { onDelete: 'cascade' }),
+  movie_id: integer('movie_id')
+    .notNull()
+    .references(() => movies.id, { onDelete: 'cascade' })
+});
+
+export const voucher_branches = sqliteTable('voucher_branches', {
+  voucher_id: integer('voucher_id')
+    .notNull()
+    .references(() => vouchers.id, { onDelete: 'cascade' }),
+  branch_id: integer('branch_id')
+    .notNull()
+    .references(() => branches.id, { onDelete: 'restrict' })
+});
+
+export const voucher_packages = sqliteTable('voucher_packages', {
+  voucher_id: integer('voucher_id')
+    .notNull()
+    .references(() => vouchers.id, { onDelete: 'cascade' }),
+  package_id: integer('package_id')
+    .notNull()
+    .references(() => ticket_packages.id, { onDelete: 'cascade' })
+});
+
+export const post_branches = sqliteTable('post_branches', {
+  post_id: integer('post_id')
+    .notNull()
+    .references(() => posts.id, { onDelete: 'cascade' }),
+  branch_id: integer('branch_id')
+    .notNull()
+    .references(() => branches.id, { onDelete: 'restrict' })
+});
+
+export const site_media_branches = sqliteTable('site_media_branches', {
+  media_id: integer('media_id')
+    .notNull()
+    .references(() => site_media.id, { onDelete: 'cascade' }),
+  branch_id: integer('branch_id')
+    .notNull()
+    .references(() => branches.id, { onDelete: 'restrict' })
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -326,13 +390,9 @@ export const tokensRelations = relations(tokens, ({ one }) => ({
   })
 }));
 
-export const moviesRelations = relations(movies, ({ one, many }) => ({
+export const moviesRelations = relations(movies, ({ many }) => ({
   bookings: many(bookings),
-  showtimes: many(showtimes),
-  branch: one(branches, {
-    fields: [movies.branch_id],
-    references: [branches.id]
-  })
+  showtimes: many(showtimes)
 }));
 
 export const showtimesRelations = relations(showtimes, ({ one }) => ({

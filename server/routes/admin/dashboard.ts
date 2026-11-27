@@ -29,7 +29,7 @@ export function topTicketsRange(period: string, selectedYear: number, now: Date 
   const start = vnDayStart(anchorDay.year, anchorDay.month, anchorDay.day - (days - 1)).toISOString();
   return { start: start < yearRange.start ? yearRange.start : start, end: yearRange.end };
 }
-import { sqlBranchIdsStaffAccessFilter } from '../../../server/lib/branch-ids';
+import { sqlInStaffBranches } from '../../lib/catalog-scope';
 
 // ---- SQL aggregation helpers ----
 // Dates are stored as ISO text in UTC. Vietnam is UTC+7 all year (no daylight saving), so "+7 hours" gives the
@@ -65,7 +65,7 @@ function buildBranchBookingCondition(bookingsTable: any, restrictToBranchIds: nu
 function buildBranchMovieCondition(moviesTable: any, restrictToBranchIds: number[] | null | undefined) {
   if (restrictToBranchIds === null || restrictToBranchIds === undefined) return undefined;
   if (restrictToBranchIds.length === 0) return sql`1 = 0`;
-  return sqlBranchIdsStaffAccessFilter(moviesTable.branch_ids, restrictToBranchIds);
+  return sqlInStaffBranches('movie', restrictToBranchIds);
 }
 
 export async function getDashboardMetricsImpl(

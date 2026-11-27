@@ -1,6 +1,7 @@
 import { PaymentRequest } from '@shared/api';
 import { eq, and, asc, isNull, inArray, sql } from 'drizzle-orm';
-import { validateVoucherForVRImpl, packageServesBranch } from '../vouchers';
+import { validateVoucherForVRImpl } from '../vouchers';
+import { packageAtBranch, packagesAtBranch } from '../../../lib/catalog-scope';
 import { HttpError, MAX_TICKET_PER_ORDER, BookingValidationResult, normalizeQuantity } from './shared';
 import { resolveOrderBranchId } from '../../../lib/booking-branch';
 import { isValidCustomerName, isValidCustomerEmail, NAME_MAX_LENGTH } from '../../../lib/customer-input';
@@ -80,50 +81,59 @@ export async function validateBookingInput(
   const user = userResult[0];
   const userEmail = user?.email || email;
 
-  // The order belongs to the branch the customer chose. A package can be sold at several branches, so the package's
-  // own (first) branch is only a fallback for old clients that send no branch; then the default branch.
-  const requestedBranchId = Number(branch_id) > 0 ? Number(branch_id) : null;
+  // The order belongs to the branch the customer chose, else the default branch. Every package of the order must be
+  // sold there, and its price and movies are those of that branch (server/lib/catalog-scope.ts).
+  const targetBranchId = await resolveOrderBranchId(anyDb, branchesTable, Number(branch_id) > 0 ? Number(branch_id) : null);
+  const branch = await anyDb.query.branches.findFirst({
+    where: and(eq(branchesTable.id, targetBranchId), isNull(branchesTable.deleted_at))
+  });
+  if (!branch) {
+    throw new HttpError(404, 'Chi nhánh không tồn tại.');
+  }
+  if (!branch.is_active) {
+    throw new HttpError(403, 'Chi nhánh hiện đang ngừng hoạt động.');
+  }
+  if (!branch.is_open) {
+    throw new HttpError(403, 'Chi nhánh hiện đang đóng cửa. Vui lòng quay lại sau.');
+  }
+
+  /** A package as sold at the order's branch; refused when it is hidden, deleted, of the wrong type or not sold there. */
+  const packageAtOrderBranch = async (packageId: unknown, type: 'movie' | 'vr') => {
+    const pkg = await packageAtBranch(anyDb, Number(packageId), targetBranchId);
+    const isVr = pkg?.type === 'vr';
+    if (pkg && isVr === (type === 'vr')) {
+      checkMemberOnly(pkg, body);
+      return pkg;
+    }
+    const stored = Number(packageId) > 0 ? await findPackage(anyDb, ticketPackagesTable, Number(packageId)) : null;
+    if (stored && stored.is_active !== false && !stored.deleted_at && (stored.type === 'vr') === (type === 'vr')) {
+      throw new HttpError(400, `Gói ${type === 'vr' ? 'VR' : 'vé'} "${stored.name}" không áp dụng tại chi nhánh bạn chọn.`);
+    }
+    throw new HttpError(
+      404,
+      type === 'vr' ? 'Một số gói VR không tồn tại hoặc đã ngừng hoạt động.' : `Gói vé phim (ID: ${packageId}) không tồn tại hoặc đã bị ẩn.`
+    );
+  };
 
   let ticketPackage: any = null;
   let unitPrice = 0;
   let movieTotalPrice = 0;
-  let movieItemsDetails: Array<{ package_id: number; quantity: number; price: number; name: string }> = [];
+  const movieItemsDetails: Array<{ package_id: number; quantity: number; price: number; name: string }> = [];
   const movie_items = body.movie_items;
 
   if (movie_items && Array.isArray(movie_items) && movie_items.length > 0) {
-    const pkgIds = movie_items.map((i: any) => i.package_id);
-    const pkgs = await anyDb.query.ticket_packages.findMany({
-      where: and(
-        inArray(ticketPackagesTable.id, pkgIds),
-        sql`(${ticketPackagesTable.type} IS NULL OR ${ticketPackagesTable.type} != 'vr')`
-      )
-    });
-    const pkgsMap = new Map(pkgs.map((p: any) => [p.id, p]));
     let calculatedTicketCount = 0;
-
     for (const item of movie_items) {
-      const pkg: any = pkgsMap.get(item.package_id);
-      if (!pkg || pkg.is_active === false || pkg.deleted_at !== null) {
-        throw new HttpError(404, `Gói vé phim (ID: ${item.package_id}) không tồn tại hoặc đã bị ẩn.`);
-      }
-      checkMemberOnly(pkg, body);
+      const pkg: any = await packageAtOrderBranch(item.package_id, 'movie');
       const price = Number(pkg.price || 0);
       const qty = normalizeQuantity(item.quantity);
-
       movieTotalPrice += price * qty;
       calculatedTicketCount += qty;
-
-      movieItemsDetails.push({
-        package_id: pkg.id,
-        quantity: qty,
-        price: price,
-        name: pkg.name
-      });
+      movieItemsDetails.push({ package_id: pkg.id, quantity: qty, price, name: pkg.name });
+      if (!ticketPackage) ticketPackage = pkg;
     }
-
-    ticketPackageId = pkgs[0].id;
-    ticketPackage = pkgs[0];
-    unitPrice = Number(pkgs[0].price || 0);
+    ticketPackageId = ticketPackage.id;
+    unitPrice = Number(ticketPackage.price || 0);
     // Override ticketCount with calculated value from payload items
     ticketCount = calculatedTicketCount;
     // The limit is checked again here: the count sent by the browser was replaced by the real total from the items
@@ -131,81 +141,34 @@ export async function validateBookingInput(
       throw new HttpError(400, `Mỗi lượt chỉ đặt tối đa ${MAX_TICKET_PER_ORDER} vé.`);
     }
   } else if (ticketPackageId) {
-    ticketPackage = await anyDb.query.ticket_packages.findFirst({
-      where: eq(ticketPackagesTable.id, ticketPackageId)
-    });
-    if (!ticketPackage || ticketPackage.is_active === false || ticketPackage.deleted_at !== null) {
-      throw new HttpError(404, 'Gói vé không hợp lệ hoặc đã tắt.');
-    }
-    checkMemberOnly(ticketPackage, body);
+    ticketPackage = await packageAtOrderBranch(ticketPackageId, 'movie');
   } else {
-    ticketPackage = await anyDb.query.ticket_packages.findFirst({
-      where: and(
-        eq(ticketPackagesTable.is_active, true),
-        isNull(ticketPackagesTable.deleted_at),
-        sql`(${ticketPackagesTable.type} IS NULL OR ${ticketPackagesTable.type} != 'vr')`
-      ),
-      orderBy: [asc(ticketPackagesTable.display_order), asc(ticketPackagesTable.price)]
-    });
-    if (!ticketPackage) {
+    // No package named: the first movie package sold at the branch
+    const [firstPackage] = await packagesAtBranch(anyDb, targetBranchId, 'movie');
+    if (!firstPackage) {
       throw new HttpError(400, 'Không tìm thấy gói vé khả dụng.');
     }
+    checkMemberOnly(firstPackage, body);
+    ticketPackage = firstPackage;
   }
 
-  // The movies of the order (the package's "combo" of movies). They come from the package; the browser may only pick
-  // among them, never add a movie the package does not include.
-  const packageMovieIds = parseIdList(ticketPackage?.combo);
-  let comboIds: number[] = packageMovieIds;
+  // The movies of the order: the movies of the package at this branch. The browser may only pick among them.
+  const packageMovies: any[] = Array.isArray(ticketPackage?.movies) ? ticketPackage.movies : [];
+  const packageMovieIds = packageMovies.map((movie: any) => Number(movie.id));
+  let movies: any[] = packageMovies;
   if (combo && Array.isArray(combo) && combo.length > 0) {
     const chosenIds = parseIdList(combo);
-    if (packageMovieIds.length > 0 && chosenIds.some((movieId) => !packageMovieIds.includes(movieId))) {
-      throw new HttpError(400, 'Phim đã chọn không thuộc gói vé này.');
+    if (chosenIds.length !== combo.length || chosenIds.some((movieId) => !packageMovieIds.includes(movieId))) {
+      throw new HttpError(400, 'Phim đã chọn không thuộc gói vé này tại chi nhánh bạn chọn.');
     }
-    comboIds = chosenIds;
+    movies = packageMovies.filter((movie: any) => chosenIds.includes(Number(movie.id)));
   }
 
-  let movies: any[] = [];
-  if (comboIds.length > 0) {
-    movies = await anyDb.query.movies.findMany({
-      where: and(inArray(moviesTable.id, comboIds), eq(moviesTable.is_active, true), isNull(moviesTable.deleted_at))
-    });
-
-    if (combo && Array.isArray(combo) && combo.length > 0 && movies.length !== combo.length) {
-      throw new HttpError(404, 'Một số phim trong combo không hợp lệ hoặc đã ngừng hoạt động.');
-    }
-  }
-
-  // Branch check: the chosen branch, every package of the order must be sold there, and it must be open
   let branchSettings: any = {};
-  const targetBranchId = await resolveOrderBranchId(anyDb, branchesTable, requestedBranchId || ticketPackage.branch_id);
-  if (ticketPackage && !packageServesBranch(ticketPackage, targetBranchId)) {
-    throw new HttpError(400, `Gói vé "${ticketPackage.name}" không áp dụng tại chi nhánh bạn chọn.`);
-  }
-  for (const item of movieItemsDetails) {
-    const pkg = movie_items && movie_items.length > 0 ? await findPackage(anyDb, ticketPackagesTable, item.package_id) : null;
-    if (pkg && !packageServesBranch(pkg, targetBranchId)) {
-      throw new HttpError(400, `Gói vé "${pkg.name}" không áp dụng tại chi nhánh bạn chọn.`);
-    }
-  }
-  if (targetBranchId) {
-    const branch = await anyDb.query.branches.findFirst({
-      where: and(eq(branchesTable.id, targetBranchId), isNull(branchesTable.deleted_at))
-    });
-    if (!branch) {
-      throw new HttpError(404, 'Chi nhánh không tồn tại.');
-    }
-    if (!branch.is_active) {
-      throw new HttpError(403, 'Chi nhánh hiện đang ngừng hoạt động.');
-    }
-    if (!branch.is_open) {
-      throw new HttpError(403, 'Chi nhánh hiện đang đóng cửa. Vui lòng quay lại sau.');
-    }
-    // Parse branch settings
-    try {
-      branchSettings = branch.settings ? JSON.parse(branch.settings) : {};
-    } catch (e) {
-      branchSettings = {};
-    }
+  try {
+    branchSettings = branch.settings ? JSON.parse(branch.settings) : {};
+  } catch (e) {
+    branchSettings = {};
   }
 
   if (!movie_items || movie_items.length === 0) {
@@ -234,30 +197,8 @@ export async function validateBookingInput(
   let vrTotalPrice = 0;
 
   if (vr_items && Array.isArray(vr_items) && vr_items.length > 0) {
-    const vrPackageIds = vr_items.map((i) => i.vr_package_id);
-    const vrPkgs = await anyDb.query.ticket_packages.findMany({
-      where: and(
-        inArray(ticketPackagesTable.id, vrPackageIds),
-        eq(ticketPackagesTable.type, 'vr'),
-        eq(ticketPackagesTable.is_active, true),
-        isNull(ticketPackagesTable.deleted_at)
-      )
-    });
-
-    if (vrPkgs.length !== vrPackageIds.length) {
-      throw new HttpError(404, 'Một số gói VR không tồn tại hoặc đã ngừng hoạt động.');
-    }
-
-    const vrPkgMap = new Map(vrPkgs.map((p: any) => [p.id, p]));
     for (const it of vr_items) {
-      const pkg: any = vrPkgMap.get(it.vr_package_id);
-      if (!pkg) continue;
-
-      if (!packageServesBranch(pkg, targetBranchId)) {
-        throw new HttpError(400, `Gói VR "${pkg.name}" không áp dụng tại chi nhánh bạn chọn.`);
-      }
-      checkMemberOnly(pkg, body);
-
+      const pkg: any = await packageAtOrderBranch(it.vr_package_id, 'vr');
       const qty = normalizeQuantity(it.quantity);
       const price = Number(pkg.price || 0);
       const lineTotal = price * qty;

@@ -3,12 +3,26 @@ import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import {
-  parseBranchIds,
-  sqlBranchIdsStaffAccessFilter,
-  staffCanAccessBranchIds,
-  staffCanModifyBranchRecord
-} from '../../lib/branch-ids';
-import { validateVoucherFields, checkVoucherBranches } from '../../lib/voucher-input';
+  assertBranchesExist,
+  assertPackagesExist,
+  assertStaffMayAssign,
+  branchScopeStatements,
+  readScopeChange,
+  readScopeInput,
+  readVoucherPackagesChange,
+  readVoucherPackagesInput,
+  readVoucherScope,
+  runBatch,
+  sqlInStaffBranches,
+  staffMayModify,
+  staffMaySee,
+  voucherPackagesStatements,
+  withBranchScope,
+  withVoucherScope,
+  type BranchScope,
+  type VoucherScope
+} from '../../lib/catalog-scope';
+import { validateVoucherFields } from '../../lib/voucher-input';
 import { isFullDiscountVoucher, isSuperAdminStaff, FULL_DISCOUNT_SALES_MESSAGE } from '../../lib/free-voucher';
 import { staffs as staffsTable, bookings as bookingsTable } from '../../../shared/schema';
 
@@ -16,26 +30,6 @@ import { staffs as staffsTable, bookings as bookingsTable } from '../../../share
 function isEmptyNumber(value: unknown): boolean {
   return value === undefined || value === null || value === '';
 }
-
-function parseJsonArrayNullable(value: any): string | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (Array.isArray(value)) return JSON.stringify(value);
-  if (typeof value === 'string') return value;
-  return undefined;
-}
-
-export function parseJsonArrayOutput(val: any): any[] | null {
-  if (Array.isArray(val)) return val;
-  if (typeof val === 'string' && val.trim().length > 0) {
-    try {
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {}
-  }
-  return null;
-}
-
 
 export function parseVoucherMetadata(desc: string | null | undefined): {
   note: string;
@@ -123,10 +117,10 @@ export function buildVoucherOrderBy(vouchers: any, sort_by?: string, sort_dir?: 
   return [direction(vouchers[columnName]), desc(vouchers.id)];
 }
 
-/** Vouchers of one branch: the global ones (no branch list) and those whose list holds the branch. */
-export function voucherBranchCondition(vouchers: any, branchId: number | null | undefined) {
+/** Vouchers of one branch: the ones of every branch and those linked to the branch. */
+export function voucherBranchCondition(_vouchers: any, branchId: number | null | undefined) {
   if (!branchId) return null;
-  return sqlBranchIdsStaffAccessFilter(vouchers.branch_ids, [branchId]);
+  return sqlInStaffBranches('voucher', [branchId]);
 }
 
 /** The is_active filter of the lists: 'true'/'1' active, 'false'/'0' inactive, anything else (all, blank) no filter. */
@@ -137,26 +131,37 @@ export function voucherActiveCondition(vouchers: any, isActive: string | undefin
 }
 
 /**
- * The fields a voucher row sends to the admin screens: the stored description is replaced by its parsed parts
- * (note, Sales person), and the columns no screen reads (applicable_user_ids, excluded_ticket_package_ids) stay out.
+ * The fields a voucher row (with its scope: withVoucherScope) sends to the admin screens: the stored description is
+ * replaced by its parsed parts (note, Sales person).
  */
 function voucherRowForScreen(row: any) {
-  const {
-    description,
-    applicable_user_ids: _unusedUserIds,
-    excluded_ticket_package_ids: _unusedExcludedIds,
-    ...voucherFields
-  } = row;
+  const { description, ...voucherFields } = row;
   const meta = parseVoucherMetadata(description);
   return {
     ...voucherFields,
     note: meta.note,
     sale_staff_id: meta.sale_staff_id,
     sale_name: meta.sale_name,
-    sale_email: meta.sale_email,
-    applicable_ticket_package_ids: parseJsonArrayOutput(row.applicable_ticket_package_ids),
-    branch_ids: parseJsonArrayOutput(row.branch_ids)
+    sale_email: meta.sale_email
   };
+}
+
+/**
+ * The voucher form's choice of packages. A voucher of every type (scope 'all') covers every package; otherwise the
+ * form must say so ({ all_packages } or a list). On an edit, a choice not sent stays as it is.
+ */
+function voucherPackagesFromInput(
+  scopeValue: string,
+  input: { all_packages?: unknown; package_ids?: unknown },
+  mode: 'create' | 'edit'
+) {
+  if (scopeValue === 'all') return { all_packages: true, package_ids: [] as number[] };
+  return mode === 'create' ? readVoucherPackagesInput(input) : readVoucherPackagesChange(input);
+}
+
+/** The record as written to the audit log: the row plus where and on what it applies. */
+function voucherAuditRecord(row: any, scope: VoucherScope | null) {
+  return { ...row, ...(scope || {}) };
 }
 
 export async function listVouchersImpl(
@@ -213,12 +218,12 @@ export async function listVouchersImpl(
   if (statusCondition) conditions.push(statusCondition);
 
   // Branch access filter: staff can only see vouchers from their assigned branches
-  // (or vouchers with branch_ids = null which apply to all branches)
+  // (or vouchers of every branch)
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
     if (restrictToBranchIds.length === 0) {
       conditions.push(sql`1 = 0`);
     } else {
-      conditions.push(sqlBranchIdsStaffAccessFilter(tables.vouchers.branch_ids, restrictToBranchIds));
+      conditions.push(sqlInStaffBranches('voucher', restrictToBranchIds));
     }
   }
 
@@ -246,7 +251,7 @@ export async function listVouchersImpl(
     } catch {}
   }
 
-  const items = rawItems.map((v: any) => {
+  const items = (await withVoucherScope(anyDb, rawItems)).map((v: any) => {
     let total_revenue = 0;
     let redemptions_count = v.used_count || 0;
 
@@ -335,7 +340,7 @@ export async function listDeletedVouchersImpl(
     if (restrictToBranchIds.length === 0) {
       conditions.push(sql`1 = 0`);
     } else {
-      conditions.push(sqlBranchIdsStaffAccessFilter(vouchers.branch_ids, restrictToBranchIds));
+      conditions.push(sqlInStaffBranches('voucher', restrictToBranchIds));
     }
   }
 
@@ -349,7 +354,7 @@ export async function listDeletedVouchersImpl(
     offset: (page - 1) * pageSize
   });
   
-  const items = itemsRaw.map(({ deleted_by_staff, ...v }: any) => ({
+  const items = (await withVoucherScope(anyDb, itemsRaw)).map(({ deleted_by_staff, ...v }: any) => ({
     ...voucherRowForScreen(v),
     deleted_by_staff_name: deleted_by_staff?.fullname || null
   }));
@@ -375,8 +380,8 @@ export async function listVoucherPackageOptionsImpl(
   const conditions: any[] = [isNull(packages.deleted_at)];
   if (options.type === 'vr') conditions.push(eq(packages.type, 'vr'));
   if (options.type === 'movie') conditions.push(sql`(${packages.type} IS NULL OR ${packages.type} != 'vr')`);
-  if (options.branch_id) conditions.push(sqlBranchIdsStaffAccessFilter(packages.branch_ids, [options.branch_id]));
-  if (restrictToBranchIds) conditions.push(sqlBranchIdsStaffAccessFilter(packages.branch_ids, restrictToBranchIds));
+  if (options.branch_id) conditions.push(sqlInStaffBranches('package', [options.branch_id]));
+  if (restrictToBranchIds) conditions.push(sqlInStaffBranches('package', restrictToBranchIds));
 
   const rows = await anyDb
     .select({
@@ -384,8 +389,7 @@ export async function listVoucherPackageOptionsImpl(
       name: packages.name,
       price: packages.price,
       type: packages.type,
-      branch_id: packages.branch_id,
-      branch_ids: packages.branch_ids,
+      all_branches: packages.all_branches,
       is_active: packages.is_active
     })
     .from(packages)
@@ -393,7 +397,7 @@ export async function listVoucherPackageOptionsImpl(
     .orderBy(asc(packages.display_order), desc(packages.id))
     .limit(VOUCHER_PACKAGE_OPTIONS_LIMIT);
 
-  const items = rows.map((row: any) => ({ ...row, branch_ids: parseBranchIds(row.branch_ids) }));
+  const items = await withBranchScope(anyDb, 'package', rows);
   return { items, total: items.length };
 }
 
@@ -414,14 +418,12 @@ export async function getVoucherImpl(
   restrictToBranchIds?: number[] | null,
   redemptionLimit: number = DEFAULT_REDEMPTION_LIMIT
 ) {
-  const voucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
-  if (!voucher) return null;
+  const voucherRow = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+  if (!voucherRow) return null;
+  const [voucher] = await withVoucherScope(anyDb, [voucherRow]);
 
   // Check branch access
-  if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanAccessBranchIds(voucher.branch_ids, restrictToBranchIds, false);
-    if (!hasAccess) return null;
-  }
+  if (!staffMaySee(voucher, restrictToBranchIds ?? null)) return null;
 
   const meta = parseVoucherMetadata(voucher.description);
 
@@ -486,9 +488,7 @@ export async function getVoucherImpl(
 
   // The raw description is the stored JSON (note + Sales person); the screen gets them parsed below
   const {
-    applicable_user_ids: _unusedUserIds,
     description: _rawDescription,
-    excluded_ticket_package_ids: _unusedExcluded,
     deleted_at: _deletedAt,
     deleted_by_staff_id: _deletedBy,
     ...voucherFields
@@ -502,9 +502,7 @@ export async function getVoucherImpl(
     redemption_total_count: redemptionCountRes?.count || 0,
     recent_redemptions,
     created_by_staff_name: createLog?.staffFullname || null,
-    updated_by_staff_name: updateLog?.staffFullname || null,
-    applicable_ticket_package_ids: parseJsonArrayOutput(voucher.applicable_ticket_package_ids),
-    branch_ids: parseJsonArrayOutput(voucher.branch_ids)
+    updated_by_staff_name: updateLog?.staffFullname || null
   };
 }
 
@@ -546,8 +544,10 @@ export async function createVoucherImpl(
     is_active?: boolean;
     valid_from?: string;
     valid_until?: string;
-    applicable_ticket_package_ids?: any;
-    branch_ids?: any;
+    all_branches?: boolean;
+    branch_ids?: number[];
+    all_packages?: boolean;
+    package_ids?: number[];
   },
   staffInfo?: { id: number; email: string; fullname: string },
   restrictToBranchIds?: number[] | null
@@ -556,7 +556,13 @@ export async function createVoucherImpl(
   if (!cleanCode) throw Object.assign(new Error('Mã voucher không được trống'), { statusCode: 400 });
   validateVoucherFields({ ...args, scope: args.scope || 'all' });
   const dValue = Number(args.discount_value);
-  const branchIdsToSave = checkVoucherBranches(args.branch_ids, restrictToBranchIds, { required: true });
+  // Where and on what it applies: the form must say so; a missing choice is refused (never "every branch")
+  const restrict = restrictToBranchIds ?? null;
+  const branchScope: BranchScope = readScopeInput(args);
+  assertStaffMayAssign(branchScope, restrict, 'voucher');
+  await assertBranchesExist(anyDb, branchScope.branch_ids);
+  const packageChoice = voucherPackagesFromInput(args.scope || 'all', args, 'create')!;
+  await assertPackagesExist(anyDb, packageChoice.package_ids);
   await checkFullDiscountVoucher(anyDb, args, args.sale_staff_id, restrictToBranchIds);
 
   const formattedDesc = formatVoucherDescription(args.note || args.description, {
@@ -581,9 +587,8 @@ export async function createVoucherImpl(
     is_active: args.is_active !== undefined ? (args.is_active ? 1 : 0) : 1,
     valid_from: args.valid_from || null,
     valid_until: args.valid_until || null,
-    applicable_ticket_package_ids:
-      (args.scope || 'all') === 'all' ? null : parseJsonArrayNullable(args.applicable_ticket_package_ids),
-    branch_ids: branchIdsToSave === undefined || branchIdsToSave === null ? null : JSON.stringify(branchIdsToSave),
+    all_branches: branchScope.all_branches,
+    all_packages: packageChoice.all_packages,
     created_at: formatDateForDb(nowIso),
     updated_at: formatDateForDb(nowIso)
   };
@@ -595,8 +600,13 @@ export async function createVoucherImpl(
       voucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.code, cleanCode) });
     }
     if (!voucher) throw new Error('Không thể tạo voucher');
+    await runBatch(anyDb, [
+      ...(await branchScopeStatements(anyDb, 'voucher', voucher.id, branchScope)),
+      ...(await voucherPackagesStatements(anyDb, voucher.id, packageChoice))
+    ]);
+    const voucherScope = await readVoucherScope(anyDb, voucher.id);
 
-    const auditNew = buildAuditPayload(voucher);
+    const auditNew = buildAuditPayload(voucherAuditRecord(voucher, voucherScope));
     if (staffInfo) {
       await logAuditAction(
         anyDb,
@@ -612,7 +622,7 @@ export async function createVoucherImpl(
         auditNew
       );
     }
-    return { voucher };
+    return { voucher: { ...voucher, ...voucherScope } };
   } catch (err: any) {
     if (
       String(err.message || err)
@@ -648,8 +658,10 @@ export async function updateVoucherImpl(
     is_active?: boolean;
     valid_from?: string;
     valid_until?: string;
-    applicable_ticket_package_ids?: any;
-    branch_ids?: any;
+    all_branches?: boolean;
+    branch_ids?: number[];
+    all_packages?: boolean;
+    package_ids?: number[];
   },
   staffInfo?: { id: number; email: string; fullname: string },
   restrictToBranchIds?: number[] | null
@@ -660,10 +672,11 @@ export async function updateVoucherImpl(
     err.statusCode = 404;
     throw err;
   }
+  const oldScope = await readVoucherScope(anyDb, id);
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffMayModify(oldScope, restrictToBranchIds);
     if (!hasAccess) {
       const err: any = new Error('Voucher thuộc nhiều chi nhánh hoặc chi nhánh khác, chỉ Super Admin hoặc người quản lý đủ các chi nhánh đó được sửa');
       err.statusCode = 403;
@@ -696,7 +709,12 @@ export async function updateVoucherImpl(
     valid_from: pick('valid_from'),
     valid_until: pick('valid_until')
   });
-  const branchIdsToSave = checkVoucherBranches(args.branch_ids, restrictToBranchIds, { required: false });
+  // Sent fields change the branches / packages; fields not sent leave them as they are
+  const newBranchScope = readScopeChange(args);
+  if (newBranchScope) {
+    assertStaffMayAssign(newBranchScope, restrictToBranchIds ?? null, 'voucher');
+    await assertBranchesExist(anyDb, newBranchScope.branch_ids);
+  }
   await checkFullDiscountVoucher(
     anyDb,
     { discount_type: pick('discount_type'), discount_value: pick('discount_value') },
@@ -720,22 +738,22 @@ export async function updateVoucherImpl(
   if (args.is_active !== undefined) data.is_active = args.is_active ? 1 : 0;
   if (args.valid_from !== undefined) data.valid_from = args.valid_from || null;
   if (args.valid_until !== undefined) data.valid_until = args.valid_until || null;
+  // A voucher of every type (scope 'all') covers every package; otherwise the packages as sent (if sent)
   const targetScope = args.scope !== undefined ? args.scope : existing.scope;
-  if (targetScope === 'all') {
-    data.applicable_ticket_package_ids = null;
-  } else {
-    if (args.applicable_ticket_package_ids !== undefined)
-      data.applicable_ticket_package_ids = parseJsonArrayNullable(args.applicable_ticket_package_ids);
-  }
-  if (branchIdsToSave !== undefined) data.branch_ids = branchIdsToSave === null ? null : JSON.stringify(branchIdsToSave);
+  const newPackages = voucherPackagesFromInput(targetScope, args, 'edit');
+  if (newPackages) await assertPackagesExist(anyDb, newPackages.package_ids);
 
-  const updatedRes = await anyDb.update(tables.vouchers).set(data).where(eq(tables.vouchers.id, id)).returning();
-  let updatedVoucher: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-  if (!updatedVoucher) {
-    updatedVoucher = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
-  }
+  // The row, its branches and its packages change together
+  await runBatch(anyDb, [
+    anyDb.update(tables.vouchers).set(data).where(eq(tables.vouchers.id, id)),
+    ...(newBranchScope ? await branchScopeStatements(anyDb, 'voucher', id, newBranchScope) : []),
+    ...(newPackages ? await voucherPackagesStatements(anyDb, id, newPackages) : [])
+  ]);
+  const updatedRow: any = await anyDb.query.vouchers.findFirst({ where: eq(tables.vouchers.id, id) });
+  const newScope = await readVoucherScope(anyDb, id);
+  const updatedVoucher = updatedRow ? { ...updatedRow, ...newScope } : null;
 
-  const auditOld = buildAuditPayload(existing);
+  const auditOld = buildAuditPayload(voucherAuditRecord(existing, oldScope));
   const auditNew = buildAuditPayload(updatedVoucher);
   if (staffInfo) {
     await logAuditAction(
@@ -771,7 +789,7 @@ export async function toggleVoucherStatusImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffMayModify(await readVoucherScope(anyDb, id), restrictToBranchIds);
     if (!hasAccess) {
       const err: any = new Error('Không có quyền thay đổi trạng thái voucher này');
       err.statusCode = 403;
@@ -816,7 +834,7 @@ export async function deleteVoucherImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffMayModify(await readVoucherScope(anyDb, id), restrictToBranchIds);
     if (!hasAccess) {
       const err: any = new Error('Không có quyền xóa voucher này');
       err.statusCode = 403;
@@ -871,7 +889,7 @@ export async function restoreVoucherImpl(
 
   // Check branch access
   if (restrictToBranchIds !== null && restrictToBranchIds !== undefined) {
-    const hasAccess = staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false);
+    const hasAccess = staffMayModify(await readVoucherScope(anyDb, id), restrictToBranchIds);
     if (!hasAccess) {
       const err: any = new Error('Không có quyền khôi phục voucher này');
       err.statusCode = 403;

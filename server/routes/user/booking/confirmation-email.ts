@@ -1,4 +1,6 @@
 import { eq } from 'drizzle-orm';
+import { readVoucherScope } from '../../../lib/catalog-scope';
+import { voucherInvoicePackageIds } from '../vouchers';
 import { getBookingEmailTemplate } from '../../../lib/booking-utils';
 import { EMAIL_SUBJECTS } from '../../../lib/email-templates';
 import type { ItemLine } from '../../../lib/email-layout';
@@ -65,13 +67,13 @@ export function queueBookingConfirmationEmail(args: {
             try {
               const vt = (tables as any).vouchers;
               const v = await anyDb
-                .select({ scope: vt.scope, applicable_ticket_package_ids: vt.applicable_ticket_package_ids })
+                .select({ scope: vt.scope })
                 .from(vt)
                 .where(eq(vt.id, booking.voucher_id))
                 .limit(1);
               if (v && v.length > 0) {
                 voucherScope = v[0].scope || 'all';
-                applicableIds = parseApplicableIds(v[0].applicable_ticket_package_ids);
+                applicableIds = voucherInvoicePackageIds(await readVoucherScope(anyDb, booking.voucher_id));
               }
             } catch (e) {
               console.warn('[updatePayment] Error fetching voucher scope for mail:', e);

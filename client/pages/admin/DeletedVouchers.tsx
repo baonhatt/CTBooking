@@ -29,8 +29,11 @@ interface VoucherItem {
   redemption_total_count?: number;
   valid_from?: string | null;
   valid_until?: string | null;
-  applicable_ticket_package_ids?: number[] | null;
-  branch_ids?: number[] | null;
+  // all_packages = every package; otherwise the packages in package_ids
+  all_packages?: boolean;
+  package_ids?: number[];
+  all_branches?: boolean;
+  branch_ids?: number[];
   is_active?: boolean;
   is_deleted?: boolean;
   deleted_at?: string | null;

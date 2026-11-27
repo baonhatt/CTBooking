@@ -12,7 +12,22 @@ import { listTransactionsImpl, getTransactionByIdImpl } from './payments';
 
 // These tests run the real SQL on an in-memory SQLite database, so the WHERE clauses are really exercised.
 
-const TABLES = ['movies', 'toys', 'users', 'accounts', 'bookings', 'ticket_packages', 'branches', 'booking_vr_items', 'voucher_redemption_logs', 'vouchers'];
+const TABLES = [
+  'movies',
+  'movie_branches',
+  'toys',
+  'users',
+  'accounts',
+  'bookings',
+  'ticket_packages',
+  'package_branches',
+  'branches',
+  'booking_vr_items',
+  'voucher_redemption_logs',
+  'vouchers',
+  'voucher_branches',
+  'voucher_packages'
+];
 
 const tables: any = {
   movies: (schema as any).movies,
@@ -407,6 +422,8 @@ describe('transaction list rows', () => {
         scope: 'all',
         discount_type: 'fixed',
         discount_value: 10000,
+        all_branches: 1,
+        all_packages: 1,
         created_at: '2026-01-01',
         updated_at: '2026-01-01'
       }
@@ -435,10 +452,13 @@ describe('transaction detail', () => {
         scope: 'vr',
         discount_type: 'fixed',
         discount_value: 10000,
+        all_branches: 1,
+        all_packages: 0,
         created_at: 'x',
         updated_at: 'x'
       }
     ]);
+    insertRows(detailDb.raw, 'voucher_packages', [{ voucher_id: 3, package_id: 4 }]);
     insertRows(detailDb.raw, 'bookings', [booking({ id: 701, booking_type: 'vr', voucher_id: 3, combo: '[1,2]' })]);
     insertRows(detailDb.raw, 'booking_vr_items', [
       { id: 1, booking_id: 701, vr_ticket_package_id: 4, package_name: 'VR 30', quantity: 2, unit_price: 50000, line_total: 100000 }
@@ -447,7 +467,7 @@ describe('transaction detail', () => {
 
     const detail: any = await getTransactionByIdImpl(detailDb.db, { ...tables, auditLogs: (schema as any).auditLogs, staffs: (schema as any).staffs }, 701);
 
-    expect(detail.voucher_info).toMatchObject({ scope: 'vr', sale_name: 'Lan' });
+    expect(detail.voucher_info).toMatchObject({ scope: 'vr', sale_name: 'Lan', applicable_ids: [4] });
     expect(detail.voucher_info).not.toHaveProperty('description');
     expect(detail.voucher_info).not.toHaveProperty('sale_staff_id');
     expect(detail.ticket_package).not.toHaveProperty('movies');

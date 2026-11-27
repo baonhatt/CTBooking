@@ -101,7 +101,7 @@ export default async function Home({ searchParams }: { searchParams: { branch_id
   // TẠM ẨN ĐỒ CHƠI (20261110): khách chưa dùng module đồ chơi nên ẩn khỏi giao diện. API, DB và các file Toys* vẫn giữ nguyên. Tìm "TẠM ẨN ĐỒ CHƠI" để mở lại. (bỏ lấy danh sách đồ chơi)
   const [activeMovies, siteMediaRes, ticketsRes, vrRes] = await Promise.all([
     getActiveMoviesToday(effectiveBranchId).catch(() => []),
-    getSiteMediaApi({ active: true }).catch(() => ({ items: [] })),
+    getSiteMediaApi({ active: true, branchId: effectiveBranchId }).catch(() => ({ items: [] })),
     getActiveTickets(effectiveBranchId).catch(() => ({ items: [] })),
     getVRPackages(effectiveBranchId).catch(() => ({ items: [] }))
   ]);

@@ -27,7 +27,8 @@ interface TicketPackage {
   type?: string;
   is_member_only: boolean;
   deleted_at: string;
-  branch_id?: number;
+  all_branches?: boolean;
+  branch_ids?: number[];
   branch_name?: string;
   deleted_by_staff_name?: string;
 }

@@ -1,5 +1,5 @@
 import { eq, desc, and, isNull } from 'drizzle-orm';
-import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
+import { customerBranchId, sqlServesBranch } from '../../lib/catalog-scope';
 
 /** A movie of the "showing now" list, with only what the customer screens read (carousel, hero poster, booking). */
 export type PublicActiveMovie = {
@@ -15,10 +15,10 @@ export async function getAllActiveMoviesToday(
   tables: { movies: any },
   branch_id?: number
 ): Promise<{ activeMovies: PublicActiveMovie[] }> {
-  const baseCondition = and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at));
-  const whereCondition = branch_id
-    ? and(baseCondition, sqlBranchIdsMatchFilter(tables.movies.branch_ids, tables.movies.branch_id, branch_id))
-    : baseCondition;
+  // The movies shown at the branch (without a branch: the default branch)
+  const branchId = await customerBranchId(anyDb, branch_id);
+  if (!branchId) return { activeMovies: [] };
+  const whereCondition = and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at), sqlServesBranch('movie', branchId));
 
   const active_movies = await anyDb.query.movies.findMany({
     where: whereCondition,

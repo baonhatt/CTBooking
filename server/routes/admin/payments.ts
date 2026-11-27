@@ -1,4 +1,6 @@
 import { eq, and, or, inArray, desc, asc, count, sql } from 'drizzle-orm';
+import { readVoucherScope } from '../../lib/catalog-scope';
+import { voucherInvoicePackageIds } from '../user/vouchers';
 import { formatDateForDb } from '../../../server/lib/date-utils';
 import { vnRangeFromInputs, sqlPaidInRange, sqlListedInRange, sqlCreatedInRange } from '../../../server/lib/vn-time';
 import { chunk } from '../../../server/lib/paging';
@@ -407,15 +409,14 @@ export async function getTransactionByIdImpl(
       const [v] = await anyDb
         .select({
           scope: tables.vouchers.scope,
-          description: tables.vouchers.description,
-          applicable_ticket_package_ids: tables.vouchers.applicable_ticket_package_ids
+          description: tables.vouchers.description
         })
         .from(tables.vouchers)
         .where(eq(tables.vouchers.id, booking.voucher_id))
         .limit(1);
       if (v) {
         voucher_scope = v.scope || 'all';
-        voucher_applicable_ids = v.applicable_ticket_package_ids ?? null;
+        voucher_applicable_ids = voucherInvoicePackageIds(await readVoucherScope(anyDb, booking.voucher_id));
         if (v.description) {
           const trimmed = v.description.trim();
           if (trimmed.startsWith('{') && trimmed.endsWith('}')) {

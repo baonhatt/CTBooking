@@ -8,6 +8,7 @@ import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { ConfirmDialog } from '@/components/admin/common/ConfirmDialog';
 import { notify } from '@/components/admin/common/notify';
+import { branch_scope_of, type BranchScope } from '@/lib/branch-scope';
 
 export default function MoviesPage() {
   const navigate = useNavigate();
@@ -102,8 +103,7 @@ export default function MoviesPage() {
         updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null,
         rating: m.rating ?? null,
         is_active: m.is_active,
-        branch_id: m.branch_id,
-        branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : (m.branch_ids ?? null)
+        ...branch_scope_of(m)
       }));
       setMoviesLocal(mapped);
       setTotalMovies(total);
@@ -139,14 +139,15 @@ export default function MoviesPage() {
   };
   const handleOpenCreate = () => {
     setEditType('movie');
-    const defaultBranchIds =
+    // The branch being viewed, else the staff member's own branches, else (Super Admin) every branch
+    const defaultScope: BranchScope =
       selectedBranchId && selectedBranchId !== 'all'
-        ? [selectedBranchId]
+        ? { all_branches: false, branch_ids: [Number(selectedBranchId)] }
         : staffBranchIds && staffBranchIds.length > 0
-          ? staffBranchIds
+          ? { all_branches: false, branch_ids: [...staffBranchIds] }
           : staff?.isSuperAdmin
-            ? null
-            : [];
+            ? { all_branches: true, branch_ids: [] }
+            : { all_branches: false, branch_ids: [] };
 
     setEditData({
       id: '',
@@ -156,8 +157,7 @@ export default function MoviesPage() {
       posterUrl: '',
       status: 'active',
       price: 0,
-      branch_ids: defaultBranchIds,
-      branch_id: defaultBranchIds && defaultBranchIds.length === 1 ? defaultBranchIds[0] : null
+      ...defaultScope
     });
     setIsEditOpen(true);
   };
@@ -189,8 +189,7 @@ export default function MoviesPage() {
       release_date: m.release_date ? new Date(m.release_date).toISOString() : null,
       rating: m.rating ?? null,
       is_active: m.is_active,
-      branch_id: m.branch_id,
-      branch_ids: Array.isArray(m.branch_ids) ? m.branch_ids : (m.branch_ids ?? null),
+      ...branch_scope_of(m),
       updated_at: m.updated_at ? new Date(m.updated_at).toISOString() : null
     }));
     setMoviesLocal(mapped);

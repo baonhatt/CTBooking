@@ -515,7 +515,11 @@ publicRouter.get('/api/site-media', async (c) => {
 
       const db = drizzle(c.env.cinema_db, { schema });
 
-      const items = await listPublicSiteMedia(db, { site_media: schema.site_media }, { section, type });
+      const items = await listPublicSiteMedia(
+        db,
+        { site_media: schema.site_media },
+        { section, type, branch_id: c.req.query('branch_id') }
+      );
 
       const parsed = {
         items: (items as any[]).map((m: any) => ({

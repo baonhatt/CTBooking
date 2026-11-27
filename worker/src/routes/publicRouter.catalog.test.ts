@@ -85,17 +85,16 @@ describe('GET /api/tickets-active', () => {
     features: '["A"]',
     type: 'movie',
     display_order: 1,
-    combo: [3],
+    movie_scope: 'selected',
     code: 'V1',
-    branch_id: 2,
+    all_branches: false,
     branch_ids: [2],
-    branch_ids_parsed: [2],
     min_group_size: 1,
     created_at: '2026-01-01',
     updated_at: '2026-01-02',
     deleted_at: null,
     deleted_by_staff_id: null,
-    movies: [{ id: 3, title: 'Phim', cover_image: 'x.jpg', duration_min: 90, branch_id: 2, branch_ids: '[2]', description: 'd' }]
+    movies: [{ id: 3, title: 'Phim', cover_image: 'x.jpg', duration_min: 90, all_branches: false, branch_ids: [2], description: 'd' }]
   };
 
   it('hides member-only packages from visitors, then sends only the fields the screens read', async () => {
@@ -110,7 +109,7 @@ describe('GET /api/tickets-active', () => {
       ['description', 'display_order', 'features', 'id', 'movies', 'name', 'price', 'type'].sort()
     );
     expect(Object.keys(body.items[0].movies[0]).sort()).toEqual(
-      ['branch_id', 'branch_ids', 'cover_image', 'duration_min', 'id', 'title'].sort()
+      ['cover_image', 'duration_min', 'id', 'title'].sort()
     );
     expect(JSON.stringify(body)).not.toMatch(AUDIT_FIELDS);
   });

@@ -3,6 +3,7 @@ import * as schema from '../../../shared/schema';
 import { deletePostImpl, createPostImpl, updatePostImpl, loadPostStaffNames } from './posts';
 
 const tables: any = { posts: (schema as any).posts, auditLogs: (schema as any).auditLogs };
+const postBranches = (schema as any).post_branches;
 const staff = { id: 5, email: 'staff@example.com', fullname: 'Staff' };
 
 function postRow(overrides: Record<string, unknown> = {}) {
@@ -44,7 +45,9 @@ function makeDb(row: any) {
         return { returning: async () => rows, then: (resolve: any) => Promise.resolve(rows).then(resolve) };
       }
     }),
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => [], orderBy: async () => [] }) }) })
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [], orderBy: async () => [] }) }) }),
+    // The statements were recorded when they were built; the batch only runs them
+    batch: async (statements: any[]) => Promise.all(statements)
   };
   return { db, writes };
 }
@@ -131,7 +134,7 @@ describe('post content is cleaned when it is saved', () => {
   it('create: scripts and event handlers are removed, the rest stays', async () => {
     const { db, writes } = makeDb(undefined);
 
-    await createPostImpl(db, tables, { title: 'T', content: EVIL } as any, undefined, undefined, staff);
+    await createPostImpl(db, tables, { title: 'T', content: EVIL, all_branches: true } as any, undefined, undefined, staff);
 
     const saved = postWrites(writes).find((entry) => entry.kind === 'insert')!.values.content;
     expect(saved).toContain('text-align:center');
@@ -159,47 +162,84 @@ describe('post content is cleaned when it is saved', () => {
 });
 
 describe('post branches', () => {
-  it('create: no branch list means all branches (null), a list is saved as JSON', async () => {
+  const linkWrites = (writes: Write[]) => writes.filter((entry) => entry.table === postBranches);
+
+  it('create: all_branches = 1 for every branch, a list becomes post_branches rows', async () => {
     const all = makeDb(undefined);
-    await createPostImpl(all.db, tables, { title: 'T', content: '<p>x</p>' } as any, undefined, undefined, staff);
-    expect(postWrites(all.writes).find((entry) => entry.kind === 'insert')!.values.branch_ids).toBeNull();
+    await createPostImpl(all.db, tables, { title: 'T', content: '<p>x</p>', all_branches: true } as any, undefined, undefined, staff);
+    expect(postWrites(all.writes).find((entry) => entry.kind === 'insert')!.values.all_branches).toBe(true);
+    expect(linkWrites(all.writes)).toHaveLength(0);
 
     const some = makeDb(undefined);
-    await createPostImpl(some.db, tables, { title: 'T', content: '<p>x</p>', branch_ids: [2, 1, 2] } as any, undefined, undefined, staff);
-    expect(postWrites(some.writes).find((entry) => entry.kind === 'insert')!.values.branch_ids).toBe('[2,1]');
+    await createPostImpl(
+      some.db,
+      tables,
+      { title: 'T', content: '<p>x</p>', all_branches: false, branch_ids: [2, 1, 2] } as any,
+      undefined,
+      undefined,
+      staff
+    );
+    expect(postWrites(some.writes).find((entry) => entry.kind === 'insert')!.values.all_branches).toBe(false);
+    expect(linkWrites(some.writes).find((entry) => entry.kind === 'insert')!.values).toEqual([
+      { post_id: 99, branch_id: 2 },
+      { post_id: 99, branch_id: 1 }
+    ]);
   });
 
-  it('update: not sent leaves the branches alone, null means all, a list replaces them', async () => {
+  it('create: an empty list is saved as "no branch yet" (not every branch, no link rows)', async () => {
+    const none = makeDb(undefined);
+    await createPostImpl(none.db, tables, { title: 'T', content: '<p>x</p>', all_branches: false, branch_ids: [] } as any, undefined, undefined, staff);
+    expect(postWrites(none.writes).find((entry) => entry.kind === 'insert')!.values.all_branches).toBe(false);
+    expect(linkWrites(none.writes).some((entry) => entry.kind === 'insert')).toBe(false);
+  });
+
+  it('create: a missing branch choice is refused with a 400 and writes nothing', async () => {
+    const created = makeDb(undefined);
+    await expect(createPostImpl(created.db, tables, { title: 'T', content: '<p>x</p>' } as any, undefined, undefined, staff)).rejects.toMatchObject({
+      statusCode: 400
+    });
+    expect(postWrites(created.writes)).toHaveLength(0);
+  });
+
+  it('update: not sent leaves the branches alone, all_branches means all, a list replaces them', async () => {
     const untouched = makeDb(postRow());
     await updatePostImpl(untouched.db, tables, 7, { title: 'New' } as any, undefined, undefined, undefined, staff);
-    expect(postWrites(untouched.writes).find((entry) => entry.kind === 'update')!.values).not.toHaveProperty('branch_ids');
+    expect(postWrites(untouched.writes).every((entry) => !('all_branches' in (entry.values || {})))).toBe(true);
+    expect(linkWrites(untouched.writes)).toHaveLength(0);
 
-    const everyBranch = makeDb(postRow({ branch_ids: '[1]' }));
-    await updatePostImpl(everyBranch.db, tables, 7, { branch_ids: null } as any, undefined, undefined, undefined, staff);
-    expect(postWrites(everyBranch.writes).find((entry) => entry.kind === 'update')!.values.branch_ids).toBeNull();
+    const everyBranch = makeDb(postRow({ all_branches: false }));
+    await updatePostImpl(everyBranch.db, tables, 7, { all_branches: true } as any, undefined, undefined, undefined, staff);
+    expect(postWrites(everyBranch.writes).some((entry) => entry.kind === 'update' && entry.values.all_branches === true)).toBe(true);
+    expect(linkWrites(everyBranch.writes).some((entry) => entry.kind === 'insert')).toBe(false);
 
     const chosen = makeDb(postRow());
-    await updatePostImpl(chosen.db, tables, 7, { branch_ids: [3] } as any, undefined, undefined, undefined, staff);
-    expect(postWrites(chosen.writes).find((entry) => entry.kind === 'update')!.values.branch_ids).toBe('[3]');
+    await updatePostImpl(chosen.db, tables, 7, { all_branches: false, branch_ids: [3] } as any, undefined, undefined, undefined, staff);
+    expect(postWrites(chosen.writes).some((entry) => entry.kind === 'update' && entry.values.all_branches === false)).toBe(true);
+    expect(linkWrites(chosen.writes).find((entry) => entry.kind === 'insert')!.values).toEqual([{ post_id: 7, branch_id: 3 }]);
   });
 
-  it.each([
-    ['an empty list', []],
-    ['a text', 'abc'],
-    ['a branch that is not a number', [1, 'x']],
-    ['a negative branch', [-1]]
-  ])('refuses %s with a 400 and writes nothing', async (_label, branchIds) => {
+  const expectRefused = async (scope: Record<string, unknown>) => {
     const created = makeDb(undefined);
     await expect(
-      createPostImpl(created.db, tables, { title: 'T', content: '<p>x</p>', branch_ids: branchIds } as any, undefined, undefined, staff)
+      createPostImpl(created.db, tables, { title: 'T', content: '<p>x</p>', ...scope } as any, undefined, undefined, staff)
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(postWrites(created.writes)).toHaveLength(0);
 
     const updated = makeDb(postRow());
     await expect(
-      updatePostImpl(updated.db, tables, 7, { branch_ids: branchIds } as any, undefined, undefined, undefined, staff)
+      updatePostImpl(updated.db, tables, 7, scope as any, undefined, undefined, undefined, staff)
     ).rejects.toMatchObject({ statusCode: 400 });
     expect(postWrites(updated.writes)).toHaveLength(0);
+  };
+
+  it.each([
+    ['a list without all_branches', { branch_ids: [1] }],
+    ['all_branches false without a list', { all_branches: false }],
+    ['a text', { all_branches: false, branch_ids: 'abc' }],
+    ['a negative branch', { all_branches: false, branch_ids: [-1] }],
+    ['a branch that is not a number', { all_branches: false, branch_ids: [1, 'x'] }]
+  ])('refuses %s with a 400 and writes nothing', async (_label, scope) => {
+    await expectRefused(scope);
   });
 });
 

@@ -12,6 +12,7 @@ import { useStaffPermission } from '@/hooks/useStaffPermission';
 import { useStaffStore } from '@/store/staffStore';
 import { useNavigate } from 'react-router-dom';
 import { notify } from '@/components/admin/common/notify';
+import { default_branch_scope } from '@/lib/branch-scope';
 
 interface VoucherItem {
   id: number;
@@ -34,8 +35,11 @@ interface VoucherItem {
   redemption_total_count?: number;
   valid_from?: string | null;
   valid_until?: string | null;
-  applicable_ticket_package_ids?: number[] | null;
-  branch_ids?: number[] | null;
+  // all_packages = every package; otherwise the packages in package_ids
+  all_packages?: boolean;
+  package_ids?: number[];
+  all_branches?: boolean;
+  branch_ids?: number[];
   is_active?: boolean;
   is_deleted?: boolean;
   deleted_at?: string | null;
@@ -58,6 +62,7 @@ const generateRandomCode = () => {
 export default function VouchersPage() {
   const navigate = useNavigate();
   const staff = useStaffStore((state) => state.staff);
+  const staffBranchIds = useStaffStore((state) => state.branchIds);
   const clearStaff = useStaffStore((state) => state.clearStaff);
 
   const getInitialFilters = () => {
@@ -196,12 +201,14 @@ export default function VouchersPage() {
       per_user_limit: 1,
       valid_from: getTodayStartIso(),
       valid_until: getTodayEndIso(),
-      applicable_ticket_package_ids: null,
-      branch_ids: staff?.isSuperAdmin
-        ? null
+      all_packages: true,
+      package_ids: [],
+      // A Super Admin starts with every branch; a branch staff member with the branch being viewed, else their own
+      ...(staff?.isSuperAdmin
+        ? { all_branches: true, branch_ids: [] }
         : selectedBranchId && selectedBranchId !== 'all'
-          ? [selectedBranchId]
-          : null,
+          ? { all_branches: false, branch_ids: [Number(selectedBranchId)] }
+          : default_branch_scope(false, staffBranchIds)),
       is_active: true
     });
     setIsEditOpen(true);

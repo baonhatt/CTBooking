@@ -2,6 +2,7 @@ import { eq, desc, asc, count, and, or, sql, isNull, isNotNull, like, gte, inArr
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import { branchUsage, sqlCountServedAt } from '../../lib/catalog-scope';
 
 export async function listBranchesImpl(
   anyDb: any,
@@ -81,16 +82,15 @@ export async function listBranchesImpl(
   // The outer branch row, written out in full: drizzle prints a column of the single table of a select without its
   // table name, and inside the sub-select a bare "id" would mean the movie's / package's own id
   const outerBranchId = sql.raw('"branches"."id"');
+  // Paid orders not used yet
+  const unusedPaidSql = sql`${tables.bookings.payment_status} = 'paid' AND COALESCE(${tables.bookings.is_used}, 0) = 0`;
   const [catalogStats, bookingStats] = await Promise.all([
-    // 1-2. Active movies and packages each branch shows: the ones listing this branch in branch_ids, plus the ones for
-    // all branches (branch_ids empty), the same rule as the customer site (sqlBranchIdsMatchFilter)
+    // 1-2. Active movies and packages each branch shows, the same rule as the customer site (server/lib/catalog-scope.ts)
     anyDb
       .select({
         branch_id: tables.branches.id,
-        movie_count: sql<number>`(select count(*) from ${tables.movies} m where m.is_active = 1 and m.deleted_at is null
-          and (m.branch_ids is null or exists (select 1 from json_each(m.branch_ids) where cast(value as integer) = ${outerBranchId})))`,
-        package_count: sql<number>`(select count(*) from ${tables.ticket_packages} p where p.is_active = 1 and p.deleted_at is null
-          and (p.branch_ids is null or exists (select 1 from json_each(p.branch_ids) where cast(value as integer) = ${outerBranchId})))`
+        movie_count: sqlCountServedAt('movie', outerBranchId),
+        package_count: sqlCountServedAt('package', outerBranchId)
       })
       .from(tables.branches)
       .where(inArray(tables.branches.id, branchIds)),
@@ -101,7 +101,7 @@ export async function listBranchesImpl(
         branch_id: tables.bookings.branch_id,
         booking_count: count(),
         pending_bookings_count: sql<number>`SUM(CASE WHEN ${tables.bookings.payment_status} = 'pending' AND ${tables.bookings.created_at} >= ${fifteenMinutesAgoStr} THEN 1 ELSE 0 END)`,
-        paid_unused_count: sql<number>`SUM(CASE WHEN ${tables.bookings.payment_status} = 'paid' AND (${tables.bookings.is_used} = 0 OR ${tables.bookings.is_used} = false OR ${tables.bookings.is_used} IS NULL) THEN 1 ELSE 0 END)`
+        paid_unused_count: sql<number>`SUM(CASE WHEN ${unusedPaidSql} THEN 1 ELSE 0 END)`
       })
       .from(tables.bookings)
       .where(inArray(tables.bookings.branch_id, branchIds))
@@ -487,28 +487,18 @@ export async function deleteBranchImpl(
     throw new Error('Không thể xóa chi nhánh mặc định');
   }
 
-  const [activeMovies] = await anyDb
-    .select({ count: count() })
-    .from(tables.movies)
-    .where(and(eq(tables.movies.branch_id, id), eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at)));
-
-  if (activeMovies?.count > 0) {
-    throw new Error(`Không thể xóa chi nhánh vì có ${activeMovies.count} phim đang hoạt động`);
-  }
-
-  const [activePackages] = await anyDb
-    .select({ count: count() })
-    .from(tables.ticket_packages)
-    .where(
-      and(
-        eq(tables.ticket_packages.branch_id, id),
-        eq(tables.ticket_packages.is_active, true),
-        isNull(tables.ticket_packages.deleted_at)
-      )
-    );
-
-  if (activePackages?.count > 0) {
-    throw new Error(`Không thể xóa chi nhánh vì có ${activePackages.count} gói vé đang hoạt động`);
+  // Movies, packages, vouchers, posts and media still linked to the branch (records of every branch do not count:
+  // they simply stop showing there). The admin first takes the branch off them.
+  const usage = await branchUsage(anyDb, id);
+  const linked = [
+    usage.movies ? `${usage.movies} phim` : '',
+    usage.packages ? `${usage.packages} gói vé` : '',
+    usage.vouchers ? `${usage.vouchers} voucher` : '',
+    usage.posts ? `${usage.posts} bài viết` : '',
+    usage.media ? `${usage.media} ảnh/video` : ''
+  ].filter(Boolean);
+  if (linked.length > 0) {
+    throw new Error(`Không thể xóa chi nhánh vì còn ${linked.join(', ')} gắn với chi nhánh này. Hãy bỏ chi nhánh khỏi các mục đó trước.`);
   }
 
   const [bookings] = await anyDb

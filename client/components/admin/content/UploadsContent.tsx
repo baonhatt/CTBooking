@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   uploadAdminVideo,
   uploadDirectToCloudinary,
+  checkSiteMediaApi,
   createSiteMediaApi,
   getSiteMediaApi,
   updateSiteMediaApi,
@@ -13,6 +14,13 @@ import {
 } from '@/lib/api/uploads';
 import { getAdminBranchOptions } from '@/lib/api/branches';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
+import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
+import {
+  branch_scope_payload,
+  branch_scope_status,
+  default_branch_scope,
+  type BranchScope
+} from '@/lib/branch-scope';
 import { formatVnDateTime } from '@/lib/format';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -53,7 +61,7 @@ import { PageHeader } from '@/components/admin/common/PageHeader';
 import { EmptyState } from '@/components/admin/common/EmptyState';
 import { FormField } from '@/components/admin/common/FormField';
 import { notify } from '@/components/admin/common/notify';
-import { useHasStaffPermission } from '@/hooks/useStaffPermission';
+import { useHasStaffPermission, useIsSuperAdmin, useStaffBranchIds } from '@/hooks/useStaffPermission';
 import {
   ADMIN_BTN_PRIMARY,
   ADMIN_BTN_OUTLINE,
@@ -70,6 +78,13 @@ export default function UploadsContent() {
   // The server enforces these rights; hiding the buttons avoids offering actions that would fail
   const can_upload = hasPermission('uploads', 'upload');
   const can_delete = hasPermission('uploads', 'delete');
+  const isSuperAdmin = useIsSuperAdmin();
+  const staffBranchIds = useStaffBranchIds();
+  // Branches the uploaded media shows at: every upload and replacement sends this choice explicitly.
+  // A Super Admin starts with every branch, a branch staff member with their own branches.
+  const [mediaBranchScope, setMediaBranchScope] = useState<BranchScope>(() =>
+    default_branch_scope(isSuperAdmin, staffBranchIds)
+  );
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [openConfirm, setOpenConfirm] = useState(false);
@@ -90,6 +105,7 @@ export default function UploadsContent() {
       status: 'pending' | 'uploading' | 'done' | 'error';
       error?: string;
       targetId?: number;
+      branchScope: BranchScope;
     }[]
   >([]);
   const runningRef = useRef(0);
@@ -307,6 +323,20 @@ export default function UploadsContent() {
 
         // Start async task
         (async () => {
+          // Ask the server first (rights and branches), so nothing is compressed or sent to Cloudinary when it would be refused.
+          // A replacement keeps the branches of the file it replaces; a new file uses the branches chosen in the panel.
+          try {
+            await checkSiteMediaApi(
+              nextItem.targetId ? { target_id: nextItem.targetId } : branch_scope_payload(nextItem.branchScope)
+            );
+          } catch (err: any) {
+            const reason = err?.message || 'Không được phép tải lên';
+            setUploads((arr) => arr.map((x) => (x.id === nextItem.id ? { ...x, status: 'error', error: reason } : x)));
+            setStage('error');
+            push_status_line(`Không tải lên [${nextItem.name}]: ${reason}`);
+            return;
+          }
+
           try {
             let finalFile = nextItem.file;
             // Compress image if needed
@@ -376,7 +406,8 @@ export default function UploadsContent() {
                 height: result.height,
                 duration: result.duration,
                 display_order: 0,
-                is_active: true
+                is_active: true,
+                ...branch_scope_payload(nextItem.branchScope)
               });
               push_status_line(`Đã tạo mới [${nextItem.name}] vào ${getSectionLabel(nextItem.section)}`);
             }
@@ -455,6 +486,13 @@ export default function UploadsContent() {
 
   const startUpload = async () => {
     if (!files.length) return;
+    // A new file: a branch staff member must choose at least one of their branches (a Super Admin may leave it empty).
+    // A replacement keeps the branches of the file it replaces, so the panel's choice does not matter then.
+    if (!pendingTargetId && !isSuperAdmin && (mediaBranchScope.all_branches || mediaBranchScope.branch_ids.length === 0)) {
+      setOpenConfirm(false);
+      notify.error('Vui lòng chọn ít nhất một chi nhánh bạn quản lý');
+      return;
+    }
     setOpenConfirm(false);
     setStage('compressing');
     push_status_line('Đã thêm vào hàng đợi...');
@@ -470,7 +508,8 @@ export default function UploadsContent() {
       compressProgress: /^image\//.test(f.type) ? 0 : null,
       uploadProgress: 0,
       status: 'pending' as const,
-      targetId: pendingTargetId || undefined
+      targetId: pendingTargetId || undefined,
+      branchScope: mediaBranchScope
     }));
     setUploads((arr) => [...arr, ...toAdd]);
     setFiles([]);
@@ -712,6 +751,24 @@ export default function UploadsContent() {
                 <Info className="mt-0.5 h-3.5 w-3.5 text-blue-500" />
                 <span>Media sẽ được upload và áp dụng trực tiếp cho phần này trên website.</span>
               </div>
+            </FormField>
+
+            <FormField
+              label="Chi nhánh hiển thị"
+              helper={
+                branch_scope_status(mediaBranchScope) === 'none'
+                  ? 'Chưa chọn chi nhánh: media được lưu nhưng chưa hiện ở chi nhánh nào'
+                  : 'Áp dụng cho file mới; file thay thế giữ chi nhánh của file cũ'
+              }
+            >
+              <BranchMultiSelect
+                branches={branches}
+                value={mediaBranchScope}
+                allowAll={isSuperAdmin}
+                onChange={setMediaBranchScope}
+                disabled={has_active_upload}
+                className="rounded-xl text-xs"
+              />
             </FormField>
 
             <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
@@ -1216,7 +1273,7 @@ export default function UploadsContent() {
                             <div className="mt-1 truncate text-sm font-medium text-slate-800" title={media_display_name(m)}>
                               {media_display_name(m)}
                             </div>
-                            <BranchIdsBadge branch_ids={m.branch_ids} branches={branches} className="mt-1" />
+                            <BranchIdsBadge all_branches={m.all_branches} branch_ids={m.branch_ids} branches={branches} className="mt-1" />
                           </div>
 
                           <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-slate-500">
@@ -1278,7 +1335,7 @@ export default function UploadsContent() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <BranchIdsBadge branch_ids={m.branch_ids} branches={branches} />
+                            <BranchIdsBadge all_branches={m.all_branches} branch_ids={m.branch_ids} branches={branches} />
                           </TableCell>
                           <TableCell>
                             <StatusBadge tone="info">{getSectionLabel(m.section)}</StatusBadge>
@@ -1362,7 +1419,12 @@ export default function UploadsContent() {
 
                     <div>
                       <div className="text-[11px] font-bold uppercase text-slate-500">Chi nhánh</div>
-                      <BranchIdsBadge branch_ids={selectedMediaItem.branch_ids} branches={branches} className="mt-1" />
+                      <BranchIdsBadge
+                        all_branches={selectedMediaItem.all_branches}
+                        branch_ids={selectedMediaItem.branch_ids}
+                        branches={branches}
+                        className="mt-1"
+                      />
                     </div>
 
                     <div className="flex items-center gap-4">

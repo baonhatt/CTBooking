@@ -54,7 +54,7 @@ vi.mock('../../../../server/routes/admin/branches', async (importOriginal) => ({
 
 vi.mock('../../../../server/routes/admin/site-media', async (importOriginal) => ({
   ...(await importOriginal<any>()),
-  findSiteMediaBranchIdsImpl: vi.fn(async () => ({ branch_ids: null })),
+  findSiteMediaBranchIdsImpl: vi.fn(async () => ({ all_branches: true, branch_ids: [] as number[] })),
   updateSiteMediaImpl: vi.fn(async () => ({ item: { id: 1 }, success: true })),
   deleteSiteMediaImpl: vi.fn(async () => ({ ok: true, item: { id: 1, url: 'u', public_id: null, type: 'image' } })),
   createSiteMediaImpl: vi.fn(async () => ({ item: { id: 1 } }))
@@ -166,16 +166,30 @@ describe('site media and Cloudinary signing', () => {
     expect(await good.json()).toHaveProperty('signature');
   });
 
-  it('branch staff cannot add, change or delete global media', async () => {
-    const create = await call(sitemediaRouter, '/api/admin/site-media', {
-      method: 'POST',
-      permissions: 'uploads:upload',
-      branches: '1',
-      body: { section: 'hero_section', type: 'image', url: 'u' }
-    });
-    expect(create.status).toBe(403);
-    expect(createSiteMediaImpl).not.toHaveBeenCalled();
+  it('branch staff may add media: the create gets their branches, and its refusals keep their status', async () => {
+    const body = { section: 'hero_section', type: 'image', url: 'u', all_branches: false, branch_ids: [1] };
+    const create = await call(sitemediaRouter, '/api/admin/site-media', { method: 'POST', permissions: 'uploads:upload', branches: '1', body });
+    expect(create.status).toBe(201);
+    expect((createSiteMediaImpl as any).mock.calls[0][5]).toEqual([1]);
 
+    const superAdmin = await call(sitemediaRouter, '/api/admin/site-media', { method: 'POST', body: { ...body, all_branches: true } });
+    expect(superAdmin.status).toBe(201);
+    expect((createSiteMediaImpl as any).mock.calls[1][5]).toBeNull();
+
+    for (const status of [400, 403]) {
+      (createSiteMediaImpl as any).mockRejectedValueOnce(Object.assign(new Error('refused'), { statusCode: status }));
+      const refused = await call(sitemediaRouter, '/api/admin/site-media', { method: 'POST', permissions: 'uploads:upload', branches: '1', body });
+      expect(refused.status).toBe(status);
+      expect(await refused.json()).toMatchObject({ status: 'error', message: 'refused' });
+    }
+
+    (createSiteMediaImpl as any).mockRejectedValueOnce(new Error('database down'));
+    const failed = await call(sitemediaRouter, '/api/admin/site-media', { method: 'POST', permissions: 'uploads:upload', branches: '1', body });
+    expect(failed.status).toBe(500);
+    expect(JSON.stringify(await failed.json())).not.toContain('database down');
+  });
+
+  it('branch staff cannot change or delete global media', async () => {
     const update = await call(sitemediaRouter, '/api/admin/site-media', {
       method: 'PUT',
       permissions: 'uploads:upload',
@@ -191,7 +205,7 @@ describe('site media and Cloudinary signing', () => {
   });
 
   it('branch staff may change media fully inside their branches', async () => {
-    (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce({ branch_ids: '[1]' });
+    (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce({ all_branches: false, branch_ids: [1] });
     const update = await call(sitemediaRouter, '/api/admin/site-media', {
       method: 'PUT',
       permissions: 'uploads:upload',
@@ -199,6 +213,53 @@ describe('site media and Cloudinary signing', () => {
       body: { id: 1, title: 'x' }
     });
     expect(update.status).toBe(200);
+  });
+
+  it('a change of branches is checked: 400 when not explicit, 403 outside the staff branches', async () => {
+    (findSiteMediaBranchIdsImpl as any).mockResolvedValue({ all_branches: false, branch_ids: [1] });
+    const put = (body: Record<string, unknown>) =>
+      call(sitemediaRouter, '/api/admin/site-media', { method: 'PUT', permissions: 'uploads:upload', branches: '1', body: { id: 1, ...body } });
+    expect((await put({ branch_ids: [1] })).status).toBe(400);
+    expect((await put({ all_branches: true })).status).toBe(403);
+    expect((await put({ all_branches: false, branch_ids: [2] })).status).toBe(403);
+    expect((await put({ all_branches: false, branch_ids: [] })).status).toBe(403);
+    expect(updateSiteMediaImpl).not.toHaveBeenCalled();
+    expect((await put({ all_branches: false, branch_ids: [1] })).status).toBe(200);
+    (findSiteMediaBranchIdsImpl as any).mockReset();
+    (findSiteMediaBranchIdsImpl as any).mockResolvedValue({ all_branches: true, branch_ids: [] });
+  });
+
+  describe('POST /api/admin/site-media/check (asked before the upload)', () => {
+    const check = (body: Record<string, unknown>, branches?: string) =>
+      call(sitemediaRouter, '/api/admin/site-media/check', { method: 'POST', permissions: 'uploads:upload', branches, body });
+
+    it('a new media: staff may name their own branches only, at least one', async () => {
+      expect((await check({ all_branches: false, branch_ids: [1] }, '1,2')).status).toBe(200);
+      expect((await check({ all_branches: true }, '1')).status).toBe(403);
+      expect((await check({ all_branches: false, branch_ids: [] }, '1')).status).toBe(403);
+      expect((await check({ all_branches: false, branch_ids: [3] }, '1')).status).toBe(403);
+      expect((await check({}, '1')).status).toBe(400);
+      expect((await check({ branch_ids: [1] }, '1')).status).toBe(400);
+    });
+
+    it('the Super Admin may name every branch or none', async () => {
+      expect((await check({ all_branches: true })).status).toBe(200);
+      expect((await check({ all_branches: false, branch_ids: [] })).status).toBe(200);
+    });
+
+    it('replacing the file of a media: 404 when missing, 403 when not fully the staff member', async () => {
+      (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce(null);
+      expect((await check({ target_id: 5 }, '1')).status).toBe(404);
+      (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce({ all_branches: true, branch_ids: [] });
+      expect((await check({ target_id: 5 }, '1')).status).toBe(403);
+      (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce({ all_branches: false, branch_ids: [1, 3] });
+      expect((await check({ target_id: 5 }, '1')).status).toBe(403);
+      (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce({ all_branches: false, branch_ids: [] });
+      expect((await check({ target_id: 5 }, '1')).status).toBe(403);
+      (findSiteMediaBranchIdsImpl as any).mockResolvedValueOnce({ all_branches: false, branch_ids: [1] });
+      expect((await check({ target_id: 5 }, '1')).status).toBe(200);
+      expect((findSiteMediaBranchIdsImpl as any).mock.calls.at(-1)[2]).toBe(5);
+    });
   });
 
   it('the delete reply carries no row', async () => {

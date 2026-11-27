@@ -12,8 +12,8 @@ export type AdminMovieListItem = {
   updated_at: string | null;
   rating: number | null;
   is_active: boolean;
-  branch_id: number | null;
-  branch_ids: number[] | null;
+  all_branches: boolean;
+  branch_ids: number[];
 };
 
 export async function getMoviesAdmin(options?: {
@@ -84,8 +84,8 @@ export async function createMovieApi(body: {
   duration_min?: number;
   is_active?: boolean;
   release_date?: string;
-  branch_id?: number | null;
-  branch_ids?: number[] | null;
+  all_branches?: boolean;
+  branch_ids?: number[];
 }) {
   return request<{ movie: any }>('/api/admin/movies', {
     method: 'POST',
@@ -106,8 +106,8 @@ export async function updateMovieApi(
     duration_min?: number;
     is_active?: boolean;
     release_date?: string;
-    branch_id?: number | null;
-    branch_ids?: number[] | null;
+    all_branches?: boolean;
+    branch_ids?: number[];
   }
 ) {
   return request<{ movie: any }>(`/api/admin/movies/${id}`, {
@@ -130,8 +130,8 @@ export async function getMovieById(id: number) {
     rating: number | null;
     duration_min: number | null;
     is_active: boolean;
-    branch_id: number | null;
-    branch_ids?: number[] | null;
+    all_branches: boolean;
+    branch_ids: number[];
     release_date: string | null;
     created_at: string | null;
     updated_at: string | null;
@@ -144,8 +144,8 @@ export async function getMovieById(id: number) {
       name: string;
       code: string | null;
       price: number;
-      branch_id: number | null;
-      branch_ids: number[] | null;
+      all_branches: boolean;
+      branch_ids: number[];
     }>;
   }>(`/api/admin/movies/${id}`);
 }

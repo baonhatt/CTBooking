@@ -139,16 +139,6 @@ export default function Account() {
         card: 'Thẻ ngân hàng'
     };
 
-    const getMovieCountFromCombo = (comboStr: string) => {
-        try {
-            if (!comboStr) return 0;
-            const comboArray = JSON.parse(comboStr);
-            return Array.isArray(comboArray) ? comboArray.length : 0;
-        } catch (error) {
-            console.error('Lỗi parse combo:', error);
-            return 0;
-        }
-    };
     const handleCopy = async (text: string) => {
         if (await copyText(text)) {
             toast.success('Đã sao chép');
@@ -697,7 +687,6 @@ export default function Account() {
 
                                                         <div className="grid gap-4">
                                                             {g.items.map((t: any, i: number) => {
-                                                                const movieCount = getMovieCountFromCombo(t.combo);
                                                                 const isVietQR = t.method?.toLowerCase() === 'vietqr';
                                                                 const isPaid = t.payment_status === 'paid';
                                                                 const bookingCodeText = getBookingCode(t);

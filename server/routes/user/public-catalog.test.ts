@@ -123,16 +123,19 @@ describe('public movie detail', () => {
 });
 
 describe('public site media', () => {
-  it('always filters active and not deleted, and selects only what the home page reads', async () => {
+  it('always filters active, not deleted and offered at the branch, and selects only what the home page reads', async () => {
     const { db, seen } = selectDb([]);
 
-    await listPublicSiteMedia(db, tables, { section: 'hero_section' });
+    await listPublicSiteMedia(db, tables, { section: 'hero_section', branch_id: 2 });
 
     expect(Object.keys(seen.columns || {}).sort()).toEqual(['description', 'id', 'section', 'title', 'type', 'url']);
     const where = sqlText(seen.where);
     expect(where).toContain('"is_active"');
     expect(where).toContain('"deleted_at" is null');
     expect(where).toContain('"section"');
+    // Media of every branch, or linked to the asked branch
+    expect(where).toContain('"all_branches" = 1');
+    expect(where).toContain('"site_media_branches"');
   });
 });
 
@@ -145,13 +148,15 @@ describe('package trimming', () => {
       is_member_only: false,
       code: 'X',
       created_at: 'c',
-      movies: [{ id: 3, title: 'P', branch_ids: '[1]', description: 'long text' }]
+      movies: [{ id: 3, title: 'P', cover_image: 'p.jpg', duration_min: 90, description: 'long text', all_branches: 1 }]
     });
 
     expect(trimmed).not.toHaveProperty('is_member_only');
     expect(trimmed).not.toHaveProperty('code');
     expect(trimmed.movies[0]).not.toHaveProperty('description');
-    expect(trimmed.movies[0].branch_ids).toBe('[1]');
+    // The movies are already those of the asked branch: no branch scope is sent
+    expect(trimmed.movies[0]).not.toHaveProperty('all_branches');
+    expect(trimmed.movies[0]).toEqual({ id: 3, title: 'P', cover_image: 'p.jpg', duration_min: 90 });
   });
 
   it('a VR package keeps what the VR section reads', () => {

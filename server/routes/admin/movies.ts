@@ -2,16 +2,61 @@ import { eq, desc, asc, and, inArray, sql, or, isNull, isNotNull, like, count } 
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
+import * as schema from '../../../shared/schema';
 import {
-  enrichWithParsedBranchIds,
-  enrichItemsWithParsedBranchIds,
-  parseBranchIds,
-  resolveBranchIdsInput,
-  staffCanAccessBranchIds,
-  staffCanModifyBranchRecord,
-  sqlBranchIdsMatchFilter,
-  sqlBranchIdsStaffAccessFilter
-} from '../../lib/branch-ids';
+  assertBranchesExist,
+  assertStaffMayAssign,
+  branchScopeStatements,
+  packagesSelectingMovie,
+  readBranchScope,
+  readScopeChange,
+  readScopeInput,
+  runBatch,
+  sqlInStaffBranches,
+  sqlServesBranch,
+  staffMayModify,
+  withBranchScope,
+  withPackageMovies,
+  type BranchScope
+} from '../../lib/catalog-scope';
+
+/** Error with an HTTP status. */
+function statusError(status: number, message: string) {
+  const err: any = new Error(message);
+  err.statusCode = status;
+  return err;
+}
+
+/** Refuses to hide or delete a movie that an active package lists among its selected movies. */
+async function assertNoPackageSelects(anyDb: any, movieId: number, message: string) {
+  const packages = await packagesSelectingMovie(anyDb, movieId);
+  if (packages.length > 0) throw statusError(400, `${message}: ${packages.map((p: any) => p.name).join(', ')}`);
+}
+
+/**
+ * Refuses to take a movie away from a branch that still has showtimes of it: a showtime is only valid for a movie
+ * shown at its branch. The admin first removes those showtimes.
+ */
+async function assertNoShowtimesLeft(anyDb: any, movieId: number, oldScope: BranchScope, newScope: BranchScope) {
+  if (newScope.all_branches) return;
+  const showtimes = schema.showtimes;
+  const rows = await anyDb
+    .select({ branch_id: showtimes.branch_id, branch_name: schema.branches.name, count: sql<number>`COUNT(*)` })
+    .from(showtimes)
+    .leftJoin(schema.branches, eq(schema.branches.id, showtimes.branch_id))
+    .where(eq(showtimes.movie_id, movieId))
+    .groupBy(showtimes.branch_id, schema.branches.name);
+  const left = rows.filter((row: any) => !newScope.branch_ids.includes(Number(row.branch_id)));
+  if (left.length > 0) {
+    const where = left.map((row: any) => `${row.branch_name || 'chi nhánh #' + row.branch_id} (${row.count} suất)`).join(', ');
+    throw statusError(400, `Phim còn suất chiếu ở ${where}. Xóa các suất chiếu đó trước khi bỏ chi nhánh khỏi phim.`);
+  }
+}
+
+/** The record as written to the audit log: the row plus its branches. */
+function movieAuditRecord(row: any, scope: BranchScope | null) {
+  return { ...row, ...(scope || {}) };
+}
 
 export async function createMovieImpl(
   anyDb: any,
@@ -27,8 +72,8 @@ export async function createMovieImpl(
     duration_min: number;
     is_active?: boolean;
     release_date: string | Date | null;
-    branch_id?: number | null;
-    branch_ids?: number[] | null;
+    all_branches?: boolean;
+    branch_ids?: number[];
   },
   config?: any,
   RUN_ENV?: any,
@@ -51,40 +96,11 @@ export async function createMovieImpl(
     }
   }
 
-  let targetBranchIds = data.branch_ids;
-  let targetBranchId = data.branch_id;
+  // Where it is shown: the form must say so (every branch, or a list that may be empty); a missing choice is refused
+  const scope: BranchScope = readScopeInput(data);
+  assertStaffMayAssign(scope, restrictToBranchIds, 'phim');
+  await assertBranchesExist(anyDb, scope.branch_ids);
 
-  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-    if (targetBranchIds === undefined && targetBranchId === undefined) {
-      targetBranchIds = restrictToBranchIds;
-      targetBranchId = restrictToBranchIds[0];
-    } else if (targetBranchIds === null || (targetBranchIds === undefined && targetBranchId === null)) {
-      const err: any = new Error('Chỉ Super Admin mới có quyền tạo phim cho tất cả chi nhánh');
-      err.statusCode = 403;
-      throw err;
-    } else if (targetBranchIds !== undefined && targetBranchIds !== null) {
-      if (!Array.isArray(targetBranchIds) || targetBranchIds.length === 0) {
-        const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý của bạn');
-        err.statusCode = 400;
-        throw err;
-      }
-      const hasInvalid = targetBranchIds.some((id) => !restrictToBranchIds.includes(Number(id)));
-      if (hasInvalid) {
-        const err: any = new Error('Bạn không có quyền tạo phim cho chi nhánh ngoài phạm vi quản lý');
-        err.statusCode = 403;
-        throw err;
-      }
-    } else if (targetBranchId !== undefined && targetBranchId !== null) {
-      if (!restrictToBranchIds.includes(Number(targetBranchId))) {
-        const err: any = new Error('Bạn không có quyền tạo phim cho chi nhánh ngoài phạm vi quản lý');
-        err.statusCode = 403;
-        throw err;
-      }
-      targetBranchIds = [Number(targetBranchId)];
-    }
-  }
-
-  const branchFields = resolveBranchIdsInput(targetBranchIds, targetBranchId);
   const baseData: any = {
     title: data.title,
     description: data.description,
@@ -94,8 +110,7 @@ export async function createMovieImpl(
     genres: Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres,
     rating: data.rating ?? null,
     duration_min: data.duration_min,
-    branch_id: branchFields.branch_id ?? null,
-    branch_ids: branchFields.branch_ids ?? null,
+    all_branches: scope.all_branches,
     is_active: data.is_active === undefined ? true : Boolean(data.is_active),
     release_date: data.release_date ? formatDateForDb(data.release_date) : null,
     created_at: formatDateForDb(now),
@@ -105,9 +120,9 @@ export async function createMovieImpl(
     const movieInsert = await anyDb.insert(tables.movies).values(baseData).returning();
     let movie: any = Array.isArray(movieInsert) ? movieInsert[0] : movieInsert;
     if (!movie) throw new Error('Không thể tạo phim');
+    await runBatch(anyDb, await branchScopeStatements(anyDb, 'movie', movie.id, scope));
 
-
-    const auditNew = buildAuditPayload(movie);
+    const auditNew = buildAuditPayload(movieAuditRecord(movie, scope));
 
     // Log audit action
     if (staffInfo) {
@@ -126,7 +141,8 @@ export async function createMovieImpl(
       );
     }
 
-    return { movie: enrichWithParsedBranchIds(movie) };
+    const [scopedMovie] = await withBranchScope(anyDb, 'movie', [{ ...movie, all_branches: scope.all_branches }]);
+    return { movie: scopedMovie };
   } catch (err: any) {
     throw err;
   }
@@ -147,8 +163,8 @@ export async function updateMovieImpl(
     duration_min?: number;
     is_active?: boolean;
     release_date?: string | Date | null;
-    branch_id?: number | null;
-    branch_ids?: number[] | null;
+    all_branches?: boolean;
+    branch_ids?: number[];
   },
   config?: any,
   RUN_ENV?: any,
@@ -165,12 +181,8 @@ export async function updateMovieImpl(
   const oldMovie = await anyDb.query.movies.findFirst({
     where: eq(tables.movies.id, id)
   });
-  if (
-    oldMovie &&
-    restrictToBranchIds &&
-    restrictToBranchIds.length > 0 &&
-    !staffCanModifyBranchRecord(oldMovie.branch_ids, restrictToBranchIds, false)
-  ) {
+  const oldScope = oldMovie ? await readBranchScope(anyDb, 'movie', id) : null;
+  if (oldMovie && !staffMayModify(oldScope, restrictToBranchIds)) {
     const err: any = new Error('Bạn không có quyền sửa phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
     err.statusCode = 403;
     throw err;
@@ -197,87 +209,29 @@ export async function updateMovieImpl(
     payload.genres = Array.isArray(data.genres) ? JSON.stringify(data.genres) : data.genres;
   if (data.rating !== undefined) payload.rating = data.rating ?? null;
   if (data.duration_min !== undefined) payload.duration_min = data.duration_min;
-  if (data.branch_ids !== undefined || data.branch_id !== undefined) {
-    if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-      if (data.branch_ids === null || (data.branch_ids === undefined && data.branch_id === null)) {
-        const err: any = new Error('Chỉ Super Admin mới có quyền gán phim cho tất cả chi nhánh');
-        err.statusCode = 403;
-        throw err;
-      }
-      if (data.branch_ids !== undefined && data.branch_ids !== null) {
-        if (!Array.isArray(data.branch_ids) || data.branch_ids.length === 0) {
-          const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
-          err.statusCode = 400;
-          throw err;
-        }
-        const hasInvalid = data.branch_ids.some((id) => !restrictToBranchIds.includes(Number(id)));
-        if (hasInvalid) {
-          const err: any = new Error('Bạn không có quyền gán phim cho chi nhánh ngoài phạm vi quản lý');
-          err.statusCode = 403;
-          throw err;
-        }
-      }
-      if (data.branch_id !== undefined && data.branch_id !== null) {
-        if (!restrictToBranchIds.includes(Number(data.branch_id))) {
-          const err: any = new Error('Bạn không có quyền gán phim cho chi nhánh ngoài phạm vi quản lý');
-          err.statusCode = 403;
-          throw err;
-        }
-      }
-    }
-    const branchFields = resolveBranchIdsInput(data.branch_ids, data.branch_id);
-    if (branchFields.branch_ids !== undefined) payload.branch_ids = branchFields.branch_ids;
-    if (branchFields.branch_id !== undefined) payload.branch_id = branchFields.branch_id;
+  // Sent fields change the branches; fields not sent leave them as they are
+  const newScope = readScopeChange(data);
+  if (newScope) {
+    assertStaffMayAssign(newScope, restrictToBranchIds, 'phim');
+    await assertBranchesExist(anyDb, newScope.branch_ids);
+    if (oldScope) await assertNoShowtimesLeft(anyDb, id, oldScope, newScope);
   }
   if (data.is_active !== undefined) payload.is_active = data.is_active;
   if (data.release_date !== undefined) {
     payload.release_date = data.release_date ? formatDateForDb(data.release_date) : null;
   }
   if (data.is_active === false) {
-    const searchId = String(id);
-    const activePackages = await anyDb
-      .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
-      .from(tables.ticket_packages)
-      .where(and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at)));
-
-    const conflictPackages = activePackages.filter((p: any) => {
-      let comboArr: any[] = [];
-      try {
-        if (Array.isArray(p.combo)) {
-          comboArr = p.combo;
-        } else if (typeof p.combo === 'string') {
-          // Handle old format: "1|2|3" or JSON array
-          if (p.combo.includes('|')) {
-            comboArr = p.combo
-              .split('|')
-              .map((x: string) => x.trim())
-              .filter(Boolean);
-          } else {
-            comboArr = JSON.parse(p.combo);
-          }
-        }
-      } catch (e) {
-        console.error('Error parsing combo for package check:', e);
-      }
-      return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
-    });
-
-    if (conflictPackages.length > 0) {
-      const packageNames = conflictPackages.map((p: any) => p.name).join(', ');
-      const conflictErr: any = new Error(`Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`);
-      conflictErr.statusCode = 400;
-      throw conflictErr;
-    }
+    await assertNoPackageSelects(anyDb, id, 'Không thể ẩn phim vì phim đang được sử dụng trong các gói');
   }
   try {
-    const updated = await anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)).returning();
-
-    let movie: any = Array.isArray(updated) ? updated[0] : updated;
-    // Fallback: D1/SQLite sometimes returns empty array from .returning()
-    if (!movie) {
-      movie = await anyDb.query.movies.findFirst({ where: eq(tables.movies.id, id) });
-    }
+    // The row and its branches change together
+    await runBatch(anyDb, [
+      anyDb.update(tables.movies).set(payload).where(eq(tables.movies.id, id)),
+      ...(newScope ? await branchScopeStatements(anyDb, 'movie', id, newScope) : [])
+    ]);
+    const movie: any = await anyDb.query.movies.findFirst({ where: eq(tables.movies.id, id) });
     if (!movie) throw new Error('Không tìm thấy phim để cập nhật');
+    const [scopedMovie] = await withBranchScope(anyDb, 'movie', [movie]);
 
     // Clean up old Cloudinary image if changed
     if (
@@ -290,8 +244,8 @@ export async function updateMovieImpl(
       deleter(oldMovie.cover_image).catch((e) => console.error('Failed to delete old movie image:', e));
     }
 
-    const auditOld = buildAuditPayload(oldMovie);
-    const auditNew = buildAuditPayload(movie);
+    const auditOld = buildAuditPayload(movieAuditRecord(oldMovie, oldScope));
+    const auditNew = buildAuditPayload(scopedMovie);
 
     // Log audit action
     if (staffInfo) {
@@ -310,7 +264,7 @@ export async function updateMovieImpl(
       );
     }
 
-    return { movie: enrichWithParsedBranchIds(movie) };
+    return { movie: scopedMovie };
   } catch (err: any) {
     throw err;
   }
@@ -331,46 +285,14 @@ export async function deleteMovieImpl(
   });
 
   if (!existing) return null;
-  if (
-    restrictToBranchIds &&
-    restrictToBranchIds.length > 0 &&
-    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
-  ) {
+  if (!staffMayModify(await readBranchScope(anyDb, 'movie', id), restrictToBranchIds)) {
     const err: any = new Error('Bạn không có quyền xóa phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
     err.statusCode = 403;
     throw err;
   }
 
-  // Check if movie is being used in active ticket packages
-  const activePackages = await anyDb
-    .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
-    .from(tables.ticket_packages)
-    .where(and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at)));
-
-  const conflictPackages = activePackages.filter((p: any) => {
-    let comboArr: any[] = [];
-    try {
-      if (Array.isArray(p.combo)) {
-        comboArr = p.combo;
-      } else if (typeof p.combo === 'string') {
-        if (p.combo.includes('|')) {
-          comboArr = p.combo.split('|').map((id: string) => Number(id.trim()));
-        } else {
-          comboArr = JSON.parse(p.combo);
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing combo:', e);
-    }
-    return comboArr.includes(Number(id));
-  });
-
-  if (conflictPackages.length > 0) {
-    const packageNames = conflictPackages.map((p: any) => p.name).join(', ');
-    const err: any = new Error(`Không thể xóa phim vì đang được sử dụng trong gói vé: ${packageNames}`);
-    err.statusCode = 400;
-    throw err;
-  }
+  // A movie that an active package lists among its selected movies cannot be deleted
+  await assertNoPackageSelects(anyDb, id, 'Không thể xóa phim vì đang được sử dụng trong gói vé');
 
   // Soft delete by setting is_active = false and deleted_at
   await anyDb
@@ -424,11 +346,7 @@ export async function restoreMovieImpl(
     throw err;
   }
 
-  if (
-    restrictToBranchIds &&
-    restrictToBranchIds.length > 0 &&
-    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
-  ) {
+  if (!staffMayModify(await readBranchScope(anyDb, 'movie', id), restrictToBranchIds)) {
     const err: any = new Error('Bạn không có quyền khôi phục phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
     err.statusCode = 403;
     throw err;
@@ -481,10 +399,10 @@ export async function listDeletedMoviesImpl(
     conditions.push(like(movies.title, `%${search}%`));
   }
   if (branch_id) {
-    conditions.push(sqlBranchIdsMatchFilter(movies.branch_ids, movies.branch_id, branch_id));
+    conditions.push(sqlServesBranch('movie', branch_id));
   }
-  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-    conditions.push(sqlBranchIdsStaffAccessFilter(movies.branch_ids, restrictToBranchIds));
+  if (restrictToBranchIds) {
+    conditions.push(sqlInStaffBranches('movie', restrictToBranchIds));
   }
   conditions.push(isNotNull(movies.deleted_at));
 
@@ -571,8 +489,8 @@ export async function listAdminMoviesImpl(
   }
   if (status === 'active') conditions.push(eq(movies.is_active, true));
   if (status === 'inactive') conditions.push(eq(movies.is_active, false));
-  if (branch_id) conditions.push(sqlBranchIdsMatchFilter(movies.branch_ids, movies.branch_id, branch_id));
-  if (restrictToBranchIds) conditions.push(sqlBranchIdsStaffAccessFilter(movies.branch_ids, restrictToBranchIds));
+  if (branch_id) conditions.push(sqlServesBranch('movie', branch_id));
+  if (restrictToBranchIds) conditions.push(sqlInStaffBranches('movie', restrictToBranchIds));
   const whereClause = and(...conditions);
 
   const sortColumns: Record<string, any> = {
@@ -595,8 +513,7 @@ export async function listAdminMoviesImpl(
       updated_at: movies.updated_at,
       rating: movies.rating,
       is_active: movies.is_active,
-      branch_id: movies.branch_id,
-      branch_ids: movies.branch_ids
+      all_branches: movies.all_branches
     })
     .from(movies)
     .where(whereClause)
@@ -606,11 +523,7 @@ export async function listAdminMoviesImpl(
 
   const [countResult] = await anyDb.select({ count: count() }).from(movies).where(whereClause);
 
-  const items = rows.map((row: any) => ({
-    ...row,
-    genres: parseGenres(row.genres),
-    branch_ids: parseBranchIds(row.branch_ids)
-  }));
+  const items = (await withBranchScope(anyDb, 'movie', rows)).map((row: any) => ({ ...row, genres: parseGenres(row.genres) }));
 
   return { items, page, pageSize, total: Number(countResult?.count || 0) };
 }
@@ -634,49 +547,17 @@ export async function updateMovieStatusImpl(
     if (!existingMovie) {
       throw new Error('Movie not found');
     }
-    if (
-      restrictToBranchIds &&
-      restrictToBranchIds.length > 0 &&
-      !staffCanModifyBranchRecord(existingMovie.branch_ids, restrictToBranchIds, false)
-    ) {
+    if (!staffMayModify(await readBranchScope(anyDb, 'movie', id), restrictToBranchIds)) {
       const err: any = new Error('Bạn không có quyền thay đổi trạng thái phim này (phim thuộc chi nhánh khác hoặc áp dụng cho tất cả chi nhánh)');
       err.statusCode = 403;
       throw err;
     }
     if (isActive === false) {
-      const searchId = String(id);
-      const activePackages = await anyDb
-        .select({ name: tables.ticket_packages.name, combo: tables.ticket_packages.combo })
-        .from(tables.ticket_packages)
-        .where(and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at)));
-
-      const conflictPackages = activePackages.filter((p: any) => {
-        let comboArr: any[] = [];
-        try {
-          if (Array.isArray(p.combo)) {
-            comboArr = p.combo;
-          } else if (typeof p.combo === 'string') {
-            // Handle old format: "1|2|3" or JSON array
-            if (p.combo.includes('|')) {
-              comboArr = p.combo
-                .split('|')
-                .map((x: string) => x.trim())
-                .filter(Boolean);
-            } else {
-              comboArr = JSON.parse(p.combo);
-            }
-          }
-        } catch (e) {
-          console.error('Error parsing combo for status check:', e);
-        }
-        return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
-      });
-
-      if (conflictPackages.length > 0) {
-        const packageNames = conflictPackages.map((p: any) => p.name).join(', ');
+      const packages = await packagesSelectingMovie(anyDb, id);
+      if (packages.length > 0) {
         return {
           status: 400,
-          message: `Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packageNames}`
+          message: `Không thể ẩn phim vì phim đang được sử dụng trong các gói: ${packages.map((p: any) => p.name).join(', ')}`
         };
       }
     }
@@ -748,66 +629,53 @@ export async function getMovieByIdImpl(
   };
 
   const movieWhere =
-    restrictToBranchIds && restrictToBranchIds.length > 0
-      ? and(eq(tables.movies.id, movieId), sqlBranchIdsStaffAccessFilter(tables.movies.branch_ids, restrictToBranchIds))
+    restrictToBranchIds
+      ? and(eq(tables.movies.id, movieId), sqlInStaffBranches('movie', restrictToBranchIds))
       : eq(tables.movies.id, movieId);
   const movie = await anyDb.query.movies.findFirst({ where: movieWhere });
   if (!movie) return null;
 
-  // Lấy các gói vé có chứa phim này
-  const searchId = String(movieId);
+  const [scopedMovie] = await withBranchScope(anyDb, 'movie', [movie]);
+
+  // The packages a customer can buy for this movie: active packages that select it, and active packages of every
+  // movie of the branch sold at one of the movie's branches
   const activePackages = await anyDb
     .select({
       id: tables.ticket_packages.id,
       name: tables.ticket_packages.name,
-      combo: tables.ticket_packages.combo,
       code: tables.ticket_packages.code,
       price: tables.ticket_packages.price,
-      // The movie detail tells same-named packages of different branches apart
-      branch_id: tables.ticket_packages.branch_id,
-      branch_ids: tables.ticket_packages.branch_ids
+      all_branches: tables.ticket_packages.all_branches,
+      movie_scope: tables.ticket_packages.movie_scope
     })
     .from(tables.ticket_packages)
     .where(
-      restrictToBranchIds && restrictToBranchIds.length > 0
+      restrictToBranchIds
         ? and(
             eq(tables.ticket_packages.is_active, true),
             isNull(tables.ticket_packages.deleted_at),
-            sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds)
+            sql`(${tables.ticket_packages.type} IS NULL OR ${tables.ticket_packages.type} != 'vr')`,
+            sqlInStaffBranches('package', restrictToBranchIds)
           )
-        : and(eq(tables.ticket_packages.is_active, true), isNull(tables.ticket_packages.deleted_at))
+        : and(
+            eq(tables.ticket_packages.is_active, true),
+            isNull(tables.ticket_packages.deleted_at),
+            sql`(${tables.ticket_packages.type} IS NULL OR ${tables.ticket_packages.type} != 'vr')`
+          )
     );
-
-  const applicablePackages = activePackages.filter((p: any) => {
-    let comboArr: any[] = [];
-    try {
-      if (Array.isArray(p.combo)) {
-        comboArr = p.combo;
-      } else if (typeof p.combo === 'string') {
-        // Handle old format: "1|2|3" or JSON array
-        if (p.combo.includes('|')) {
-          comboArr = p.combo
-            .split('|')
-            .map((x: string) => x.trim())
-            .filter(Boolean);
-        } else {
-          comboArr = JSON.parse(p.combo);
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing combo for detail view:', e);
-    }
-    return Array.isArray(comboArr) && comboArr.map(String).includes(searchId);
-  });
-  // Only what the movie detail shows: name, code, price and the branch tag (the combo was needed for the filter only)
-  const applicableRows = applicablePackages.map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    code: p.code ?? null,
-    price: p.price,
-    branch_id: p.branch_id,
-    branch_ids: parseBranchIds(p.branch_ids)
-  }));
+  const packagesWithMovies = await withPackageMovies(anyDb, await withBranchScope(anyDb, 'package', activePackages));
+  const sharesBranch = (pkg: BranchScope) =>
+    scopedMovie.all_branches || pkg.all_branches || pkg.branch_ids.some((branchId) => scopedMovie.branch_ids.includes(branchId));
+  const applicableRows = packagesWithMovies
+    .filter((pkg: any) => (pkg.movie_scope === 'all_at_branch' ? sharesBranch(pkg) : pkg.movie_ids.includes(movieId)))
+    .map((pkg: any) => ({
+      id: pkg.id,
+      name: pkg.name,
+      code: pkg.code ?? null,
+      price: pkg.price,
+      all_branches: pkg.all_branches,
+      branch_ids: pkg.branch_ids
+    }));
 
   // Get tracking data from audit logs
   const [createLog] = await anyDb
@@ -854,7 +722,7 @@ export async function getMovieByIdImpl(
     updated_by_staff_name: updateLog?.staffFullname || null,
     applicable_packages: applicableRows,
     detail_images: safeParseJson(movie.detail_images),
-    branch_id: movie.branch_id,
-    branch_ids: parseBranchIds(movie.branch_ids)
+    all_branches: scopedMovie.all_branches,
+    branch_ids: scopedMovie.branch_ids
   };
 }

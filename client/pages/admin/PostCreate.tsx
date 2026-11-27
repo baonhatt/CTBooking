@@ -19,6 +19,8 @@ import { ArrowLeft, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react
 import { PostRichTextEditor } from '@/components/admin/content/PostRichTextEditor';
 import { createPostApi, getAdminBranchOptions } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
+import { useIsSuperAdmin, useStaffBranchIds } from '@/hooks/useStaffPermission';
+import { branch_scope_of, branch_scope_payload, default_branch_scope } from '@/lib/branch-scope';
 
 interface PostData {
   id: number;
@@ -39,8 +41,9 @@ interface PostData {
   og_image?: string;
   canonical_url?: string;
   schema_type?: string;
-  // null = all branches
-  branch_ids?: number[] | null;
+  // all_branches = every branch (also branches opened later); otherwise the branches in branch_ids
+  all_branches?: boolean;
+  branch_ids?: number[];
 }
 
 interface SectionState {
@@ -106,7 +109,11 @@ export default function PostCreatePage() {
     | 'audit-logs'
   >('posts');
   const [isSaving, setIsSaving] = useState(false);
-  const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>({
+  const isSuperAdmin = useIsSuperAdmin();
+  const staffBranchIds = useStaffBranchIds();
+  const [editData, setEditData] = useState<Partial<PostData> & { imageFile?: File; ogImageFile?: File }>(() => ({
+    // A Super Admin starts with every branch; a staff member limited to some branches with their own
+    ...default_branch_scope(isSuperAdmin, staffBranchIds),
     title: '',
     content: '',
     excerpt: '',
@@ -117,7 +124,7 @@ export default function PostCreatePage() {
     seo_title: '',
     canonical_url: '',
     schema_type: 'Article'
-  });
+  }));
   const [sections, setSections] = useState<SectionState>({ publish: true, images: true, seo: false });
   const initialSnapshotRef = useRef<string>('');
   const [branchOptions, setBranchOptions] = useState<Array<{ id: number; name: string }>>([]);
@@ -163,7 +170,8 @@ export default function PostCreatePage() {
       status: data.status ?? 'draft',
       is_featured: Boolean(data.is_featured),
       published_at: data.published_at ?? '',
-      branch_ids: data.branch_ids ?? null,
+      all_branches: branch_scope_of(data).all_branches,
+      branch_ids: branch_scope_of(data).branch_ids,
       meta_description: data.meta_description ?? '',
       meta_keywords: data.meta_keywords ?? '',
       seo_title: data.seo_title ?? '',
@@ -219,6 +227,12 @@ export default function PostCreatePage() {
       notify.error('Vui lòng nhập nội dung');
       return;
     }
+    // A branch staff member picks at least one of their branches; a Super Admin may leave the post without a branch
+    const postBranches = branch_scope_of(editData);
+    if (!isSuperAdmin && (postBranches.all_branches || postBranches.branch_ids.length === 0)) {
+      notify.error('Vui lòng chọn ít nhất một chi nhánh bạn quản lý');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -258,7 +272,7 @@ export default function PostCreatePage() {
         status: nextStatus,
         is_featured: editData.is_featured || false,
         published_at: editData.published_at,
-        branch_ids: editData.branch_ids ?? null,
+        ...branch_scope_payload(branch_scope_of(editData)),
         meta_description: editData.meta_description,
         meta_keywords: editData.meta_keywords,
         seo_title: editData.seo_title,
@@ -413,8 +427,9 @@ export default function PostCreatePage() {
                 >
                   <BranchMultiSelect
                     branches={branchOptions}
-                    value={editData.branch_ids ?? null}
-                    onChange={(ids) => setEditData({ ...editData, branch_ids: ids })}
+                    value={branch_scope_of(editData)}
+                    allowAll={isSuperAdmin}
+                    onChange={(scope) => setEditData({ ...editData, ...scope })}
                     className="rounded-xl text-xs"
                   />
                 </FormField>

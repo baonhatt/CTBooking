@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { payFreeOrderNow } from './free-order';
 import { updatePaymentImpl } from './update';
-import { packageServesBranch } from '../vouchers';
+import { packageOfferedAtBranch } from '../../../lib/catalog-scope';
+import { makeSqliteDb, insertRows } from '../../../test-utils/sqlite-db';
 import { isAssetReplaced } from '../../admin/site-media';
 
 vi.mock('./update', () => ({ updatePaymentImpl: vi.fn() }));
@@ -30,10 +31,20 @@ describe('0đ orders are paid at once', () => {
 });
 
 describe('packages sold at several branches', () => {
-  it('a package lists its branches; no list means every branch', () => {
-    expect(packageServesBranch({ branch_ids: '[1,2]', branch_id: 1 }, 2)).toBe(true);
-    expect(packageServesBranch({ branch_ids: '[1,2]', branch_id: 1 }, 3)).toBe(false);
-    expect(packageServesBranch({ branch_ids: null, branch_id: null }, 3)).toBe(true);
+  it('a package lists its branches (package_branches); all_branches means every branch', async () => {
+    const { db, raw } = makeSqliteDb(['ticket_packages', 'package_branches']);
+    insertRows(raw, 'ticket_packages', [
+      { id: 1, name: 'Hai chi nhánh', all_branches: 0, movie_scope: 'selected', is_active: 1 },
+      { id: 2, name: 'Mọi chi nhánh', all_branches: 1, movie_scope: 'all_at_branch', is_active: 1 }
+    ]);
+    insertRows(raw, 'package_branches', [
+      { package_id: 1, branch_id: 1 },
+      { package_id: 1, branch_id: 2 }
+    ]);
+
+    expect(await packageOfferedAtBranch(db, 1, 2)).toBe(true);
+    expect(await packageOfferedAtBranch(db, 1, 3)).toBe(false);
+    expect(await packageOfferedAtBranch(db, 2, 3)).toBe(true);
   });
 });
 

@@ -2,7 +2,19 @@ import { eq, and, asc, desc, isNull } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
-import { sqlBranchIdsStaffAccessFilter, staffCanModifyBranchRecord } from '../../lib/branch-ids';
+import {
+  assertBranchesExist,
+  assertStaffMayAssign,
+  branchScopeStatements,
+  readBranchScope,
+  readScopeChange,
+  readScopeInput,
+  runBatch,
+  sqlInStaffBranches,
+  staffMayModify,
+  withBranchScope,
+  type BranchScope
+} from '../../lib/catalog-scope';
 
 /**
  * Cloudinary folders the admin screens upload into (lib/api/uploads.ts builds "ctbooking/images/<name>" or
@@ -25,23 +37,17 @@ export function isAllowedUploadFolder(folder: string, resourceType: string): boo
 }
 
 /**
- * Whether a staff member may change or delete a media row. Rows for all branches (branch_ids NULL, which is every row
- * the admin screens create today) are for the Super Admin only; other staff only rows fully inside their branches.
+ * Whether a staff member may change or delete a media row. Rows for all branches (every row the admin screens create
+ * today) are for the Super Admin only; other staff only rows fully inside their branches.
  * restrictToBranchIds: null for the Super Admin.
  */
-export function staffCanModifySiteMedia(rowBranchIds: string | null | undefined, restrictToBranchIds: number[] | null): boolean {
-  if (restrictToBranchIds === null) return true;
-  return staffCanModifyBranchRecord(rowBranchIds ?? null, restrictToBranchIds, false);
+export function staffCanModifySiteMedia(scope: BranchScope | null, restrictToBranchIds: number[] | null): boolean {
+  return staffMayModify(scope, restrictToBranchIds);
 }
 
-/** The branch targeting of one media row, or null when the row does not exist. */
-export async function findSiteMediaBranchIdsImpl(anyDb: any, tables: { site_media: any }, id: number) {
-  const [row] = await anyDb
-    .select({ id: tables.site_media.id, branch_ids: tables.site_media.branch_ids })
-    .from(tables.site_media)
-    .where(eq(tables.site_media.id, Number(id)))
-    .limit(1);
-  return row ? { branch_ids: row.branch_ids as string | null } : null;
+/** The branches of one media row, or null when the row does not exist. */
+export async function findSiteMediaBranchIdsImpl(anyDb: any, _tables: { site_media: any }, id: number) {
+  return readBranchScope(anyDb, 'media', Number(id));
 }
 
 export async function createSiteMediaImpl(
@@ -60,10 +66,18 @@ export async function createSiteMediaImpl(
     duration?: string | number;
     display_order?: number;
     is_active?: boolean;
+    all_branches?: boolean;
+    branch_ids?: number[];
   },
   deleter?: (url: string, type?: string) => Promise<void>,
-  staffInfo?: { id: number; email: string; fullname: string }
+  staffInfo?: { id: number; email: string; fullname: string },
+  restrictToBranchIds: number[] | null = null
 ) {
+  // Where it is shown: the form must say so (every branch, or a list that may be empty); never assumed.
+  // Staff of some branches add media for their own branches only.
+  const mediaScope: BranchScope = readScopeInput(args);
+  assertStaffMayAssign(mediaScope, restrictToBranchIds, 'ảnh/video');
+  await assertBranchesExist(anyDb, mediaScope.branch_ids);
   const {
     section,
     type,
@@ -89,12 +103,17 @@ export async function createSiteMediaImpl(
   });
 
   if (existing) {
-    // Upsert: Update existing
+    // Upsert: the same file again updates the existing row, which keeps its own branches. Staff may only touch it
+    // when it is fully theirs.
+    if (!staffMayModify(await readBranchScope(anyDb, 'media', existing.id), restrictToBranchIds)) {
+      throw Object.assign(new Error('Bạn không có quyền với media của chi nhánh khác hoặc media dùng chung'), { statusCode: 403 });
+    }
+    const { all_branches: _sentAll, branch_ids: _sentBranches, ...fileFields } = args;
     return updateSiteMediaImpl(
       anyDb,
       tables,
       {
-        ...args,
+        ...fileFields,
         id: existing.id,
         duration: args.duration !== undefined ? Number(args.duration) : undefined
       },
@@ -119,6 +138,7 @@ export async function createSiteMediaImpl(
       duration: duration !== undefined ? String(duration) : null,
       display_order: display_order !== undefined ? Number(display_order) : 0,
       is_active: typeof is_active === 'boolean' ? is_active : true,
+      all_branches: mediaScope.all_branches,
       created_at: formatDateForDb(nowIso),
       updated_at: formatDateForDb(nowIso)
     })
@@ -131,6 +151,8 @@ export async function createSiteMediaImpl(
   // }
 
   if (!item) throw new Error('Không thể tạo site media');
+  await runBatch(anyDb, await branchScopeStatements(anyDb, 'media', item.id, mediaScope));
+  [item] = await withBranchScope(anyDb, 'media', [item]);
 
   const auditNew = buildAuditPayload(item);
 
@@ -163,7 +185,7 @@ export async function listSiteMediaImpl(
   const restrictToBranchIds = args.restrictToBranchIds ?? null;
   const conditions: any[] = [];
   // Staff of some branches see the media for all branches and the media of their branches
-  if (restrictToBranchIds) conditions.push(sqlBranchIdsStaffAccessFilter(tables.site_media.branch_ids, restrictToBranchIds));
+  if (restrictToBranchIds) conditions.push(sqlInStaffBranches('media', restrictToBranchIds));
   if (section) conditions.push(eq(tables.site_media.section, String(section)));
   if (type) conditions.push(eq(tables.site_media.type, String(type)));
   if (active)
@@ -174,7 +196,7 @@ export async function listSiteMediaImpl(
     where: and(...conditions),
     orderBy: [asc(tables.site_media.display_order), desc(tables.site_media.created_at)]
   });
-  return { items };
+  return { items: await withBranchScope(anyDb, 'media', items) };
 }
 
 /**
@@ -210,6 +232,8 @@ export async function updateSiteMediaImpl(
     duration?: number;
     display_order?: number;
     is_active?: boolean;
+    all_branches?: boolean;
+    branch_ids?: number[];
   },
   deleter?: (url: string, type?: string) => Promise<void>,
   staffInfo?: { id: number; email: string; fullname: string }
@@ -244,15 +268,18 @@ export async function updateSiteMediaImpl(
   if (display_order !== undefined)
     payload.display_order = display_order !== null && display_order !== undefined ? Number(display_order) : 0;
   if (is_active !== undefined) payload.is_active = Boolean(is_active);
-  // Try to use .returning() for update, fallback to query
+  // Sent branch fields change where it is shown; fields not sent leave it as it is
+  const newScope = readScopeChange(args);
+  if (newScope) await assertBranchesExist(anyDb, newScope.branch_ids);
   const existing = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
 
-  const updatedRes = await anyDb
-    .update(tables.site_media)
-    .set(payload)
-    .where(eq(tables.site_media.id, Number(id)))
-    .returning();
-  let item: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
+  // The row and its branches change together
+  await runBatch(anyDb, [
+    anyDb.update(tables.site_media).set(payload).where(eq(tables.site_media.id, Number(id))),
+    ...(newScope ? await branchScopeStatements(anyDb, 'media', Number(id), newScope) : [])
+  ]);
+  const updatedRow = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
+  let item: any = updatedRow ? (await withBranchScope(anyDb, 'media', [updatedRow]))[0] : null;
   // if (!item) {
   //   item = await anyDb.query.site_media.findFirst({ where: eq(tables.site_media.id, Number(id)) });
   // }

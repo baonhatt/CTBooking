@@ -189,8 +189,23 @@ export async function createSiteMediaApi(body: {
   duration?: number;
   display_order?: number;
   is_active?: boolean;
+  all_branches: boolean;
+  branch_ids?: number[];
 }) {
   return request<{ item: any }>('/api/admin/site-media', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+}
+
+/**
+ * Asks the server whether this staff member may add a new file for these branches, or replace an existing file
+ * (target_id), before anything is uploaded to Cloudinary. Throws with the server's reason on 400/403.
+ */
+export async function checkSiteMediaApi(
+  body: { all_branches: boolean; branch_ids?: number[] } | { target_id: number }
+) {
+  return request<{ ok: boolean }>('/api/admin/site-media/check', {
     method: 'POST',
     body: JSON.stringify(body)
   });

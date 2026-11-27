@@ -1,7 +1,4 @@
 import { eq, inArray } from 'drizzle-orm';
-import { parseBranchIds, staffCanAccessBranchIds, staffCanModifyBranchRecord } from './branch-ids';
-
-export { staffCanAccessBranchIds, staffCanModifyBranchRecord, parseBranchIds, matchesBranchFilter } from './branch-ids';
 
 export interface StaffScope {
   isSuperAdmin?: boolean;
@@ -82,25 +79,4 @@ export function hasBranchAccess(
   if (isSuperAdmin) return true;
   if (!staffBranchIds || staffBranchIds.length === 0) return false;
   return staffBranchIds.includes(branchId);
-}
-
-/**
- * Filter an array of items by branch
- * Useful for post-query filtering when branch filtering can't be done in SQL
- *
- * @param items - Array of items to filter
- * @param branchIdGetter - Function to extract branch ID from an item
- * @param staffBranchIds - Array of branch IDs the staff has access to
- * @param isSuperAdmin - Whether the staff is a super admin
- * @returns Filtered array of items
- */
-export function filterItemsByBranchIds<T>(
-  items: T[],
-  branchIdsGetter: (item: T) => string | null | undefined,
-  staffBranchIds: number[] | undefined,
-  isSuperAdmin: boolean | undefined
-): T[] {
-  if (isSuperAdmin) return items;
-  if (!staffBranchIds || staffBranchIds.length === 0) return [];
-  return items.filter((item) => staffCanAccessBranchIds(branchIdsGetter(item), staffBranchIds, isSuperAdmin));
 }

@@ -17,7 +17,7 @@ export default function PostsSearchClient({ initialPosts }: { initialPosts: Post
     // Search results follow the same branch rule as the list (posts of other branches are not suggested)
     return initialPosts.filter(
       (p) =>
-        isPostForBranch(p.branch_ids, selectedBranch?.id) &&
+        isPostForBranch(p, selectedBranch?.id) &&
         ((p.title ?? '').toLowerCase().includes(key) || (p.excerpt ?? '').toLowerCase().includes(key))
     );
   }, [initialPosts, q, selectedBranch?.id]);

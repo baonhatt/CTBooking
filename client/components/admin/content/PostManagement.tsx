@@ -40,8 +40,9 @@ interface PostData {
   published_at?: string;
   created_at: string;
   updated_at: string;
-  // null = all branches
-  branch_ids?: number[] | null;
+  // all_branches = every branch; otherwise the branches in branch_ids
+  all_branches?: boolean;
+  branch_ids?: number[];
   created_by_staff_name?: string | null;
   updated_by_staff_name?: string | null;
 }
@@ -282,7 +283,7 @@ export const PostManagement = () => {
                       </span>
                     </TableCell>
                     <TableCell className="px-2">
-                      <BranchIdsBadge branch_ids={post.branch_ids} branches={branches} className="text-[11px]" />
+                      <BranchIdsBadge all_branches={post.all_branches} branch_ids={post.branch_ids} branches={branches} className="text-[11px]" />
                     </TableCell>
                     <TableCell className="px-2 text-center">{render_status(post.status)}</TableCell>
                     <TableCell className="px-2 text-center text-xs text-slate-500">{formatVnDate(post.published_at)}</TableCell>

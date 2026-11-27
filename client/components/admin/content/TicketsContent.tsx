@@ -33,9 +33,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
-import { BranchTag, branch_ids_of_item } from '@/components/admin/BranchTag';
+import { BranchTag } from '@/components/admin/BranchTag';
 import { BranchGroupHeader, group_items_by_branch } from '@/components/admin/BranchGroups';
-import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
+import { branch_scope_of, branch_scope_payload } from '@/lib/branch-scope';
 import { useNavigate } from 'react-router-dom';
 import { createTicketApi, updateTicketApi, getAdminBranchOptions, toggleTicketStatusApi, getTicketById } from '@/lib/api';
 import { uploadDirectToCloudinary } from '@/lib/api/uploads';
@@ -75,10 +75,17 @@ function optional_number_or_null(value: unknown): number | null {
   return parsed === undefined ? null : parsed;
 }
 
-// Id list as a sorted copy (order does not matter); null stays null so "all branches" differs from "none"
-function sorted_id_list(ids: unknown): number[] | null {
-  if (!Array.isArray(ids)) return null;
+// Id list as a sorted copy (order does not matter)
+function sorted_id_list(ids: unknown): number[] {
+  if (!Array.isArray(ids)) return [];
   return ids.map((id) => Number(id)).sort((a, b) => a - b);
+}
+
+// 'all_at_branch' = every movie shown at the order's branch; 'selected' = only the movies in movie_ids
+type MovieScope = 'selected' | 'all_at_branch';
+
+function movie_scope_of(form: any): MovieScope {
+  return form?.movie_scope === 'all_at_branch' ? 'all_at_branch' : 'selected';
 }
 
 // Every editable field of the ticket form in a fixed shape, so two states can be compared by content
@@ -99,8 +106,10 @@ function ticket_form_snapshot(form: any): string {
     cover_image: source.cover_image || '',
     min_players: optional_number_or_null(source.min_players),
     max_players: optional_number_or_null(source.max_players),
-    combo: sorted_id_list(source.combo) || [],
-    branch_ids: sorted_id_list(normalizeBranchIdsInput(source.branch_ids, source.branch_id)),
+    movie_scope: movie_scope_of(source),
+    movie_ids: sorted_id_list(source.movie_ids),
+    all_branches: !!source.all_branches,
+    branch_ids: sorted_id_list(source.branch_ids),
     display_order: Number(source.display_order ?? 0),
     is_member_only: !!source.is_member_only,
     is_active: source.is_active !== undefined ? !!source.is_active : true
@@ -114,15 +123,16 @@ interface TicketPackage {
   description?: string;
   price: number;
   features?: string[];
-  combo?: number[];
+  movie_scope?: MovieScope;
+  movie_ids?: number[];
   type?: string;
   min_group_size?: number;
   max_group_size?: number;
   is_member_only?: boolean;
   is_active?: boolean;
   display_order?: number;
-  branch_id?: number;
-  branch_ids?: number[] | null;
+  all_branches?: boolean;
+  branch_ids?: number[];
   branch_name?: string;
   cover_image?: string;
   duration_min?: number;
@@ -133,8 +143,8 @@ interface TicketPackage {
   created_at?: string;
   created_by_staff_name?: string;
   updated_by_staff_name?: string;
-  // Movies of the combo with their titles (only the detail API returns this)
-  combo_movies?: Array<{ id: number; title: string }>;
+  // The selected movies with their titles (only the detail API returns this)
+  movies?: Array<{ id: number; title: string }>;
 }
 
 interface Props {
@@ -181,11 +191,12 @@ export default function TicketsContent(props: Props) {
     return permissions.some((p) => p.module === module && p.action === action);
   };
 
+  // A staff member edits a package when every branch of it is one of theirs; an "all branches" package only a Super Admin
   const canModifyTicket = (t: TicketPackage) => {
     if (isSuperAdmin) return true;
-    if (t.branch_ids === null || t.branch_ids === undefined) return false;
-    if (t.branch_ids.length === 0) return true;
-    return t.branch_ids.every((id) => staffBranchIds.includes(id));
+    const scope = branch_scope_of(t);
+    if (scope.all_branches) return false;
+    return scope.branch_ids.every((id) => staffBranchIds.includes(id));
   };
 
   const {
@@ -233,19 +244,15 @@ export default function TicketsContent(props: Props) {
   const [ticketToToggle, setTicketToToggle] = useState<{ id: number; currentStatus: boolean } | null>(null);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [confirmSaveData, setConfirmSaveData] = useState<{ payload: any; changes: string[] } | null>(null);
-  // Search box of the combo movie picker and how many movies match it on the server
+  // Search box of the movie picker and how many movies match it on the server
   const [movieSearch, setMovieSearch] = useState('');
   const [movieTotal, setMovieTotal] = useState(0);
-  // Every movie seen so far (search results, combo of the opened package), by id, to show titles of selected movies
+  // Every movie seen so far (search results, movies of the opened package), by id, to show titles of selected movies
   const [knownMovies, setKnownMovies] = useState<Record<number, any>>({});
-  // Movies in the combo when the form was opened. They are kept on save even if the movie is hidden since.
-  const [originalComboIds, setOriginalComboIds] = useState<number[]>([]);
   const [ticketErrors, setTicketErrors] = useState<Record<string, string>>({});
   const [detailLoadError, setDetailLoadError] = useState(false);
   // The form as it was when the dialog opened; null while the dialog is closed
   const [initialFormSnapshot, setInitialFormSnapshot] = useState<string | null>(null);
-  // Branch choice for which the combo was last auto-ticked (a new package re-ticks when the branch choice changes)
-  const autoTickKeyRef = React.useRef<string | null>(null);
 
   const clearTicketError = (field: string) => {
     setTicketErrors((previous) => (previous[field] ? { ...previous, [field]: '' } : previous));
@@ -311,9 +318,8 @@ export default function TicketsContent(props: Props) {
     close_edit_dialog();
   };
 
-  // When the form opens: load branches, remember the combo it started with and name its movies
+  // When the form opens: load branches and name the movies the package already has
   React.useEffect(() => {
-    autoTickKeyRef.current = null;
     if (!isEditOpen) {
       setMovieSearch('');
       setTicketErrors({});
@@ -325,22 +331,22 @@ export default function TicketsContent(props: Props) {
     getAdminBranchOptions({ includeInactive: true }).then((res) => {
       setBranchOptions(res.items);
     });
-    const startCombo: number[] = Array.isArray(editData?.combo) ? editData.combo.map(Number) : [];
-    setOriginalComboIds(startCombo);
-    if (editData?.id && startCombo.length > 0) {
+    if (Array.isArray(editData?.movies)) rememberMovies(editData.movies);
+    const startMovieIds: number[] = sorted_id_list(editData?.movie_ids);
+    if (editData?.id && startMovieIds.length > 0) {
       getTicketById(Number(editData.id))
         .then((res: any) => {
           const detail = res?.item ?? res;
-          if (Array.isArray(detail?.combo_movies)) rememberMovies(detail.combo_movies);
+          if (Array.isArray(detail?.movies)) rememberMovies(detail.movies);
         })
         .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditOpen]);
 
-  // Movies for the combo picker: the server searches by title, so a package can pick any movie, not only the first 100
+  // Movies for the picker: the server searches by title, so a package can pick any movie, not only the first 100
   React.useEffect(() => {
-    if (!isEditOpen) return;
+    if (!isEditOpen || editData?.type === 'vr' || movie_scope_of(editData) !== 'selected') return;
     const searchText = movieSearch.trim();
     const timer = setTimeout(
       () => {
@@ -356,63 +362,33 @@ export default function TicketsContent(props: Props) {
     );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditOpen, movieSearch]);
+  }, [isEditOpen, movieSearch, editData?.type, editData?.movie_scope]);
 
-  // A movie can join the combo when the package is global, the movie is global, or they share a branch
-  const isMovieEligible = (movie: any) => {
-    // Same reading as the branch picker and the save: no branch set at all means "all branches" (null), not an empty list
-    const packageBranchesRaw = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
-    if (packageBranchesRaw === null) return true;
-    const packageBranches = Array.isArray(packageBranchesRaw) ? packageBranchesRaw : [];
-    // The movie branch ids can be a stringified JSON from the API
-    const movieBranchesRaw = parseBranchIdsFromApi(movie.branch_ids ?? movie.branch_id);
-    if (movieBranchesRaw === null) return true;
-    const movieBranches = Array.isArray(movieBranchesRaw) ? movieBranchesRaw : [];
-    return packageBranches.some((branchId: number) => movieBranches.includes(branchId));
-  };
-
-  const filteredMovies = React.useMemo(() => {
-    if (!movies) return [];
-    return movies.filter((movie) => isMovieEligible(movie));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [movies, editData?.branch_ids, editData?.branch_id]);
-
-  // New package only: tick every movie the branch rule allows, once the movies are loaded and again whenever the
-  // branch choice changes. Edit and clone keep the combo they already have.
-  const autoTickBranchKey = JSON.stringify(sorted_id_list(normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)) ?? 'all');
-  React.useEffect(() => {
-    if (!isEditOpen || !editData?.auto_select_combo || editData.type === 'vr') return;
-    if (initialFormSnapshot === null || movieSearch.trim() || movies.length === 0) return;
-    if (autoTickKeyRef.current === autoTickBranchKey) return;
-    autoTickKeyRef.current = autoTickBranchKey;
-    const form_untouched = ticket_form_snapshot(editData) === initialFormSnapshot;
-    const next_form = { ...editData, combo: filteredMovies.map((movie) => Number(movie.id)) };
-    setEditData(next_form);
-    // Ticking by itself must not make an untouched form look edited (no "unsaved changes" prompt on close)
-    if (form_untouched) setInitialFormSnapshot(ticket_form_snapshot(next_form));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditOpen, editData?.auto_select_combo, editData?.type, autoTickBranchKey, movies, movieSearch, initialFormSnapshot]);
+  // The movie picker lists every active movie: which of them are shown at a branch is the server's job,
+  // so a package's movies are never filtered by branch here
+  const filteredMovies = movies || [];
+  const selectedMovieIds: number[] = sorted_id_list(editData?.movie_ids);
+  const setMovieIds = (movieIds: number[]) => setEditData({ ...editData, movie_ids: Array.from(new Set(movieIds)) });
 
   // The branch tag in the movie list only helps when the package spans more than one branch
   const showMovieBranchTag = (() => {
-    const packageBranches = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
-    return packageBranches === null || packageBranches.length > 1;
+    const packageScope = branch_scope_of(editData);
+    return packageScope.all_branches || packageScope.branch_ids.length > 1;
   })();
 
   // Several branches at once: list the movies branch by branch (a movie shared by several branches keeps a tag)
   const movieGroups = group_items_by_branch(
     filteredMovies,
-    (movie: any) => branch_ids_of_item(movie.branch_ids, movie.branch_id),
+    (movie: any) => branch_scope_of(movie),
     branchOptions.length > 0 ? branchOptions : branches
   );
   const toggleMovieGroup = (items: any[]) => {
-    const groupIds: number[] = items.map((movie: any) => movie.id);
-    const current: number[] = editData.combo || [];
-    const wholeGroupTicked = groupIds.every((id) => current.includes(id));
-    setEditData({
-      ...editData,
-      combo: wholeGroupTicked ? current.filter((id) => !groupIds.includes(id)) : [...current, ...groupIds.filter((id) => !current.includes(id))]
-    });
+    const groupIds: number[] = items.map((movie: any) => Number(movie.id));
+    const wholeGroupTicked = groupIds.every((id) => selectedMovieIds.includes(id));
+    setMovieIds(
+      wholeGroupTicked ? selectedMovieIds.filter((id) => !groupIds.includes(id)) : [...selectedMovieIds, ...groupIds]
+    );
+    clearTicketError('movie_ids');
   };
   const renderMovieRow = (movie: any, showTag: boolean) => (
                           <div
@@ -421,43 +397,28 @@ export default function TicketsContent(props: Props) {
                           >
                             <Checkbox
                               id={`movie-${movie.id}`}
-                              checked={(editData.combo || []).includes(movie.id)}
+                              checked={selectedMovieIds.includes(Number(movie.id))}
                               onCheckedChange={(checked) => {
-                                const current = editData.combo || [];
-                                if (checked) {
-                                  setEditData({
-                                    ...editData,
-                                    combo: [...current, movie.id]
-                                  });
-                                } else {
-                                  setEditData({
-                                    ...editData,
-                                    combo: current.filter((id: number) => id !== movie.id)
-                                  });
-                                }
+                                const current = selectedMovieIds.filter((id) => id !== Number(movie.id));
+                                setMovieIds(checked ? [...current, Number(movie.id)] : current);
+                                clearTicketError('movie_ids');
                               }}
                             />
                             <label
                               htmlFor={`movie-${movie.id}`}
-                              className="text-xs font-medium leading-none cursor-pointer flex-1 text-slate-700 truncate"
+                              className="min-w-0 flex-1 cursor-pointer truncate text-xs font-medium leading-none text-slate-700"
                               title={movie.title}
                             >
                               {movie.title}
                             </label>
                             {showTag && (
-                              <BranchTag branch_ids={movie.branch_ids} branch_id={movie.branch_id} branches={branchOptions.length > 0 ? branchOptions : branches} />
+                              <BranchTag all_branches={movie.all_branches} branch_ids={movie.branch_ids} branches={branchOptions.length > 0 ? branchOptions : branches} />
                             )}
                           </div>
   );
 
-  // Movies of the combo that stay on save: the ones it started with, plus new ones the branch rule allows
-  const keepComboIds = (combo: any[]): number[] =>
-    (combo || [])
-      .map(Number)
-      .filter((movieId) => originalComboIds.includes(movieId) || (knownMovies[movieId] && isMovieEligible(knownMovies[movieId])));
-
   // Selected movies that the current search does not show, so they can still be seen and removed
-  const selectedOutsideResults = keepComboIds(editData?.combo || []).filter(
+  const selectedOutsideResults = selectedMovieIds.filter(
     (movieId) => !filteredMovies.some((movie) => Number(movie.id) === movieId)
   );
 
@@ -475,9 +436,14 @@ export default function TicketsContent(props: Props) {
     if (displayOrder !== undefined && (displayOrder < 0 || !Number.isInteger(displayOrder))) {
       errors.display_order = 'Thứ tự phải là số nguyên từ 0 trở lên';
     }
-    const branchIds = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
-    if (Array.isArray(branchIds) && branchIds.length === 0) {
-      errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"';
+    const packageBranches = branch_scope_of(editData);
+    if (!isSuperAdmin && (packageBranches.all_branches || packageBranches.branch_ids.length === 0)) {
+      errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh bạn quản lý';
+    }
+    if (!isVr) {
+      if (movie_scope_of(editData) === 'selected' && sorted_id_list(editData?.movie_ids).length === 0) {
+        errors.movie_ids = 'Vui lòng chọn ít nhất một phim hoặc "Mọi phim chiếu ở chi nhánh"';
+      }
     }
     if (isVr) {
       const duration = parse_optional_number(editData?.duration_min);
@@ -519,7 +485,8 @@ export default function TicketsContent(props: Props) {
     }
     try {
       setIsSaving(true);
-      const branch_ids = normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id);
+      const isVr = editData.type === 'vr';
+      const movieScope: MovieScope = isVr ? 'selected' : movie_scope_of(editData);
 
       const features =
         typeof editData.features === 'string'
@@ -529,9 +496,6 @@ export default function TicketsContent(props: Props) {
               .filter(Boolean)
           : editData.features || [];
 
-      // Movies already in the combo stay even when hidden since; new ones must pass the branch rule
-      const validCombo = editData.type === 'vr' ? [] : keepComboIds(editData.combo || []);
-
       const payload = {
         name: editData.name.trim(),
         code: editData.code?.trim() || undefined,
@@ -539,11 +503,13 @@ export default function TicketsContent(props: Props) {
         price: Number(editData.price || 0),
         features,
         type: editData.type || 'movie',
-        combo: validCombo,
+        // VR packages have no movies; "every movie at the branch" sends no list
+        movie_scope: movieScope,
+        movie_ids: isVr || movieScope === 'all_at_branch' ? [] : sorted_id_list(editData.movie_ids),
         is_member_only: !!editData.is_member_only,
         is_active: editData.is_active !== undefined ? !!editData.is_active : true,
         display_order: editData.display_order ? Number(editData.display_order) : 0,
-        branch_ids,
+        ...branch_scope_payload(branch_scope_of(editData)),
         cover_image: editData.cover_image?.trim() || undefined,
         duration_min: editData.duration_min ? Number(editData.duration_min) : undefined,
         vr_genre: editData.vr_genre?.trim() || undefined,
@@ -595,7 +561,7 @@ export default function TicketsContent(props: Props) {
     }
   };
 
-  // Open the detail dialog and load what the list does not carry (creator, editor, combo titles)
+  // Open the detail dialog and load what the list does not carry (creator, editor, movie titles)
   const open_detail = (ticket: TicketPackage) => {
     setSelectedTicket(ticket);
     setIsDetailDialogOpen(true);
@@ -610,7 +576,7 @@ export default function TicketsContent(props: Props) {
             ? {
                 ...current,
                 created_at: detail.created_at ?? current.created_at,
-                combo_movies: Array.isArray(detail.combo_movies) ? detail.combo_movies : [],
+                movies: Array.isArray(detail.movies) ? detail.movies : [],
                 created_by_staff_name: detail.created_by_staff_name ?? undefined,
                 updated_by_staff_name: detail.updated_by_staff_name ?? undefined
               }
@@ -858,7 +824,12 @@ export default function TicketsContent(props: Props) {
                           className="flex w-fit items-center gap-1 whitespace-nowrap border-blue-200 bg-blue-50 text-[11px] font-bold text-blue-700"
                         >
                           <Film className="h-3 w-3 text-blue-600" />
-                          Vé phim {t.combo && t.combo.length > 0 ? `• ${t.combo.length} phim` : ''}
+                          Vé phim{' '}
+                          {t.movie_scope === 'all_at_branch'
+                            ? '• mọi phim'
+                            : t.movie_ids && t.movie_ids.length > 0
+                              ? `• ${t.movie_ids.length} phim`
+                              : ''}
                         </Badge>
                       )}
                     </TableCell>
@@ -876,7 +847,7 @@ export default function TicketsContent(props: Props) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <BranchIdsBadge branch_ids={t.branch_ids} branch_id={t.branch_id} branches={branches || []} />
+                      <BranchIdsBadge all_branches={t.all_branches} branch_ids={t.branch_ids} branches={branches || []} />
                     </TableCell>
                     <TableCell className="text-center">
                       {hasPermission('tickets', 'toggle_status') && can_modify ? (
@@ -952,7 +923,7 @@ export default function TicketsContent(props: Props) {
         subtitle={
           editData?.type === 'vr'
             ? 'Cấu hình gói dịch vụ thực tế ảo VR dành cho khách hàng'
-            : 'Cấu hình combo vé xem phim cho các cụm rạp'
+            : 'Cấu hình gói vé xem phim cho các cụm rạp'
         }
         footer={
           <AdminDialogFooter
@@ -1253,17 +1224,55 @@ export default function TicketsContent(props: Props) {
                     </div>
                   </FormSection>
                 ) : (
-                  /* MOVIE COMBO SELECT */
+                  /* MOVIE PACKAGE: MOVIES, ENTRIES AND VALIDITY */
                   <FormSection
-                    title={`Combo phim (đã chọn ${keepComboIds(editData?.combo || []).length})`}
+                    title={
+                      movie_scope_of(editData) === 'all_at_branch'
+                        ? 'Phim áp dụng (mọi phim của chi nhánh)'
+                        : `Phim áp dụng (đã chọn ${selectedMovieIds.length})`
+                    }
                     icon={<Film size={14} className="text-blue-500" />}
                     className="space-y-4"
                   >
+                    {/* Movie scope: every movie shown at the order's branch, or the movies chosen below */}
+                    <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Phim áp dụng">
+                      {(
+                        [
+                          { value: 'all_at_branch', label: 'Mọi phim chiếu ở chi nhánh', hint: 'Gồm cả phim thêm sau này' },
+                          { value: 'selected', label: 'Chọn phim', hint: 'Chỉ các phim được chọn bên dưới' }
+                        ] as const
+                      ).map((option) => {
+                        const active = movie_scope_of(editData) === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => {
+                              setEditData({ ...editData, movie_scope: option.value });
+                              clearTicketError('movie_ids');
+                            }}
+                            className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+                              active
+                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span className="block text-xs font-bold">{option.label}</span>
+                            <span className="block text-[11px] text-slate-400">{option.hint}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {movie_scope_of(editData) === 'selected' && (
+                      <>
                     <Input
                       placeholder="Tìm phim theo tên..."
                       value={movieSearch}
                       onChange={(e) => setMovieSearch(e.target.value)}
-                      aria-label="Tìm phim cho combo"
+                      aria-label="Tìm phim cho gói"
                       className="h-9 text-xs"
                     />
                     {filteredMovies.length > 0 && (
@@ -1271,19 +1280,15 @@ export default function TicketsContent(props: Props) {
                         <div className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-slate-50">
                           <Checkbox
                             id="check-all-movies"
-                            checked={filteredMovies.length > 0 && filteredMovies.every((m) => (editData.combo || []).includes(m.id))}
+                            checked={filteredMovies.length > 0 && filteredMovies.every((m) => selectedMovieIds.includes(Number(m.id)))}
                             onCheckedChange={(checked) => {
-                              const existingCombo = editData.combo || [];
-                              const visibleMovieIds = filteredMovies.map((m) => m.id);
-                              if (checked) {
-                                const toAdd = visibleMovieIds.filter((id) => !existingCombo.includes(id));
-                                setEditData({ ...editData, combo: [...existingCombo, ...toAdd] });
-                              } else {
-                                setEditData({
-                                  ...editData,
-                                  combo: existingCombo.filter((id: number) => !visibleMovieIds.includes(id))
-                                });
-                              }
+                              const visibleMovieIds = filteredMovies.map((m) => Number(m.id));
+                              setMovieIds(
+                                checked
+                                  ? [...selectedMovieIds, ...visibleMovieIds]
+                                  : selectedMovieIds.filter((id) => !visibleMovieIds.includes(id))
+                              );
+                              clearTicketError('movie_ids');
                             }}
                           />
                           <label
@@ -1304,12 +1309,7 @@ export default function TicketsContent(props: Props) {
                           <Checkbox
                             id={`movie-${movieId}`}
                             checked
-                            onCheckedChange={() =>
-                              setEditData({
-                                ...editData,
-                                combo: (editData.combo || []).filter((id: number) => Number(id) !== movieId)
-                              })
-                            }
+                            onCheckedChange={() => setMovieIds(selectedMovieIds.filter((id) => id !== movieId))}
                           />
                           <label
                             htmlFor={`movie-${movieId}`}
@@ -1325,7 +1325,7 @@ export default function TicketsContent(props: Props) {
                         <p className="text-xs text-gray-400 text-center py-6">
                           {movieSearch.trim()
                             ? 'Không tìm thấy phim nào'
-                            : 'Không có phim nào khả dụng cho chi nhánh này'}
+                            : 'Chưa có phim nào đang hoạt động'}
                         </p>
                       ) : (
                         showMovieBranchTag
@@ -1334,7 +1334,7 @@ export default function TicketsContent(props: Props) {
                                 <BranchGroupHeader
                                   label={group.label}
                                   count={group.items.length}
-                                  all_selected={group.items.every((movie: any) => (editData.combo || []).includes(movie.id))}
+                                  all_selected={group.items.every((movie: any) => selectedMovieIds.includes(Number(movie.id)))}
                                   on_toggle={() => toggleMovieGroup(group.items)}
                                 />
                                 {group.items.map((movie: any) => renderMovieRow(movie, group.key === 'multi'))}
@@ -1348,6 +1348,9 @@ export default function TicketsContent(props: Props) {
                         Đang hiện {movies.length}/{movieTotal} phim. Gõ tên phim để tìm thêm.
                       </p>
                     )}
+                      </>
+                    )}
+                    {ticketErrors.movie_ids && <p className="text-xs font-medium text-red-500">{ticketErrors.movie_ids}</p>}
                   </FormSection>
                 )}
 
@@ -1360,13 +1363,10 @@ export default function TicketsContent(props: Props) {
                   <FormField label="Chi nhánh áp dụng" required error={ticketErrors.branch_ids}>
                     <BranchMultiSelect
                       branches={branchOptions}
-                      value={normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)}
-                      onChange={(branch_ids) => {
-                        setEditData({
-                          ...editData,
-                          branch_ids,
-                          branch_id: branch_ids && branch_ids.length === 1 ? branch_ids[0] : undefined
-                        });
+                      value={branch_scope_of(editData)}
+                      allowAll={isSuperAdmin}
+                      onChange={(scope) => {
+                        setEditData({ ...editData, ...scope });
                         clearTicketError('branch_ids');
                       }}
                     />
@@ -1571,8 +1571,8 @@ export default function TicketsContent(props: Props) {
                         <Label className="text-[11px] font-bold uppercase text-gray-400 block">Chi nhánh</Label>
                         <div>
                           <BranchIdsBadge
+                            all_branches={selectedTicket.all_branches}
                             branch_ids={selectedTicket.branch_ids}
-                            branch_id={selectedTicket.branch_id}
                             branches={branches || []}
                           />
                         </div>
@@ -1616,19 +1616,21 @@ export default function TicketsContent(props: Props) {
                   </CardContent>
                 </div>
 
-                {/* Movies of the combo */}
+                {/* Movies of the package */}
                 {selectedTicket.type !== 'vr' && (
                   <div className={`${ADMIN_CARD} md:col-span-2`}>
                     <CardHeader className="pb-2 px-4 pt-4">
                       <CardTitle className="text-xs font-bold text-slate-700 flex items-center gap-2">
                         <Film className="w-3.5 h-3.5 text-blue-500" />
-                        Phim trong combo
+                        Phim áp dụng
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 pb-4">
                       <div className="flex flex-wrap gap-1.5">
-                        {selectedTicket.combo_movies && selectedTicket.combo_movies.length > 0 ? (
-                          selectedTicket.combo_movies.map((movie) => (
+                        {selectedTicket.movie_scope === 'all_at_branch' ? (
+                          <span className="text-xs font-medium text-slate-600">Mọi phim chiếu ở chi nhánh của đơn</span>
+                        ) : selectedTicket.movies && selectedTicket.movies.length > 0 ? (
+                          selectedTicket.movies.map((movie) => (
                             <Badge
                               key={movie.id}
                               variant="outline"
@@ -1640,8 +1642,8 @@ export default function TicketsContent(props: Props) {
                           ))
                         ) : (
                           <span className="text-xs text-gray-400">
-                            {selectedTicket.combo && selectedTicket.combo.length > 0
-                              ? `${selectedTicket.combo.length} phim (đang tải tên phim)`
+                            {selectedTicket.movie_ids && selectedTicket.movie_ids.length > 0
+                              ? `${selectedTicket.movie_ids.length} phim (đang tải tên phim)`
                               : EMPTY_VALUE}
                           </span>
                         )}

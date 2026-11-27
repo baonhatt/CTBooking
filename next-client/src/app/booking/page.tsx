@@ -297,7 +297,9 @@ export default function BookingPage() {
   const movieSubtotal = useMemo(() => movieItems.reduce((s, i) => s + i.price * i.quantity, 0), [movieItems, selectedItems]);
   const vrSubtotal = useMemo(() => vrItems.reduce((s, i) => s + i.price * i.quantity, 0), [vrItems, selectedItems]);
 
-  // Available movies for selected movie packages (filtered strictly by active branch)
+  // Movies of the selected movie packages. The server already sends each package with the movies it offers at the
+  // chosen branch (tickets-active?branch_id=), so nothing is filtered by branch here. The branch's movie list is only
+  // used to show fuller movie details when it has the same movie.
   const availableMovies = useMemo(() => {
     const branchMovieMap = new Map<number, any>();
     branchMovies.forEach((m: any) => {
@@ -307,46 +309,17 @@ export default function BookingPage() {
     const moviesMap = new Map<number, any>();
     movieItems.forEach((item) => {
       const pkg = ticketPackages.find((p: any) => p.id === item.packageId);
-      const list = pkg?.movies && pkg.movies.length > 0 ? pkg.movies : item.movies || [];
+      // The package as loaded for this branch wins over the copy saved in the cart (it may be from another branch)
+      const list = pkg ? pkg.movies || [] : item.movies || [];
       list.forEach((m: any) => {
         if (!m?.id) return;
         const mid = Number(m.id);
-
-        // 1. Phim BẮT BUỘC phải nằm trong danh sách phim đang chiếu của chi nhánh
-        if (branchMovieMap.size > 0 && !branchMovieMap.has(mid)) {
-          return;
-        }
-
-        // 2. Kiểm tra branch_ids / branch_id trên object movie (nếu có)
-        if (activeBranchId && m.branch_ids) {
-          try {
-            const bIds = Array.isArray(m.branch_ids)
-              ? m.branch_ids
-              : typeof m.branch_ids === 'string'
-                ? JSON.parse(m.branch_ids)
-                : null;
-            if (Array.isArray(bIds) && bIds.length > 0 && !bIds.includes(activeBranchId)) {
-              return;
-            }
-          } catch {}
-        }
-        if (activeBranchId && m.branch_id && m.branch_id !== activeBranchId) {
-          return;
-        }
-
-        const fullMovie = branchMovieMap.get(mid) || m;
-        moviesMap.set(mid, fullMovie);
+        moviesMap.set(mid, branchMovieMap.get(mid) || m);
       });
     });
 
-    // Nếu người dùng chọn gói xem phim nhưng moviesMap trống (do combo cũ trỏ sai rạp khác),
-    // tự động fallback hiển thị toàn bộ phim đang chiếu tại chi nhánh hiện tại!
-    if (movieItems.length > 0 && moviesMap.size === 0 && branchMovies.length > 0) {
-      return branchMovies;
-    }
-
     return Array.from(moviesMap.values());
-  }, [movieItems, ticketPackages, activeBranchId, branchMovies]);
+  }, [movieItems, ticketPackages, branchMovies]);
 
   // No movie selection needed – single-room rotating model, just show info
 

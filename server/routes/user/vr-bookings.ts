@@ -1,8 +1,8 @@
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import type { VRBookingRequest, VRBookingResponse, VRPackageLineItem } from '../../../shared/api';
 import { formatDateForDb } from '../../lib/date-utils';
-import { validateVoucherForVRImpl, packageServesBranch } from './vouchers';
-import { sqlBranchIdsMatchFilter } from '../../lib/branch-ids';
+import { validateVoucherForVRImpl } from './vouchers';
+import { customerBranchId, packageAtBranch, packagesAtBranch } from '../../lib/catalog-scope';
 import { allocateVoucherDiscountToVrItems, parseApplicableIds } from '../../../shared/booking-invoice';
 import { generatePayTxtCode, isPayCodeCollision } from '../../lib/pay-code';
 import { resolveOrderBranchId } from '../../lib/booking-branch';
@@ -10,53 +10,11 @@ import { isValidCustomerName, isValidCustomerEmail } from '../../lib/customer-in
 import { releaseVoucherForCancelledBooking } from '../scheduled/booking-expiry';
 
 // =============== 1. List VR Packages for user booking page ===============
-export async function listActiveVRPackagesImpl(anyDb: any, tables: { ticket_packages: any }, branch_id?: number) {
-  const pkgs = tables.ticket_packages;
-  // Safe version using OR logic fallback in case SQL stringify is tricky:
-  const whereClause = branch_id
-    ? and(
-        eq(pkgs.is_active, true),
-        isNull(pkgs.deleted_at),
-        eq(pkgs.type, 'vr'),
-        sqlBranchIdsMatchFilter(pkgs.branch_ids, pkgs.branch_id, branch_id)
-      )
-    : and(eq(pkgs.is_active, true), isNull(pkgs.deleted_at), eq(pkgs.type, 'vr'));
-
-  const items = await anyDb.query.ticket_packages.findMany({
-    where: whereClause,
-    // What the customer screens show, plus is_member_only (the route hides those packages from visitors)
-    columns: {
-      id: true,
-      name: true,
-      description: true,
-      price: true,
-      features: true,
-      type: true,
-      vr_genre: true,
-      cover_image: true,
-      duration_min: true,
-      min_players: true,
-      max_players: true,
-      display_order: true,
-      is_member_only: true,
-      branch_ids: true
-    },
-    orderBy: [sql`CAST(${pkgs.display_order} AS INTEGER) ASC`, sql`CAST(${pkgs.price} AS REAL) ASC`]
-  });
-
-  // Enrich with branch_ids_parsed for backward compat
-  const enriched = items.map((it: any) => {
-    let bIds: number[] | null = null;
-    if (it.branch_ids) {
-      try {
-        const parsed = JSON.parse(it.branch_ids);
-        if (Array.isArray(parsed)) bIds = parsed.map((x: any) => Number(x)).filter((x: number) => !isNaN(x));
-      } catch {}
-    }
-    return { ...it, branch_ids: bIds, branch_ids_parsed: bIds };
-  });
-
-  return { items: enriched };
+/** The VR packages sold at a branch (without a branch: the default branch), with the branch's price. */
+export async function listActiveVRPackagesImpl(anyDb: any, _tables: { ticket_packages: any }, branch_id?: number) {
+  const branchId = await customerBranchId(anyDb, branch_id);
+  if (!branchId) return { items: [] };
+  return { items: await packagesAtBranch(anyDb, branchId, 'vr') };
 }
 
 // =============== 2. Validate VR booking (pre-checkout) ===============
@@ -89,23 +47,19 @@ export async function validateVRBookingInput(
     if (!Number.isInteger(it.quantity)) throw new Error('Số lượng phải là số nguyên');
   }
 
-  const pkgs = await anyDb.query.ticket_packages.findMany({
-    where: and(
-      inArray(tables.ticket_packages.id, vrPackageIds),
-      eq(tables.ticket_packages.type, 'vr'),
-      eq(tables.ticket_packages.is_active, true),
-      isNull(tables.ticket_packages.deleted_at)
-    )
-  });
-
-  if (pkgs.length !== vrPackageIds.length) {
-    throw new Error('Có gói VR không tồn tại hoặc đang tạm ngừng bán');
+  // Each package as sold at the order's branch (its price there); a package not sold there is refused
+  const orderBranchId = await customerBranchId(anyDb, branch_id);
+  if (!orderBranchId) throw new Error('Vui lòng chọn chi nhánh để đặt vé.');
+  const pkgs: any[] = [];
+  for (const packageId of vrPackageIds) {
+    const pkg = await packageAtBranch(anyDb, Number(packageId), orderBranchId);
+    if (!pkg || pkg.type !== 'vr') {
+      throw new Error('Có gói VR không tồn tại, đang tạm ngừng bán hoặc không bán tại chi nhánh bạn chọn');
+    }
+    pkgs.push(pkg);
   }
 
   for (const p of pkgs) {
-    if (branch_id && !packageServesBranch(p, Number(branch_id))) {
-      throw new Error(`Gói "${p.name}" không bán tại chi nhánh bạn chọn`);
-    }
     // Member-only packages need a signed-in customer (the route takes it from the session, never from the form)
     if (p.is_member_only && !(Number((body as any).signed_in_account_id) > 0)) {
       throw new Error('Gói này chỉ dành cho thành viên. Vui lòng đăng nhập để đặt.');
@@ -142,7 +96,7 @@ export async function validateVRBookingInput(
       vr_items,
       vr_subtotal: original_total,
       vr_price_map: vrPriceMap,
-      branch_id,
+      branch_id: orderBranchId,
       // The customer's email, so the per-customer limit (paid + still-pending orders) is checked here too
       email: emailBook,
       order_total_before: original_total
@@ -322,7 +276,7 @@ export async function createVRBookingImpl(
     }
 
     // Insert booking_vr_items using standard pro-rata discount allocation
-    const applicableIds = parseApplicableIds(voucher_applied?.voucher_details?.applicable_ticket_package_ids);
+    const applicableIds = parseApplicableIds(voucher_applied?.voucher_details?.applicable_ids);
     const allocatedItems = allocateVoucherDiscountToVrItems({
       vrItems: validated.vr_items_resolved.map((it) => ({
         vr_package_id: it.vr_package_id,

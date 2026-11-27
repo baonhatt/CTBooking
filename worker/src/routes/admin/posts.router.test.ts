@@ -18,10 +18,22 @@ vi.mock('../../../../server/routes/admin/posts', async (importOriginal) => ({
   deletePostImpl: vi.fn(async () => ({ id: 7 }))
 }));
 
-// The post being changed belongs to the branches in postBranchIds (JSON text, null = all branches)
-let postBranchIds: string | null = '[1]';
+// The post being changed is offered at postScope: all_branches = 1, or post_branches rows for the listed branches
+type PostScope = { all_branches: boolean; branch_ids: number[] };
+let postScope: PostScope = { all_branches: false, branch_ids: [1] };
 vi.mock('drizzle-orm/d1', () => ({
-  drizzle: () => ({ query: { posts: { findFirst: async () => ({ branch_ids: postBranchIds }) } } })
+  drizzle: () => ({
+    query: { posts: { findFirst: async () => ({ id: 7 }) } },
+    // readBranchScope reads the post row (…limit) and then its post_branches rows (…orderBy)
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ id: 7, all_branches: postScope.all_branches ? 1 : 0 }],
+          orderBy: async () => postScope.branch_ids.map((branchId) => ({ record_id: 7, branch_id: branchId }))
+        })
+      })
+    })
+  })
 }));
 
 const env = { cinema_db: {} };
@@ -33,29 +45,47 @@ function del(path: string, superAdmin: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  postBranchIds = '[1]';
+  postScope = { all_branches: false, branch_ids: [1] };
 });
 
 describe('posts of other branches', () => {
   it('branch staff cannot archive a post of another branch, or one for all branches', async () => {
-    for (const branchIds of ['[2]', '[1,2]', null]) {
-      postBranchIds = branchIds;
+    const otherScopes: PostScope[] = [
+      { all_branches: false, branch_ids: [2] },
+      { all_branches: false, branch_ids: [1, 2] },
+      { all_branches: true, branch_ids: [] }
+    ];
+    for (const scope of otherScopes) {
+      postScope = scope;
       const response = await del('/api/admin/posts/7', false);
       expect(response.status).toBe(403);
     }
     expect(deletePostImpl).not.toHaveBeenCalled();
   });
 
-  it('branch staff cannot create a post for all branches or for another branch', async () => {
-    for (const branch_ids of [null, undefined, [2], [1, 2]]) {
-      const response = await postsRouter.request(
-        '/api/admin/posts',
-        { method: 'POST', headers: { 'x-test-super': '0', 'content-type': 'application/json' }, body: JSON.stringify({ title: 'A', branch_ids }) },
-        env,
-        executionContext
-      );
-      expect(response.status).toBe(403);
+  const createAsStaff = (scope: Record<string, unknown>) =>
+    postsRouter.request(
+      '/api/admin/posts',
+      { method: 'POST', headers: { 'x-test-super': '0', 'content-type': 'application/json' }, body: JSON.stringify({ title: 'A', ...scope }) },
+      env,
+      executionContext
+    );
+
+  it('branch staff cannot create a post for all branches, for another branch or for no branch', async () => {
+    const scopes = [
+      { all_branches: true },
+      { all_branches: false, branch_ids: [2] },
+      { all_branches: false, branch_ids: [1, 2] },
+      { all_branches: false, branch_ids: [] }
+    ];
+    for (const scope of scopes) {
+      expect((await createAsStaff(scope)).status).toBe(403);
     }
+  });
+
+  it('a create without a branch choice is refused with 400', async () => {
+    expect((await createAsStaff({})).status).toBe(400);
+    expect((await createAsStaff({ branch_ids: [1] })).status).toBe(400);
   });
 });
 

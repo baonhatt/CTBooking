@@ -1,7 +1,8 @@
-import { branch_ids_of_item } from '@/components/admin/BranchTag';
+import type { BranchScope } from '@/lib/branch-scope';
 
 export type BranchGroup<T> = {
-  // 'multi' = items that belong to several branches, 'all' = items with no branch (every branch)
+  // 'multi' = items that belong to several branches, 'all' = items offered at every branch,
+  // 'none' = items not offered at any branch yet
   key: string;
   label: string;
   items: T[];
@@ -11,20 +12,25 @@ type BranchOption = { id: number; name: string };
 
 // Splits a pick-list into one group per branch so items are chosen branch by branch, not mixed by name.
 // Order: each branch (in the order of `branches`) that has items of its own, then items shared by several
-// branches, then items that apply to all branches. Empty groups are left out. Inside a group the order is kept.
+// branches, then items that apply to all branches, then items with no branch. Empty groups are left out.
+// Inside a group the order is kept.
 export function group_items_by_branch<T>(
   items: T[],
-  get_branch_ids: (item: T) => number[],
+  get_scope: (item: T) => BranchScope,
   branches: BranchOption[]
 ): BranchGroup<T>[] {
   const per_branch = new Map<number, T[]>();
   const shared: T[] = [];
   const everywhere: T[] = [];
+  const nowhere: T[] = [];
 
   for (const item of items) {
-    const ids = get_branch_ids(item);
-    if (ids.length === 0) {
+    const scope = get_scope(item);
+    const ids = scope.branch_ids;
+    if (scope.all_branches) {
       everywhere.push(item);
+    } else if (ids.length === 0) {
+      nowhere.push(item);
     } else if (ids.length === 1) {
       per_branch.set(ids[0], [...(per_branch.get(ids[0]) || []), item]);
     } else {
@@ -44,6 +50,7 @@ export function group_items_by_branch<T>(
   }
   if (shared.length > 0) groups.push({ key: 'multi', label: 'Nhiều chi nhánh', items: shared });
   if (everywhere.length > 0) groups.push({ key: 'all', label: 'Tất cả chi nhánh', items: everywhere });
+  if (nowhere.length > 0) groups.push({ key: 'none', label: 'Chưa chọn chi nhánh', items: nowhere });
   return groups;
 }
 

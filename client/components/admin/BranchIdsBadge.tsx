@@ -1,52 +1,20 @@
 import { BranchName } from '@/components/admin/BranchName';
-import {
-  formatBranchIdsLabel,
-  getBranchIdsDisplayStatus,
-  parseBranchIdsFromApi,
-  type BranchIdsValue
-} from '@/lib/branch-ids';
+import { branch_scope_label, branch_scope_of, branch_scope_status } from '@/lib/branch-scope';
 
 type BranchIdsBadgeProps = {
+  all_branches?: unknown;
   branch_ids?: unknown;
-  branch_id?: unknown;
   branches: { id: number; name: string }[];
   className?: string;
 };
 
-function toSingleBranchIdOrNull(raw: unknown): BranchIdsValue {
-  if (raw === null || raw === undefined) return null;
-  if (typeof raw === 'number') {
-    return Number.isNaN(raw) || raw <= 0 ? null : [raw];
-  }
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) return null;
-    const n = Number(trimmed);
-    if (!Number.isNaN(n) && n > 0) return [n];
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (typeof parsed === 'number') {
-        return Number.isNaN(parsed) || parsed <= 0 ? null : [parsed];
-      }
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const n2 = Number(parsed[0]);
-        return Number.isNaN(n2) || n2 <= 0 ? null : [n2];
-      }
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-export function BranchIdsBadge({ branch_ids, branch_id, branches, className }: BranchIdsBadgeProps) {
-  const normalized: BranchIdsValue =
-    branch_ids !== undefined ? parseBranchIdsFromApi(branch_ids) : toSingleBranchIdOrNull(branch_id);
-  const status = getBranchIdsDisplayStatus(normalized);
-  const label = formatBranchIdsLabel(normalized, branches);
+export function BranchIdsBadge({ all_branches, branch_ids, branches, className }: BranchIdsBadgeProps) {
+  const scope = branch_scope_of({ all_branches, branch_ids });
+  const status = branch_scope_status(scope);
+  const label = branch_scope_label(scope, branches);
 
   const style =
-    status === 'unset'
+    status === 'none'
       ? 'bg-amber-50 text-amber-700 border-amber-200'
       : status === 'all'
         ? 'bg-blue-50 text-blue-700 border-blue-200'
@@ -54,10 +22,10 @@ export function BranchIdsBadge({ branch_ids, branch_id, branches, className }: B
 
   // Specific branches: one chip each (region on top, name on up to two lines), wrapping onto new lines,
   // so names like "HCM | CN AEON MALL Tân Phú Celadon" are not cut off
-  if (status === 'specific' && normalized) {
+  if (status === 'specific') {
     return (
       <span className={`flex max-w-[260px] flex-wrap gap-1 ${className || ''}`} title={label}>
-        {normalized.map((id) => (
+        {scope.branch_ids.map((id) => (
           <BranchName
             key={id}
             name={branches.find((branch) => branch.id === id)?.name || `Chi nhánh #${id}`}

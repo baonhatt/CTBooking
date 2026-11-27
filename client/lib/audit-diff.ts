@@ -48,6 +48,7 @@ const FIELD_LABELS: Record<string, string> = {
   branch_id: 'Chi nhánh',
   branch_ids: 'Chi nhánh áp dụng',
   branchIds: 'Chi nhánh',
+  all_branches: 'Tất cả chi nhánh',
   display_order: 'Thứ tự hiển thị',
   cover_image: 'Ảnh bìa',
   type: 'Loại',
@@ -77,8 +78,10 @@ const FIELD_LABELS: Record<string, string> = {
   rating: 'Đánh giá',
   release_date: 'Ngày phát hành',
   detail_images: 'Ảnh chi tiết',
-  // ticket package
+  // ticket package (combo: old log rows from before movie_scope / movie_ids)
   combo: 'Combo',
+  movie_scope: 'Phim áp dụng',
+  movie_ids: 'Phim',
   features: 'Đặc điểm',
   is_member_only: 'Chỉ dành cho hội viên',
   min_group_size: 'Số người tối thiểu',
@@ -96,7 +99,10 @@ const FIELD_LABELS: Record<string, string> = {
   valid_from: 'Hiệu lực từ',
   valid_until: 'Hiệu lực đến',
   scope: 'Phạm vi',
+  // applicable_ticket_package_ids: old log rows from before all_packages / package_ids
   applicable_ticket_package_ids: 'Gói vé áp dụng',
+  package_ids: 'Gói áp dụng',
+  all_packages: 'Tất cả gói',
   excluded_ticket_package_ids: 'Gói vé loại trừ',
   applicable_user_ids: 'Khách hàng áp dụng',
   // post
@@ -164,6 +170,7 @@ const FIELD_LABELS: Record<string, string> = {
 const VALUE_LABELS: Record<string, Record<string, string>> = {
   type: { movie: 'Phim', vr: 'VR' },
   scope: { all: 'Tất cả', movie: 'Gói phim', vr: 'Gói VR' },
+  movie_scope: { selected: 'Phim đã chọn', all_at_branch: 'Mọi phim của chi nhánh' },
   discount_type: { percent: 'Phần trăm', fixed: 'Số tiền cố định' },
   status: { draft: 'Nháp', published: 'Đã đăng', archived: 'Lưu trữ' },
   payment_status: {
@@ -395,7 +402,7 @@ export function formatAuditValue(field: string, value: unknown, branchNames: Rec
     const ids = Array.isArray(value) ? value : [value];
     return ids.map((id) => branchNames[Number(id)] || `#${id}`).join(', ');
   }
-  if (typeof value === 'boolean' || ((value === 0 || value === 1) && /^(is_|show_|is[A-Z]|force)/.test(field))) {
+  if (typeof value === 'boolean' || ((value === 0 || value === 1) && /^(is_|show_|is[A-Z]|force|all_)/.test(field))) {
     const on = value === true || value === 1;
     if (SWITCH_FIELDS.has(field)) return on ? 'Bật' : 'Tắt';
     return on ? 'Có' : 'Không';

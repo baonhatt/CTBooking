@@ -309,8 +309,8 @@ export interface VoucherPackageOption {
   name: string;
   price: number;
   type: string | null;
-  branch_id: number | null;
-  branch_ids: number[] | null;
+  all_branches: boolean;
+  branch_ids: number[];
   is_active: boolean;
 }
 

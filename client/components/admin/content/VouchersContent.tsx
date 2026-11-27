@@ -41,7 +41,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
 import { BranchIdsBadge } from '@/components/admin/BranchIdsBadge';
-import { BranchTag, branch_ids_of_item } from '@/components/admin/BranchTag';
+import { BranchTag } from '@/components/admin/BranchTag';
+import { branch_scope_of, branch_scope_payload, branch_scope_status, scope_covers_branch, type BranchScope } from '@/lib/branch-scope';
 import { BranchGroupHeader, group_items_by_branch } from '@/components/admin/BranchGroups';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -94,8 +95,11 @@ interface VoucherItem {
     redemption_total_count?: number;
     valid_from?: string | null;
     valid_until?: string | null;
-    applicable_ticket_package_ids?: number[] | null;
-    branch_ids?: number[] | null;
+    // all_packages = every package of the scope; otherwise the packages in package_ids
+    all_packages?: boolean;
+    package_ids?: number[];
+    all_branches?: boolean;
+    branch_ids?: number[];
     is_active?: boolean;
     is_deleted?: boolean;
     deleted_at?: string | null;
@@ -164,7 +168,9 @@ const VOUCHER_KEY_TO_FIELD: Record<string, VoucherField> = {
     discount_value: 'discount_value',
     valid_from: 'valid_until',
     valid_until: 'valid_until',
-    applicable_ticket_package_ids: 'packages',
+    all_packages: 'packages',
+    package_ids: 'packages',
+    all_branches: 'branch_ids',
     branch_ids: 'branch_ids'
 };
 
@@ -190,10 +196,17 @@ const is_voucher_permanent = (voucher: any): boolean => {
     return !voucher.valid_until && !voucher.valid_from;
 };
 
-// Number list as a sorted copy (order does not matter for ids); null stays null so "all" differs from "none"
-const sorted_id_list = (ids: unknown): number[] | null => {
-    if (!Array.isArray(ids)) return null;
+// Number list as a sorted copy (order does not matter for ids)
+const sorted_id_list = (ids: unknown): number[] => {
+    if (!Array.isArray(ids)) return [];
     return ids.map((id) => Number(id)).sort((a, b) => a - b);
+};
+
+// The packages of a voucher form or row: every package, or the ones in package_ids.
+// A missing flag reads as "not all" (never silently "every package"); an empty list = no package chosen yet.
+const package_choice_of = (form: any): { all_packages: boolean; package_ids: number[] } => {
+    const all_packages = form?.all_packages === true || form?.all_packages === 1;
+    return { all_packages, package_ids: all_packages ? [] : sorted_id_list(form?.package_ids) };
 };
 
 // Every editable field of the voucher form in a fixed shape, so two states can be compared by content
@@ -214,8 +227,8 @@ const voucher_form_snapshot = (form: any, permanent: boolean): string => {
         valid_from: permanent ? null : source.valid_from || null,
         valid_until: permanent ? null : source.valid_until || null,
         permanent,
-        applicable_ticket_package_ids: sorted_id_list(source.applicable_ticket_package_ids),
-        branch_ids: sorted_id_list(source.branch_ids),
+        ...package_choice_of(source),
+        ...branch_scope_of(source),
         is_active: !!(source.is_active ?? true)
     });
 };
@@ -267,25 +280,12 @@ const getTodayEndIso = () => {
     return new Date(`${dateStr}T23:59:59+07:00`).toISOString();
 };
 
-// Does a ticket package belong to one of the selected branches? A package with no branch set is global (all branches).
-// An empty selection matches nothing.
-function package_in_branches(pkg: any, allowed_branch_ids: number[]): boolean {
-    if (allowed_branch_ids.length === 0) return false;
-    const allowed = new Set(allowed_branch_ids.map(Number));
-    let package_branches: number[] = [];
-    if (Array.isArray(pkg.branch_ids)) {
-        package_branches = pkg.branch_ids.map(Number);
-    } else if (typeof pkg.branch_ids === 'string' && pkg.branch_ids.trim().length > 0) {
-        try {
-            const parsed = JSON.parse(pkg.branch_ids);
-            if (Array.isArray(parsed)) package_branches = parsed.map(Number);
-        } catch {
-            package_branches = [];
-        }
-    }
-    if (typeof pkg.branch_id === 'number') package_branches = [...package_branches, pkg.branch_id];
-    if (package_branches.length === 0) return true;
-    return package_branches.some((id) => allowed.has(id));
+// Is a ticket package sold at one of the voucher's branches? Only narrows the pick-list; the server decides at checkout.
+// A voucher for every branch shows every package; a voucher with no branch chosen shows none.
+function package_in_voucher_branches(pkg: any, voucher_scope: BranchScope): boolean {
+    if (voucher_scope.all_branches) return true;
+    const package_scope = branch_scope_of(pkg);
+    return voucher_scope.branch_ids.some((branch_id) => scope_covers_branch(package_scope, branch_id));
 }
 
 export default function VouchersContent(props: Props) {
@@ -300,10 +300,11 @@ export default function VouchersContent(props: Props) {
 
     // A voucher for all branches, for no branch, or for a branch the staff member does not manage can only be changed by
     // the Super Admin. The server enforces this too; here the Save button is locked and the reason shown.
-    const isVoucherLockedForStaff = (branchIds: unknown, managedBranchIds: number[]) => {
+    const isVoucherLockedForStaff = (voucher: any, managedBranchIds: number[]) => {
         if (isSuperAdmin) return false;
-        if (!Array.isArray(branchIds) || branchIds.length === 0) return true;
-        return branchIds.some((id) => !managedBranchIds.includes(Number(id)));
+        const scope = branch_scope_of(voucher);
+        if (scope.all_branches || scope.branch_ids.length === 0) return true;
+        return scope.branch_ids.some((id) => !managedBranchIds.includes(Number(id)));
     };
 
     const {
@@ -450,14 +451,17 @@ export default function VouchersContent(props: Props) {
 
     // Packages of the chosen scope, narrowed to the chosen branches. Reloads when the scope or the branches change.
     const packagesScopeRef = React.useRef<string | null>(null);
+    // Scope + branches the package list was last loaded for; null until the first load after the form opens
+    const packagesLoadedKeyRef = React.useRef<string | null>(null);
     useEffect(() => {
         if (!isEditOpen) {
             packagesScopeRef.current = null;
+            packagesLoadedKeyRef.current = null;
             return;
         }
         let cancelled = false;
         const scope = editData?.scope || 'vr';
-        const branchIds = editData?.branch_ids;
+        const voucherBranches = branch_scope_of(editData);
         // Do not show packages of the previous scope while the new list loads
         if (packagesScopeRef.current !== scope) {
             setVrPackages([]);
@@ -467,13 +471,27 @@ export default function VouchersContent(props: Props) {
             .then((res) => {
                 if (cancelled) return;
                 const packages = res.items || [];
-                setVrPackages(Array.isArray(branchIds) ? packages.filter((pkg: any) => package_in_branches(pkg, branchIds as number[])) : packages);
+                const visiblePackages = packages.filter((pkg: any) => package_in_voucher_branches(pkg, voucherBranches));
+                setVrPackages(visiblePackages);
+                // After the user changed the type or the branches (not on the first load): keep the package choice and
+                // drop only the chosen packages that no longer fit. An emptied list stays empty; it never becomes "all".
+                const loadedKey = JSON.stringify([scope, voucherBranches]);
+                const choiceChanged = packagesLoadedKeyRef.current !== null && packagesLoadedKeyRef.current !== loadedKey;
+                packagesLoadedKeyRef.current = loadedKey;
+                if (!choiceChanged || (editData?.scope || 'all') === 'all') return;
+                const validIds = new Set(visiblePackages.map((pkg: any) => Number(pkg.id)));
+                setEditData((current: any) => {
+                    if (!current || package_choice_of(current).all_packages) return current;
+                    const keptIds = sorted_id_list(current.package_ids).filter((id) => validIds.has(id));
+                    if (keptIds.length === sorted_id_list(current.package_ids).length) return current;
+                    return { ...current, all_packages: false, package_ids: keptIds };
+                });
             })
             .catch(() => { });
         return () => {
             cancelled = true;
         };
-    }, [isEditOpen, editData?.scope, JSON.stringify(editData?.branch_ids)]);
+    }, [isEditOpen, editData?.scope, !!editData?.all_branches, JSON.stringify(editData?.branch_ids)]);
 
     useEffect(() => {
         if (!isEditOpen) return;
@@ -604,7 +622,7 @@ export default function VouchersContent(props: Props) {
         }
     };
 
-    const isEditLocked = !!editData?.id && isVoucherLockedForStaff(editData?.branch_ids, branchOptions.map((b) => b.id));
+    const isEditLocked = !!editData?.id && isVoucherLockedForStaff(editData, branchOptions.map((b) => b.id));
 
     // Changes some fields of the form and clears the errors those fields had
     const update_fields = (patch: Record<string, any>) => {
@@ -629,7 +647,8 @@ export default function VouchersContent(props: Props) {
         element.focus();
     };
 
-    // What is wrong with the form, field by field. A limited staff member names branches of their own; nobody saves an empty list.
+    // What is wrong with the form, field by field. A limited staff member names branches of their own; a voucher limited to
+    // packages names at least one.
     const collect_voucher_errors = (payload: any, discountValue: number) => {
         const errors: Partial<Record<VoucherField, string>> = {};
         if (!payload.code || payload.code.trim() === '') errors.code = 'Vui lòng nhập mã voucher';
@@ -644,18 +663,17 @@ export default function VouchersContent(props: Props) {
                 errors.valid_until = 'Ngày hết hạn phải sau ngày bắt đầu';
             }
         }
-        if (
-            (payload.scope || 'all') !== 'all' &&
-            Array.isArray(payload.applicable_ticket_package_ids) &&
-            payload.applicable_ticket_package_ids.length === 0
-        ) {
-            errors.packages = 'Vui lòng chọn ít nhất 1 gói áp dụng (hoặc chọn tất cả)';
+        // A voucher limited to packages needs at least one package (a voucher of every type covers every package).
+        // For a Super Admin, an empty branch list is allowed (not linked to any branch yet).
+        if (payload.scope !== 'all') {
+            const packages_chosen = package_choice_of(payload);
+            if (!packages_chosen.all_packages && packages_chosen.package_ids.length === 0) {
+                errors.packages = 'Vui lòng chọn ít nhất một gói áp dụng hoặc tích "Tất cả gói"';
+            }
         }
-        if (!isSuperAdmin) {
-            const chosen = payload.branch_ids ?? branchOptions.map((b) => b.id);
-            if (!Array.isArray(chosen) || chosen.length === 0) errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh';
-        } else if (Array.isArray(payload.branch_ids) && payload.branch_ids.length === 0) {
-            errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh hoặc chọn "Tất cả chi nhánh"';
+        const branches_chosen = branch_scope_of(payload);
+        if (!isSuperAdmin && (branches_chosen.all_branches || branches_chosen.branch_ids.length === 0)) {
+            errors.branch_ids = 'Vui lòng chọn ít nhất một chi nhánh';
         }
         return errors;
     };
@@ -674,8 +692,10 @@ export default function VouchersContent(props: Props) {
             return;
         }
         setFieldErrors({});
-        // A limited staff member who left the branches empty saves for all the branches they manage
-        if (!isSuperAdmin) payload.branch_ids = payload.branch_ids ?? branchOptions.map((b) => b.id);
+        // { all_branches: true } or { all_branches: false, branch_ids: [...] }
+        delete payload.all_branches;
+        delete payload.branch_ids;
+        Object.assign(payload, branch_scope_payload(branch_scope_of(editData)));
         payload.code = payload.code.toUpperCase().trim();
         payload.scope = editData.scope || 'all';
         payload.discount_value = value;
@@ -699,11 +719,11 @@ export default function VouchersContent(props: Props) {
             payload.valid_from = payload.valid_from || null;
             payload.valid_until = payload.valid_until || null;
         }
-        if (payload.scope === 'all') {
-            payload.applicable_ticket_package_ids = null;
-        } else {
-            // An empty list was refused above. A list is kept as it is; null means all packages.
-        }
+        // Always explicit: { all_packages: true } or { all_packages: false, package_ids: [...] } (empty = no package yet)
+        const packageChoice = payload.scope === 'all' ? { all_packages: true, package_ids: [] } : package_choice_of(editData);
+        delete payload.package_ids;
+        payload.all_packages = packageChoice.all_packages;
+        if (!packageChoice.all_packages) payload.package_ids = packageChoice.package_ids;
 
         if (editData.id && editData.id > 0) {
             const originalItem = data.find((v) => v.id === editData.id);
@@ -1062,7 +1082,7 @@ export default function VouchersContent(props: Props) {
                                                 </span>
                                                 {/* Below 2xl the Branch column is hidden, so the branches sit under the code */}
                                                 <div className="2xl:hidden">
-                                                    <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
+                                                    <BranchIdsBadge all_branches={v.all_branches} branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
                                                 </div>
                                             </div>
                                         </TableCell>
@@ -1169,7 +1189,7 @@ export default function VouchersContent(props: Props) {
                                             </div>
                                         </TableCell>
                                         <TableCell className="hidden 2xl:table-cell">
-                                            <BranchIdsBadge branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
+                                            <BranchIdsBadge all_branches={v.all_branches} branch_ids={v.branch_ids} branches={branches} className="text-[11px]" />
                                         </TableCell>
                                         <TableCell className="text-center">
                                             {isDeletedView ? (
@@ -1417,7 +1437,8 @@ export default function VouchersContent(props: Props) {
                                         <Select
                                             value={editData?.scope || 'all'}
                                             onValueChange={(val) => {
-                                                update_fields({ scope: val, applicable_ticket_package_ids: null });
+                                                // The package choice is kept; packages that do not fit the new type are dropped once the list loads
+                                                update_fields({ scope: val });
                                             }}
                                         >
                                             <SelectTrigger className={ADMIN_INPUT}>
@@ -1651,48 +1672,51 @@ export default function VouchersContent(props: Props) {
                                         const scopeConfig = {
                                             vr: {
                                                 title: 'Áp dụng cho gói VR cụ thể',
-                                                hint: 'Để trống = tất cả VR',
+                                                hint: 'Bỏ chọn hết = chưa áp dụng gói VR nào',
                                                 empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
                                                 icon: <Gamepad2 size={14} className="text-purple-500" />
                                             },
                                             movie: {
                                                 title: 'Áp dụng cho gói phim cụ thể',
-                                                hint: 'Để trống = tất cả gói phim',
+                                                hint: 'Bỏ chọn hết = chưa áp dụng gói phim nào',
                                                 empty: 'Không có gói phim — vui lòng tạo ít nhất 1 gói phim trước',
                                                 icon: <Film size={14} className="text-blue-500" />
                                             }
                                         }[scopeType as 'vr' | 'movie'] || {
                                             title: 'Áp dụng cho gói VR cụ thể',
-                                            hint: 'Để trống = tất cả VR',
+                                            hint: 'Bỏ chọn hết = chưa áp dụng gói VR nào',
                                             empty: 'Không có gói VR — vui lòng tạo ít nhất 1 gói VR trước',
                                             icon: <Gamepad2 size={14} className="text-purple-500" />
                                         };
 
-                                        const appliedList: number[] = Array.isArray(editData?.applicable_ticket_package_ids)
-                                            ? editData.applicable_ticket_package_ids
-                                            : (editData?.applicable_ticket_package_ids === null || editData?.applicable_ticket_package_ids === undefined) ? vrPackages.map((p: any) => p.id) : [];
-
-                                        const isAllChecked = vrPackages.length > 0 && appliedList.length === vrPackages.length;
-                                        const hasAnyApplicable = appliedList.length > 0;
+                                        // "Tất cả gói" ticks every row; unticking one row turns it into a list of the others
+                                        const packageChoice = package_choice_of(editData);
+                                        const isAllChecked = packageChoice.all_packages;
+                                        const appliedList: number[] = isAllChecked
+                                            ? vrPackages.map((p: any) => Number(p.id))
+                                            : packageChoice.package_ids;
                                         const mode: 'all' | 'whitelist' = isAllChecked ? 'all' : 'whitelist';
+                                        const set_chosen_packages = (package_ids: number[]) =>
+                                            update_fields({ all_packages: false, package_ids: Array.from(new Set(package_ids.map(Number))) });
 
                                         // Several branches at once: list the packages branch by branch (a package shared by several branches keeps a tag)
-                                        const show_branch_groups = !Array.isArray(editData?.branch_ids) || editData.branch_ids.length > 1;
+                                        const voucherBranches = branch_scope_of(editData);
+                                        const show_branch_groups = voucherBranches.all_branches || voucherBranches.branch_ids.length > 1;
                                         const package_groups = group_items_by_branch(
                                             vrPackages,
-                                            (pkg: any) => branch_ids_of_item(pkg.branch_ids, pkg.branch_id),
+                                            (pkg: any) => branch_scope_of(pkg),
                                             branchOptions.length > 0 ? branchOptions : branches
                                         );
                                         const toggle_package_group = (items: any[]) => {
-                                            const group_ids: number[] = items.map((pkg: any) => pkg.id);
+                                            const group_ids: number[] = items.map((pkg: any) => Number(pkg.id));
                                             const whole_group_ticked = group_ids.every((id) => appliedList.includes(id));
                                             const next_applied = whole_group_ticked
                                                 ? appliedList.filter((id: number) => !group_ids.includes(id))
                                                 : [...appliedList, ...group_ids.filter((id) => !appliedList.includes(id))];
-                                            update_fields({ applicable_ticket_package_ids: next_applied });
+                                            set_chosen_packages(next_applied);
                                         };
                                         const render_package_row = (pkg: any, show_tag: boolean) => {
-                                                                const applied = appliedList.includes(pkg.id);
+                                                                const applied = appliedList.includes(Number(pkg.id));
                                                                 return (
                                                                     <div
                                                                         key={pkg.id}
@@ -1705,16 +1729,16 @@ export default function VouchersContent(props: Props) {
                                                                                 onCheckedChange={(checked) => {
                                                                                     const curr = appliedList;
                                                                                     const nextApplied = checked
-                                                                                        ? [...curr, pkg.id]
-                                                                                        : curr.filter((id: number) => id !== pkg.id);
+                                                                                        ? [...curr, Number(pkg.id)]
+                                                                                        : curr.filter((id: number) => id !== Number(pkg.id));
 
-                                                                                    update_fields({ applicable_ticket_package_ids: nextApplied });
+                                                                                    set_chosen_packages(nextApplied);
                                                                                 }}
                                                                             />
                                                                         </div>
                                                                         <label
                                                                             htmlFor={`vrpkg-apply-${pkg.id}`}
-                                                                            className={`text-xs font-medium leading-none cursor-pointer flex-1 truncate ${applied ? 'text-slate-800 font-semibold' : 'text-slate-700'
+                                                                            className={`min-w-0 text-xs font-medium leading-none cursor-pointer flex-1 truncate ${applied ? 'text-slate-800 font-semibold' : 'text-slate-700'
                                                                                 }`}
                                                                         >
                                                                             {pkg.name}
@@ -1723,7 +1747,7 @@ export default function VouchersContent(props: Props) {
                                                                             </span>
                                                                         </label>
                                                                         {show_tag && (
-                                                                            <BranchTag branch_ids={pkg.branch_ids} branch_id={pkg.branch_id} branches={branchOptions.length > 0 ? branchOptions : branches} />
+                                                                            <BranchTag all_branches={pkg.all_branches} branch_ids={pkg.branch_ids} branches={branchOptions.length > 0 ? branchOptions : branches} />
                                                                         )}
                                                                     </div>
                                                                 );
@@ -1759,7 +1783,7 @@ export default function VouchersContent(props: Props) {
                                                 >
                                                     {vrPackages.length === 0 ? (
                                                         <p className="text-xs text-gray-400 text-center py-6">
-                                                            {Array.isArray(editData?.branch_ids) && editData.branch_ids.length === 0
+                                                            {branch_scope_status(voucherBranches) === 'none'
                                                                 ? 'Chọn chi nhánh áp dụng để xem các gói'
                                                                 : scopeConfig.empty}
                                                         </p>
@@ -1773,9 +1797,7 @@ export default function VouchersContent(props: Props) {
                                                                         id={`vrpkg-apply-all`}
                                                                         checked={isAllChecked}
                                                                         onCheckedChange={(checked) => {
-                                                                            update_fields({
-                                                                                applicable_ticket_package_ids: checked ? vrPackages.map((p: any) => p.id) : []
-                                                                            });
+                                                                            update_fields({ all_packages: !!checked, package_ids: [] });
                                                                         }}
                                                                     />
                                                                 </div>
@@ -1783,7 +1805,7 @@ export default function VouchersContent(props: Props) {
                                                                     htmlFor={`vrpkg-apply-all`}
                                                                     className={`text-xs font-semibold leading-none cursor-pointer flex-1 text-slate-800`}
                                                                 >
-                                                                    Chọn tất cả
+                                                                    Tất cả gói
                                                                 </label>
                                                             </div>
                                                             {show_branch_groups
@@ -1802,6 +1824,11 @@ export default function VouchersContent(props: Props) {
                                                         </>
                                                     )}
                                                 </div>
+                                                {mode === 'whitelist' && appliedList.length === 0 && (
+                                                    <p className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">
+                                                        Chưa chọn gói nào: hãy chọn gói áp dụng hoặc tích "Tất cả gói"
+                                                    </p>
+                                                )}
                                                 <FieldError message={fieldErrors.packages} />
                                             </FormSection>
                                         );
@@ -1823,20 +1850,25 @@ export default function VouchersContent(props: Props) {
                                         }
                                         helper={
                                             isSuperAdmin
-                                                ? 'Chọn "Tất cả chi nhánh" hoặc ít nhất một chi nhánh'
+                                                ? 'Chọn "Tất cả chi nhánh", một vài chi nhánh, hoặc để trống (chưa gắn chi nhánh)'
                                                 : 'Chọn ít nhất một chi nhánh bạn quản lý'
                                         }
                                     >
                                         <div id="div_voucher_branch_ids" tabIndex={-1} className="outline-none">
                                         {isEditLocked ? (
                                             // Read-only summary: the staff member cannot change branches they do not manage
-                                            <BranchIdsBadge branch_ids={editData?.branch_ids} branches={branches} className="text-[11px]" />
+                                            <BranchIdsBadge
+                                                all_branches={editData?.all_branches}
+                                                branch_ids={editData?.branch_ids}
+                                                branches={branches}
+                                                className="text-[11px]"
+                                            />
                                         ) : (
                                             <BranchMultiSelect
                                                 branches={branchOptions.length > 0 ? branchOptions : branches}
-                                                value={editData?.branch_ids ?? null}
-                                                // Changing the branches shows that branch's packages with every one ticked (null = all packages)
-                                                onChange={(ids) => update_fields({ branch_ids: ids, applicable_ticket_package_ids: null })}
+                                                value={branch_scope_of(editData)}
+                                                // The package choice is kept; packages not sold at the new branches are dropped once the list loads
+                                                onChange={(scope) => update_fields({ ...scope })}
                                                 allowAll={isSuperAdmin}
                                                 className="rounded-lg text-xs"
                                             />
@@ -1934,8 +1966,11 @@ export default function VouchersContent(props: Props) {
                         <>
                             <div className="space-y-5 text-slate-800">
                                 {(() => {
-                                    const toArr = (v: any): number[] => (Array.isArray(v) ? (v as number[]) : []);
-                                    const applied = toArr(selectedVoucher.applicable_ticket_package_ids);
+                                    const detailChoice = package_choice_of(selectedVoucher);
+                                    const applied = detailChoice.package_ids;
+                                    // Not "all packages" and an empty list = no package chosen yet (a type 'all' voucher covers every package)
+                                    const noPackageYet =
+                                        (selectedVoucher.scope || 'all') !== 'all' && !detailChoice.all_packages && applied.length === 0;
                                     const recent = Array.isArray(selectedVoucher.recent_redemptions)
                                         ? (selectedVoucher.recent_redemptions as any[])
                                         : [];
@@ -2047,6 +2082,7 @@ export default function VouchersContent(props: Props) {
                                                         <div>
                                                             <p className="text-[11px] uppercase font-bold text-slate-400 mb-1">CHI NHÁNH ÁP DỤNG</p>
                                                             <BranchIdsBadge
+                                                                all_branches={selectedVoucher.all_branches}
                                                                 branch_ids={selectedVoucher.branch_ids}
                                                                 branches={branches}
                                                                 className="text-[11px]"
@@ -2090,7 +2126,7 @@ export default function VouchersContent(props: Props) {
                                                                         : 'Tất cả dịch vụ hệ thống';
 
                                                             const hasSpecificApplied = applied.length > 0;
-                                                            const isAllPackages = !hasSpecificApplied;
+                                                            const isAllPackages = !hasSpecificApplied && !noPackageYet;
 
                                                             return (
                                                                 <div className="space-y-3">
@@ -2101,6 +2137,10 @@ export default function VouchersContent(props: Props) {
                                                                         {isAllPackages ? (
                                                                             <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
                                                                                 Áp dụng tất cả ({detailPackages.length > 0 ? detailPackages.length : 'Tất cả'} gói)
+                                                                            </Badge>
+                                                                        ) : noPackageYet ? (
+                                                                            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                                                                                Chưa chọn gói
                                                                             </Badge>
                                                                         ) : (
                                                                             <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
@@ -2114,7 +2154,11 @@ export default function VouchersContent(props: Props) {
                                                                         <p className="text-[11px] font-bold uppercase text-emerald-700 mb-1.5 flex items-center justify-between">
                                                                             <span>DANH SÁCH GÓI VÉ ĐƯỢC ÁP DỤNG:</span>
                                                                         </p>
-                                                                        {detailPackages.length === 0 && !hasSpecificApplied ? (
+                                                                        {noPackageYet ? (
+                                                                            <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl text-center">
+                                                                                <p className="text-xs text-slate-400 italic">Voucher chưa áp dụng cho gói nào</p>
+                                                                            </div>
+                                                                        ) : detailPackages.length === 0 && !hasSpecificApplied ? (
                                                                             <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl text-center">
                                                                                 <p className="text-xs text-slate-400 italic">Đang tải danh sách gói vé...</p>
                                                                             </div>

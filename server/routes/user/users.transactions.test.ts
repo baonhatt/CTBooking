@@ -68,7 +68,9 @@ describe('listUserTransactionsImpl', () => {
       [{ booking: BOOKING }],
       [{ booking_id: 55, vr_ticket_package_id: 9, package_name: 'VR', quantity: 1, unit_price: 50000, line_total: 45000 }],
       [{ id: 2, name: 'Chi nhánh B', address: '1 Đường A' }],
-      [{ id: 7, scope: 'all', applicable_ticket_package_ids: '[9]' }]
+      [{ id: 7, scope: 'all', all_packages: 0 }],
+      // The voucher's packages (voucher_packages)
+      [{ voucher_id: 7, package_id: 9 }]
     ]);
 
     const result: any = await listUserTransactionsImpl(db, tables, args);
@@ -105,7 +107,7 @@ describe('listUserTransactionsImpl', () => {
         'vr_items'
       ].sort()
     );
-    expect(item.voucher_details).toEqual({ scope: 'all', applicable_ids: '[9]' });
+    expect(item.voucher_details).toEqual({ scope: 'all', applicable_ids: [9] });
     expect(item.vr_items).toEqual([
       { vr_ticket_package_id: 9, package_name: 'VR', quantity: 1, unit_price: 50000, line_total: 45000 }
     ]);
@@ -117,7 +119,7 @@ describe('listUserTransactionsImpl', () => {
     expect(bookingColumns).not.toContain('email');
     expect(bookingColumns).not.toContain('phone');
     expect(Object.keys(selected[1] || {})).toEqual(['booking']);
-    expect(Object.keys(selected[4] || {}).sort()).toEqual(['applicable_ticket_package_ids', 'id', 'scope']);
+    expect(Object.keys(selected[4] || {}).sort()).toEqual(['all_packages', 'id', 'scope']);
   });
 
   it('gives an empty list without an account', async () => {

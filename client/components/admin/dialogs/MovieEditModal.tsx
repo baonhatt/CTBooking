@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { activeStatusLabel } from '@/lib/format';
 import { BranchMultiSelect } from '@/components/admin/BranchMultiSelect';
-import { normalizeBranchIdsInput, parseBranchIdsFromApi } from '@/lib/branch-ids';
+import { branch_scope_of, branch_scope_payload } from '@/lib/branch-scope';
 import { createMovieApi, updateMovieApi, getMovieById, getAdminBranchOptions } from '@/lib/api';
 import { formatToVNDatetimeLocal, vnDatetimeLocalToUTC } from '@/lib/utils';
 import { useIsSuperAdmin, useStaffBranchIds } from '@/hooks/useStaffPermission';
@@ -108,8 +108,7 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                 ? editData.duration
                 : (m.duration_min ?? ''),
             release_date: editData.release_date ?? m.release_date ?? null,
-            branch_id: editData.branch_id ?? m.branch_id ?? null,
-            branch_ids: editData.branch_ids ?? parseBranchIdsFromApi(m.branch_ids ?? m.branch_id),
+            ...branch_scope_of(editData.branch_ids !== undefined || editData.all_branches !== undefined ? editData : m),
             is_active: editData.is_active ?? m.is_active ?? true
           });
         }
@@ -222,26 +221,26 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
         });
       }
 
-      let branch_ids = normalizeBranchIdsInput(editData.branch_ids, editData.branch_id);
+      let branchScope = branch_scope_of(editData);
       if (!isSuperAdmin) {
-        if (branch_ids === null) {
-          branch_ids =
-            staffBranchIds && staffBranchIds.length > 0
-              ? staffBranchIds
-              : availableBranches.length > 0
-                ? [availableBranches[0].id]
-                : [];
+        // A staff member limited to some branches cannot save a movie for "all branches"
+        if (branchScope.all_branches) {
+          branchScope = {
+            all_branches: false,
+            branch_ids:
+              staffBranchIds && staffBranchIds.length > 0
+                ? [...staffBranchIds]
+                : availableBranches.length > 0
+                  ? [availableBranches[0].id]
+                  : []
+          };
         }
-        if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
+        if (branchScope.branch_ids.length === 0) {
           notify.error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
           return;
         }
-      } else {
-        if (Array.isArray(branch_ids) && branch_ids.length === 0) {
-          notify.error('Vui lòng chọn ít nhất một chi nhánh hoặc "Tất cả chi nhánh"');
-          return;
-        }
       }
+      // A Super Admin may save a movie with no branch yet ("chưa gắn chi nhánh")
 
       const payload = {
         title: editData.title,
@@ -254,7 +253,7 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
           ? null
           : Number(editData.rating)) as any,
         duration_min: Number(editData.duration),
-        branch_ids,
+        ...branch_scope_payload(branchScope),
         is_active: editData.is_active !== false,
         release_date: editData.release_date
       };
@@ -408,13 +407,9 @@ export const MovieEditModal: React.FC<MovieEditModalProps> = ({
                     <BranchMultiSelect
                       branches={availableBranches}
                       allowAll={isSuperAdmin}
-                      value={normalizeBranchIdsInput(editData?.branch_ids, editData?.branch_id)}
-                      onChange={(branch_ids) => {
-                        setEditData({
-                          ...editData,
-                          branch_ids,
-                          branch_id: branch_ids && branch_ids.length === 1 ? branch_ids[0] : null
-                        });
+                      value={branch_scope_of(editData)}
+                      onChange={(scope) => {
+                        setEditData({ ...editData, ...scope });
                         setIsDirty(true);
                       }}
                     />

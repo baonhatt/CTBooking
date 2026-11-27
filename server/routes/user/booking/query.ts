@@ -1,6 +1,8 @@
 import { eq, and, isNull, or, inArray, desc } from 'drizzle-orm';
 import { formatDateForDb } from '../../../lib/date-utils';
 import { logAuditAction } from '../../../lib/audit-logger';
+import { readVoucherScope } from '../../../lib/catalog-scope';
+import { voucherInvoicePackageIds } from '../vouchers';
 
 export async function getBookingImpl(anyDb: any, id: number, tables: { bookings: any }) {
   const bookingsTable = tables.bookings;
@@ -195,12 +197,13 @@ export async function getBookingByCodeImpl(
     try {
       const v = await anyDb.query.vouchers.findFirst({
         where: eq((tables as any).vouchers.id, booking.voucher_id),
-        columns: { scope: true, applicable_ticket_package_ids: true }
+        columns: { scope: true }
       });
       if (v) {
         voucher_details = {
           scope: v.scope || 'all',
-          applicable_ids: v.applicable_ticket_package_ids ?? null
+          // Packages the discount covers (empty = every package of the voucher's type)
+          applicable_ids: voucherInvoicePackageIds(await readVoucherScope(anyDb, booking.voucher_id))
         };
       }
     } catch {}

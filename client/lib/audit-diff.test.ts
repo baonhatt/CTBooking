@@ -103,6 +103,30 @@ describe('formatAuditValue', () => {
     expect(formatAuditValue('branch_ids', [2, 9], { 2: 'HCM | CN Vạn Hạnh Mall' })).toBe('HCM | CN Vạn Hạnh Mall, #9');
   });
 
+  it('reads the branch, movie and package scope fields of packages and vouchers', () => {
+    expect(formatAuditValue('all_branches', 1)).toBe('Có');
+    expect(formatAuditValue('all_packages', false)).toBe('Không');
+    expect(formatAuditValue('movie_scope', 'all_at_branch')).toBe('Mọi phim của chi nhánh');
+    expect(formatAuditValue('movie_scope', 'selected')).toBe('Phim đã chọn');
+    const changes = auditChanges(
+      '{"all_branches":false,"movie_scope":"selected"}',
+      '{"all_branches":true,"movie_scope":"all_at_branch"}'
+    );
+    expect(changes.map((change) => change.label)).toEqual(['Tất cả chi nhánh', 'Phim áp dụng']);
+    const labels = auditChanges(
+      '{"movie_ids":[1],"package_ids":[2],"all_packages":true}',
+      '{"movie_ids":[1,3],"package_ids":[2,4],"all_packages":false}'
+    ).map((change) => change.label);
+    expect(labels).toEqual(['Phim', 'Gói áp dụng', 'Tất cả gói']);
+  });
+
+  it('keeps the labels of fields that only old log rows have', () => {
+    const labels = auditChanges('{"combo":[1],"applicable_ticket_package_ids":null}', '{"combo":[1,2],"applicable_ticket_package_ids":[3]}').map(
+      (change) => change.label
+    );
+    expect(labels).toEqual(['Combo', 'Gói vé áp dụng']);
+  });
+
   it('cuts long text', () => {
     const text = 'a'.repeat(400);
     expect(formatAuditValue('content', text).length).toBe(301);

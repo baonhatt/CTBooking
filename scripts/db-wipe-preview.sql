@@ -3,6 +3,14 @@
 -- Tables that point to other tables are dropped first. The new tables of migrations 0002/0003 are included in case
 -- preview already has them.
 PRAGMA defer_foreign_keys = TRUE;
+-- Link tables of migration 0005 (they point to movies, packages, vouchers, posts, media and branches)
+DROP TABLE IF EXISTS "movie_branches";
+DROP TABLE IF EXISTS "package_branches";
+DROP TABLE IF EXISTS "package_movies";
+DROP TABLE IF EXISTS "voucher_branches";
+DROP TABLE IF EXISTS "voucher_packages";
+DROP TABLE IF EXISTS "post_branches";
+DROP TABLE IF EXISTS "site_media_branches";
 DROP TABLE IF EXISTS "unmatched_transfers";
 DROP TABLE IF EXISTS "register_pending";
 DROP TABLE IF EXISTS "audit_logs";

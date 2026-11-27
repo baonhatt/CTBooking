@@ -116,8 +116,10 @@ export interface VoucherSummary {
   is_active: boolean;
   valid_from?: string;
   valid_until?: string;
-  applicable_ticket_package_ids?: string;
-  branch_ids?: string;
+  // Packages the discount covers (empty = every package of the scope)
+  applicable_ids?: number[];
+  all_branches?: boolean;
+  branch_ids?: number[];
 }
 
 export interface VoucherValidateRequest {
@@ -168,8 +170,11 @@ export interface VoucherCreateRequest {
   is_active?: boolean;
   valid_from?: string;
   valid_until?: string;
-  applicable_ticket_package_ids?: number[] | string;
-  branch_ids?: number[] | string;
+  all_branches?: boolean;
+  branch_ids?: number[];
+  // Every package of the scope, or only package_ids
+  all_packages?: boolean;
+  package_ids?: number[];
 }
 
 export interface VoucherUpdateRequest extends VoucherCreateRequest {

@@ -4,54 +4,49 @@ import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { buildAuditPayload } from '../../lib/audit-utils';
 import {
-  enrichWithParsedBranchIds,
-  enrichItemsWithParsedBranchIds,
-  parseBranchIds,
-  resolveBranchIdsInput,
-  staffCanAccessBranchIds,
-  staffCanModifyBranchRecord,
-  sqlBranchIdsMatchFilter,
-  sqlBranchIdsStaffAccessFilter
-} from '../../lib/branch-ids';
+  assertBranchesExist,
+  assertMoviesExist,
+  assertStaffMayAssign,
+  branchScopeLabel,
+  branchScopeStatements,
+  packageMoviesStatements,
+  readBranchScope,
+  readPackageMoviesChange,
+  readPackageMoviesInput,
+  readScopeChange,
+  readScopeInput,
+  runBatch,
+  sqlInStaffBranches,
+  sqlServesBranch,
+  staffMayModify,
+  withBranchScope,
+  withPackageMovies,
+  type BranchScope,
+  type PackageMovies
+} from '../../lib/catalog-scope';
 
-/**
- * Hàm helper xử lý dữ liệu combo
- * @param combo Dữ liệu combo đầu vào (có thể là mảng hoặc chuỗi)
- * @returns Mảng các ID đã được xử lý và làm sạch
- */
-function processComboInput(combo: any): number[] {
-  if (!combo) return [];
-
+/** Features stored as JSON text, as a list. */
+function parseFeatures(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value) return [];
   try {
-    // Nếu là chuỗi, chuyển đổi thành mảng
-    if (typeof combo === 'string') {
-      // Thử parse nếu là JSON string
-      try {
-        const parsed = JSON.parse(combo);
-        if (Array.isArray(parsed)) {
-          return parsed.map(Number).filter((id) => !isNaN(id) && id > 0);
-        }
-      } catch {
-        // Nếu không phải JSON, xử lý như chuỗi thông thường
-        return combo
-          .split(',')
-          .map((x) => parseInt(x.trim(), 10))
-          .filter((id) => !isNaN(id) && id > 0);
-      }
-    }
-
-    // Nếu là mảng, xử lý các phần tử
-    if (Array.isArray(combo)) {
-      return combo
-        .map((item) => (typeof item === 'number' ? item : parseInt(item, 10)))
-        .filter((id) => !isNaN(id) && id > 0);
-    }
-
-    return [];
-  } catch (error) {
-    console.error('Lỗi khi xử lý combo:', error);
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
     return [];
   }
+}
+
+/** Package rows as the admin screens read them: features as a list, branches, movie scope and selected movies. */
+export async function packagesForAdmin(anyDb: any, rows: any[]) {
+  const scoped = await withBranchScope(anyDb, 'package', rows);
+  const withMovies = await withPackageMovies(anyDb, scoped);
+  return withMovies.map((row: any) => ({ ...row, features: parseFeatures(row.features) }));
+}
+
+/** The record as written to the audit log: the row plus its branches and movies. */
+function packageAuditRecord(row: any, scope: BranchScope | null, movies: PackageMovies | null) {
+  return { ...row, ...(scope || {}), ...(movies || {}) };
 }
 
 /**
@@ -103,15 +98,11 @@ export async function listTicketPackagesImpl(
     whereCondition = whereCondition ? and(whereCondition, searchCondition) : searchCondition;
   }
   if (branch_id) {
-    const branchFilter = sqlBranchIdsMatchFilter(
-      tables.ticket_packages.branch_ids,
-      tables.ticket_packages.branch_id,
-      branch_id
-    );
+    const branchFilter = sqlServesBranch('package', branch_id);
     whereCondition = whereCondition ? and(whereCondition, branchFilter) : branchFilter;
   }
-  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-    const staffFilter = sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds);
+  if (restrictToBranchIds) {
+    const staffFilter = sqlInStaffBranches('package', restrictToBranchIds);
     whereCondition = whereCondition ? and(whereCondition, staffFilter) : staffFilter;
   }
   // Determine order by
@@ -156,42 +147,8 @@ export async function listTicketPackagesImpl(
 
   const total = totalResult ? Number(totalResult.count) : 0;
 
-  // 3. Xử lý combo và features cho từng gói vé
-  const items = packages.map((pkg: any) =>
-    enrichWithParsedBranchIds({
-      ...pkg,
-      // Parse JSON string to array (handle old data formats: JSON array or "1|2|3")
-      combo: pkg.combo
-        ? Array.isArray(pkg.combo)
-          ? pkg.combo
-          : (() => {
-              try {
-                return JSON.parse(pkg.combo);
-              } catch {
-                // Handle old format: "1|2|3"
-                if (typeof pkg.combo === 'string' && pkg.combo.includes('|')) {
-                  return pkg.combo
-                    .split('|')
-                    .map((x: string) => x.trim())
-                    .filter(Boolean);
-                }
-                return [];
-              }
-            })()
-        : [],
-      features: pkg.features
-        ? Array.isArray(pkg.features)
-          ? pkg.features
-          : (() => {
-              try {
-                return JSON.parse(pkg.features);
-              } catch {
-                return [];
-              }
-            })()
-        : []
-    })
-  );
+  // 3. Branches, movies and features of each package
+  const items = await packagesForAdmin(anyDb, packages);
 
   // 4. Trả về kết quả phân trang
   return {
@@ -217,10 +174,10 @@ export async function getTicketPackageImpl(
   restrictToBranchIds: number[] | null = null
 ) {
   const whereClause =
-    restrictToBranchIds && restrictToBranchIds.length > 0
+    restrictToBranchIds
       ? and(
           eq(tables.ticket_packages.id, id),
-          sqlBranchIdsStaffAccessFilter(tables.ticket_packages.branch_ids, restrictToBranchIds)
+          sqlInStaffBranches('package', restrictToBranchIds)
         )
       : eq(tables.ticket_packages.id, id);
   const [item] = await anyDb.select().from(tables.ticket_packages).where(whereClause).limit(1);
@@ -253,21 +210,20 @@ export async function getTicketPackageImpl(
     .orderBy(desc(tables.auditLogs.createdAt))
     .limit(1);
 
-  // Titles of the movies in the combo, so the admin detail can show names instead of ids (only when the
-  // caller passes the movies table). Movies that were deleted or hidden are still named: the combo keeps them.
-  let comboMovies: Array<{ id: number; title: string }> = [];
-  if (tables.movies) {
-    const comboIds = processComboInput(item.combo);
-    if (comboIds.length > 0) {
-      const movieRows = await anyDb
-        .select({ id: tables.movies.id, title: tables.movies.title })
-        .from(tables.movies)
-        .where(inArray(tables.movies.id, comboIds));
-      const titleById = new Map<number, string>(movieRows.map((row: any) => [Number(row.id), String(row.title)]));
-      comboMovies = comboIds
-        .filter((movieId) => titleById.has(movieId))
-        .map((movieId) => ({ id: movieId, title: titleById.get(movieId) as string }));
-    }
+  const [adminItem] = await packagesForAdmin(anyDb, [item]);
+
+  // Titles of the selected movies, so the admin detail shows names instead of ids. Deleted or hidden movies are still
+  // named: the package keeps them until an admin changes its movies.
+  let selectedMovies: Array<{ id: number; title: string }> = [];
+  if (tables.movies && adminItem.movie_ids.length > 0) {
+    const movieRows = await anyDb
+      .select({ id: tables.movies.id, title: tables.movies.title })
+      .from(tables.movies)
+      .where(inArray(tables.movies.id, adminItem.movie_ids));
+    const titleById = new Map<number, string>(movieRows.map((row: any) => [Number(row.id), String(row.title)]));
+    selectedMovies = adminItem.movie_ids
+      .filter((movieId: number) => titleById.has(movieId))
+      .map((movieId: number) => ({ id: movieId, title: titleById.get(movieId) as string }));
   }
 
   // How many orders use this package (a package with orders cannot be deleted; the delete dialog shows this first)
@@ -280,43 +236,13 @@ export async function getTicketPackageImpl(
     bookingCount = Number(usage?.count || 0);
   }
 
-  // Parse JSON strings to arrays (handle old data formats: JSON array or "1|2|3")
-  return enrichWithParsedBranchIds({
-    ...item,
+  return {
+    ...adminItem,
     booking_count: bookingCount,
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null,
-    combo_movies: comboMovies,
-    combo: item.combo
-      ? Array.isArray(item.combo)
-        ? item.combo
-        : (() => {
-            try {
-              return JSON.parse(item.combo);
-            } catch {
-              // Handle old format: "1|2|3"
-              if (typeof item.combo === 'string' && item.combo.includes('|')) {
-                return item.combo
-                  .split('|')
-                  .map((x: string) => x.trim())
-                  .filter(Boolean);
-              }
-              return [];
-            }
-          })()
-      : [],
-    features: item.features
-      ? Array.isArray(item.features)
-        ? item.features
-        : (() => {
-            try {
-              return JSON.parse(item.features);
-            } catch {
-              return [];
-            }
-          })()
-      : []
-  });
+    movies: selectedMovies
+  };
 }
 
 /**
@@ -330,20 +256,21 @@ export async function createTicketPackageImpl(
   anyDb: any,
   tables: { ticket_packages: any; movies: any; auditLogs: any },
   args: {
-    name: string; // Tên gói vé
-    code?: string; // Mã gói vé
-    description?: string; // Mô tả
-    price: number; // Giá
-    features?: any; // Các tính năng (dạng mảng)
-    combo?: any; // Danh sách ID phim (dạng mảng hoặc chuỗi)
-    type?: string; // Loại gói vé
-    min_group_size?: number; // Số lượng tối thiểu
-    max_group_size?: number; // Số lượng tối đa
-    is_member_only?: boolean; // Chỉ dành cho thành viên
-    is_active?: boolean; // Trạng thái hoạt động
-    display_order?: number; // Thứ tự hiển thị
-    branch_id?: number | null;
-    branch_ids?: number[] | null;
+    name: string;
+    code?: string;
+    description?: string;
+    price: number;
+    features?: any;
+    type?: string;
+    min_group_size?: number;
+    max_group_size?: number;
+    is_member_only?: boolean;
+    is_active?: boolean;
+    display_order?: number;
+    all_branches?: boolean;
+    branch_ids?: number[];
+    movie_scope?: string;
+    movie_ids?: number[];
     // ===== VR-specific fields =====
     cover_image?: string;
     duration_min?: number;
@@ -355,170 +282,64 @@ export async function createTicketPackageImpl(
   staffInfo?: { id: number; email: string; fullname: string },
   restrictToBranchIds: number[] | null = null
 ) {
-  const {
-    name,
-    code,
-    description,
-    price,
-    features,
-    combo,
-    type,
-    min_group_size,
-    max_group_size,
-    is_member_only,
-    is_active,
-    display_order,
-    branch_id,
-    branch_ids,
-    cover_image,
-    duration_min,
-    vr_genre,
-    min_players,
-    max_players
-  } = args;
+  const { name, code, description, price, features, type, min_group_size, max_group_size, is_member_only } = args;
+  const { is_active, display_order, cover_image, duration_min, vr_genre, min_players, max_players } = args;
 
-  const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
+  // Where it is sold: the form must say so (every branch, or a list that may be empty); a missing choice is refused
+  const scope: BranchScope = readScopeInput(args);
+  assertStaffMayAssign(scope, restrictToBranchIds, 'gói vé');
+  await assertBranchesExist(anyDb, scope.branch_ids);
 
-  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-    if (branchFields.branch_ids === null || (branchFields.branch_ids === undefined && branchFields.branch_id === null)) {
-      const err: any = new Error('Chỉ Super Admin mới có quyền tạo gói vé cho tất cả chi nhánh');
-      err.statusCode = 403;
-      throw err;
-    }
-    if (branch_ids !== undefined && branch_ids !== null) {
-      if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
-        const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
-        err.statusCode = 400;
-        throw err;
-      }
-      const hasInvalid = branch_ids.some((id) => !restrictToBranchIds.includes(Number(id)));
-      if (hasInvalid) {
-        const err: any = new Error('Bạn không có quyền tạo gói vé cho chi nhánh ngoài phạm vi quản lý');
-        err.statusCode = 403;
-        throw err;
-      }
-    }
-    if (branch_id !== undefined && branch_id !== null) {
-      if (!restrictToBranchIds.includes(Number(branch_id))) {
-        const err: any = new Error('Bạn không có quyền tạo gói vé cho chi nhánh ngoài phạm vi quản lý');
-        err.statusCode = 403;
-        throw err;
-      }
-    }
-  }
+  // Its movies (none for VR): the form must say so (every movie of the branch, or a list)
+  const isVr = type === 'vr';
+  const movies: PackageMovies = isVr ? { movie_scope: 'selected', movie_ids: [] } : readPackageMoviesInput(args);
+  await assertMoviesExist(anyDb, movies.movie_ids);
 
-  // 1. Chuẩn bị thời gian tạo và cập nhật
-  const now = new Date();
-  const formattedNow = formatDateForDb(now);
-
-  // 2. Xử lý danh sách tính năng (features)
-  // Chuyển đổi features thành mảng nếu là chuỗi, ngược lại giữ nguyên nếu đã là mảng
-  let processedFeatures = undefined;
+  const formattedNow = formatDateForDb(new Date());
+  let processedFeatures: string[] | undefined = undefined;
   if (features) {
     processedFeatures = Array.isArray(features)
-      ? features // Nếu đã là mảng thì giữ nguyên
-      : String(features) // Nếu là chuỗi thì tách thành mảng
+      ? features
+      : String(features)
           .split(',')
-          .map((x) => x.trim()) // Xóa khoảng trắng thừa
-          .filter(Boolean); // Lọc bỏ các phần tử rỗng
+          .map((x) => x.trim())
+          .filter(Boolean);
   }
 
-  // 3. Xử lý danh sách phim (combo)
-  let processedCombo: (number | string)[] = [];
-
-  if (combo !== undefined && combo !== null) {
-    // Xử lý tùy theo kiểu dữ liệu của combo
-    if (Array.isArray(combo)) {
-      // Nếu là mảng, lọc bỏ các giá trị null/undefined
-      processedCombo = combo.filter((v) => v !== null && v !== undefined);
-    } else if (typeof combo === 'string') {
-      // Nếu là chuỗi, tách thành mảng dựa trên dấu phẩy
-      processedCombo = combo
-        .split(',')
-        .map((x) => x.trim()) // Xóa khoảng trắng thừa
-        .filter(Boolean); // Lọc bỏ các phần tử rỗng
-    }
-
-    // Loại bỏ các ID trùng lặp bằng cách chuyển qua Set
-    processedCombo = Array.from(new Set(processedCombo));
-
-    // Nếu có ID phim, kiểm tra tính hợp lệ
-    if (processedCombo.length > 0) {
-      // Chuyển đổi tất cả ID sang số và lọc bỏ các giá trị không hợp lệ
-      const numericIds = processedCombo.map((v) => Number(v)).filter((v) => !Number.isNaN(v));
-
-      // Kiểm tra xem tất cả ID phim có tồn tại trong database không
-      const [movieCountRes] = await anyDb
-        .select({ count: count() })
-        .from(tables.movies)
-        .where(inArray(tables.movies.id, numericIds));
-
-      const movieCount = movieCountRes ? Number(movieCountRes.count) : 0;
-      if (movieCount !== numericIds.length) {
-        throw new Error('Một hoặc nhiều ID phim trong combo không tồn tại');
-      }
-
-      // Cập nhật lại danh sách ID đã được kiểm tra và chuyển đổi
-      processedCombo = numericIds;
-    }
-  }
-
-  // 4. Thực hiện thêm mới gói vé vào database
   const inserted = await anyDb
     .insert(tables.ticket_packages)
     .values({
-      name, // Tên gói vé (bắt buộc)
-      code, // Mã gói vé
-      description, // Mô tả
-      // Lưu danh sách ID phim dưới dạng JSON string
-      combo: processedCombo.length > 0 ? JSON.stringify(processedCombo) : null,
-      // Đảm bảo giá luôn là chuỗi
+      name,
+      code,
+      description,
       price: Number(price).toString(),
-      // Danh sách tính năng đã xử lý - lưu dạng JSON string
       features: processedFeatures ? JSON.stringify(processedFeatures) : null,
-      type, // Loại gói vé
-      // Xử lý giá trị mặc định cho các trường tùy chọn
+      type,
       min_group_size: min_group_size !== undefined ? Number(min_group_size) : null,
       max_group_size: max_group_size !== undefined ? Number(max_group_size) : null,
-      // Đảm bảo giá trị boolean
       is_member_only: Boolean(is_member_only),
-      // Mặc định là true nếu không xác định
       is_active: is_active ?? true,
-      // Mặc định thứ tự hiển thị là 0 nếu không xác định
       display_order: Number(display_order ?? 0),
-      branch_id: branchFields.branch_id ?? null,
-      branch_ids: branchFields.branch_ids ?? null,
-      // ===== VR-specific fields =====
+      all_branches: scope.all_branches,
+      movie_scope: movies.movie_scope,
       cover_image: cover_image || null,
       duration_min: duration_min !== undefined ? Number(duration_min) : null,
       vr_genre: vr_genre || null,
       min_players: min_players !== undefined ? Number(min_players) : null,
       max_players: max_players !== undefined ? Number(max_players) : null,
-      // Thời gian tạo và cập nhật
       created_at: formattedNow,
       updated_at: formattedNow
     })
-    .returning(); // Trả về bản ghi vừa được tạo
-
-  // Xử lý kết quả trả về từ database
+    .returning();
   const item = Array.isArray(inserted) ? inserted[0] : inserted;
-
-  // Nếu không tạo được gói vé, ném lỗi
   if (!item) throw new Error('Không thể tạo gói vé');
 
-  // Trả về thông tin gói vé vừa tạo
-  // Tự động xóa cache trang active-ticket-packages
-  const origin = 'https://cinesphere.com.vn'; // Default origin if not provided in env
-  // NOTE: Server routes often don't have access to full Request object to get Origin header easily if not passed down.
-  // We'll trust the worker to clear it or use a well-known key if we can.
-  // In our worker setup, we use full URL as cache key.
-  // We need to clear `${origin}/api/active-ticket-packages`.
+  // Branch links and movies in one batch (a failure leaves the package sold nowhere, never at a wrong branch)
+  await runBatch(anyDb, [
+    ...(await branchScopeStatements(anyDb, 'package', item.id, scope)),
+    ...(await packageMoviesStatements(anyDb, item.id, movies))
+  ]);
 
-
-
-  const auditNew = buildAuditPayload(item);
-
-  // Log audit action
   if (staffInfo) {
     await logAuditAction(
       anyDb,
@@ -531,11 +352,12 @@ export async function createTicketPackageImpl(
       staffInfo.email,
       staffInfo.fullname,
       undefined,
-      auditNew
+      buildAuditPayload(packageAuditRecord(item, scope, movies))
     );
   }
 
-  return { item: enrichWithParsedBranchIds(item) };
+  const [adminItem] = await packagesForAdmin(anyDb, [{ ...item, all_branches: scope.all_branches }]);
+  return { item: adminItem };
 }
 
 /**
@@ -551,20 +373,21 @@ export async function updateTicketPackageImpl(
   tables: { ticket_packages: any; movies: any; auditLogs: any },
   id: number,
   args: {
-    name?: string; // Tên gói vé
-    code?: string; // Mã gói vé
-    description?: string; // Mô tả
-    price?: number; // Giá
-    features?: any; // Các tính năng
-    combo?: any; // Danh sách ID phim
-    type?: string; // Loại gói vé
-    min_group_size?: number; // Số lượng tối thiểu
-    max_group_size?: number; // Số lượng tối đa
-    is_member_only?: boolean; // Chỉ dành cho thành viên
-    is_active?: boolean; // Trạng thái hoạt động
-    display_order?: number; // Thứ tự hiển thị
-    branch_id?: number | null;
-    branch_ids?: number[] | null;
+    name?: string;
+    code?: string;
+    description?: string;
+    price?: number;
+    features?: any;
+    type?: string;
+    min_group_size?: number;
+    max_group_size?: number;
+    is_member_only?: boolean;
+    is_active?: boolean;
+    display_order?: number;
+    all_branches?: boolean;
+    branch_ids?: number[];
+    movie_scope?: string;
+    movie_ids?: number[];
     // ===== VR-specific fields =====
     cover_image?: string;
     duration_min?: number;
@@ -580,38 +403,18 @@ export async function updateTicketPackageImpl(
   if (!existing) {
     throw new Error('Không tìm thấy gói vé');
   }
+  const [existingAdmin] = await packagesForAdmin(anyDb, [existing]);
+  const oldScope: BranchScope = { all_branches: existingAdmin.all_branches, branch_ids: existingAdmin.branch_ids };
+  const oldMovies: PackageMovies = { movie_scope: existingAdmin.movie_scope, movie_ids: existingAdmin.movie_ids };
 
-  if (
-    restrictToBranchIds &&
-    restrictToBranchIds.length > 0 &&
-    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
-  ) {
+  if (!staffMayModify(oldScope, restrictToBranchIds)) {
     const err: any = new Error('Bạn không có quyền sửa gói vé này (thuộc chi nhánh khác hoặc tất cả chi nhánh)');
     err.statusCode = 403;
     throw err;
   }
 
-  const {
-    name,
-    code,
-    description,
-    price,
-    features,
-    combo,
-    type,
-    min_group_size,
-    max_group_size,
-    is_member_only,
-    is_active,
-    display_order,
-    branch_id,
-    branch_ids,
-    cover_image,
-    duration_min,
-    vr_genre,
-    min_players,
-    max_players
-  } = args;
+  const { name, code, description, price, features, type, min_group_size, max_group_size, is_member_only } = args;
+  const { is_active, display_order, cover_image, duration_min, vr_genre, min_players, max_players } = args;
 
   // Loại gói (vé phim / VR) không được đổi sau khi tạo; gửi lại đúng loại cũ thì chấp nhận
   if (type !== undefined && type !== null && type !== '') {
@@ -624,11 +427,17 @@ export async function updateTicketPackageImpl(
     }
   }
 
-  const now = new Date();
-  // Khởi tạo object data với ngày cập nhật
-  const data: any = { updated_at: formatDateForDb(now) };
+  // Sent fields change the branches / movies; fields not sent leave them as they are
+  const newScope = readScopeChange(args);
+  if (newScope) {
+    assertStaffMayAssign(newScope, restrictToBranchIds, 'gói vé');
+    await assertBranchesExist(anyDb, newScope.branch_ids);
+  }
+  const newMovies = existing.type === 'vr' ? undefined : readPackageMoviesChange(args);
+  if (newMovies) await assertMoviesExist(anyDb, newMovies.movie_ids);
 
-  // 1. Tối ưu gán giá trị cơ bản (Chỉ gán nếu không phải undefined)
+  const formattedNow = formatDateForDb(new Date());
+  const data: any = { updated_at: formattedNow };
   if (name !== undefined) data.name = name;
   if (code !== undefined) data.code = code;
   if (description !== undefined) data.description = description;
@@ -639,46 +448,12 @@ export async function updateTicketPackageImpl(
   if (is_member_only !== undefined) data.is_member_only = Boolean(is_member_only);
   if (is_active !== undefined) data.is_active = Boolean(is_active);
   if (display_order !== undefined) data.display_order = Number(display_order);
-  if (branch_ids !== undefined || branch_id !== undefined) {
-    if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-      if (branch_ids === null || (branch_ids === undefined && branch_id === null)) {
-        const err: any = new Error('Chỉ Super Admin mới có quyền gán gói vé cho tất cả chi nhánh');
-        err.statusCode = 403;
-        throw err;
-      }
-      if (branch_ids !== undefined && branch_ids !== null) {
-        if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
-          const err: any = new Error('Vui lòng chọn ít nhất một chi nhánh thuộc quyền quản lý');
-          err.statusCode = 400;
-          throw err;
-        }
-        const hasInvalid = branch_ids.some((id) => !restrictToBranchIds.includes(Number(id)));
-        if (hasInvalid) {
-          const err: any = new Error('Bạn không có quyền gán gói vé cho chi nhánh ngoài phạm vi quản lý');
-          err.statusCode = 403;
-          throw err;
-        }
-      }
-      if (branch_id !== undefined && branch_id !== null) {
-        if (!restrictToBranchIds.includes(Number(branch_id))) {
-          const err: any = new Error('Bạn không có quyền gán gói vé cho chi nhánh ngoài phạm vi quản lý');
-          err.statusCode = 403;
-          throw err;
-        }
-      }
-    }
-    const branchFields = resolveBranchIdsInput(branch_ids, branch_id);
-    if (branchFields.branch_ids !== undefined) data.branch_ids = branchFields.branch_ids;
-    if (branchFields.branch_id !== undefined) data.branch_id = branchFields.branch_id;
-  }
   // ===== VR-specific fields =====
   if (cover_image !== undefined) data.cover_image = cover_image || null;
   if (duration_min !== undefined) data.duration_min = duration_min !== null ? Number(duration_min) : null;
   if (vr_genre !== undefined) data.vr_genre = vr_genre || null;
   if (min_players !== undefined) data.min_players = min_players !== null ? Number(min_players) : null;
   if (max_players !== undefined) data.max_players = max_players !== null ? Number(max_players) : null;
-
-  // 2. Tối ưu xử lý Features
   if (features !== undefined) {
     const featuresArr = Array.isArray(features)
       ? features
@@ -689,57 +464,17 @@ export async function updateTicketPackageImpl(
     data.features = featuresArr.length > 0 ? JSON.stringify(featuresArr) : null;
   }
 
-  // 3. Tối ưu xử lý Combo (Lưu dạng JSON string)
-  if (combo !== undefined) {
-    let comboArr: (number | string)[] = [];
+  // The row, its branches and its movies change together
+  await runBatch(anyDb, [
+    anyDb.update(tables.ticket_packages).set(data).where(eq(tables.ticket_packages.id, id)),
+    ...(newScope ? await branchScopeStatements(anyDb, 'package', id, newScope) : []),
+    ...(newMovies ? await packageMoviesStatements(anyDb, id, newMovies) : [])
+  ]);
 
-    if (Array.isArray(combo)) {
-      // Giữ nguyên mảng nếu FE gửi lên [1, 3]
-      comboArr = combo.filter((v) => v !== null && v !== undefined);
-    } else if (typeof combo === 'string') {
-      comboArr = combo
-        .split(',')
-        .map((x) => x.trim())
-        .filter(Boolean);
-    }
+  const item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
+  if (!item) return null;
+  const [adminItem] = await packagesForAdmin(anyDb, [item]);
 
-    // Loại bỏ ID trùng lặp
-    comboArr = Array.from(new Set(comboArr));
-
-    if (comboArr.length > 0) {
-      // Kiểm tra tính hợp lệ của phim (Chuyển sang Number để query DB)
-      const numericIds = comboArr.map((v) => Number(v)).filter((v) => !Number.isNaN(v));
-      const [movieCountRes] = await anyDb
-        .select({ count: count() })
-        .from(tables.movies)
-        .where(inArray(tables.movies.id, numericIds));
-
-      const movieCount = movieCountRes ? Number(movieCountRes.count) : 0;
-      if (movieCount !== numericIds.length) {
-        throw new Error('Một hoặc nhiều ID phim trong combo không tồn tại');
-      }
-    }
-    data.combo = comboArr.length > 0 ? JSON.stringify(comboArr) : null;
-  }
-  // 4. Thực thi Update
-  const updatedRes = await anyDb
-    .update(tables.ticket_packages)
-    .set(data)
-    .where(eq(tables.ticket_packages.id, id))
-    .returning();
-
-  // D1/SQLite trả về array khi dùng .returning()
-  let item = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-  if (!item) {
-    item = await anyDb.query.ticket_packages.findFirst({ where: eq(tables.ticket_packages.id, id) });
-  }
-
-
-
-  const auditOld = buildAuditPayload(existing);
-  const auditNew = buildAuditPayload(item);
-
-  // Log audit action
   if (staffInfo) {
     await logAuditAction(
       anyDb,
@@ -747,17 +482,22 @@ export async function updateTicketPackageImpl(
       'update',
       'ticket_package',
       id,
-      `Cập nhật gói vé: ${name || id}`,
+      `Cập nhật gói vé: ${name || existing.name || id}`,
       staffInfo.id,
       staffInfo.email,
       staffInfo.fullname,
-      auditOld,
-      auditNew
+      buildAuditPayload(packageAuditRecord(existing, oldScope, oldMovies)),
+      buildAuditPayload(
+        packageAuditRecord(
+          item,
+          { all_branches: adminItem.all_branches, branch_ids: adminItem.branch_ids },
+          { movie_scope: adminItem.movie_scope, movie_ids: adminItem.movie_ids }
+        )
+      )
     );
   }
 
-  if (!item) return null;
-  return enrichWithParsedBranchIds(item);
+  return adminItem;
 }
 
 /**
@@ -784,11 +524,7 @@ export async function deleteTicketPackageImpl(
     // Nếu không tìm thấy gói vé, trả về null
     if (!existing) return null;
 
-    if (
-      restrictToBranchIds &&
-      restrictToBranchIds.length > 0 &&
-      !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
-    ) {
+    if (!staffMayModify(await readBranchScope(anyDb, 'package', id), restrictToBranchIds)) {
       const err: any = new Error('Bạn không có quyền xóa gói vé này (thuộc chi nhánh khác hoặc tất cả chi nhánh)');
       err.statusCode = 403;
       throw err;
@@ -862,11 +598,7 @@ export async function restoreTicketPackageImpl(
       throw err;
     }
 
-    if (
-      restrictToBranchIds &&
-      restrictToBranchIds.length > 0 &&
-      !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
-    ) {
+    if (!staffMayModify(await readBranchScope(anyDb, 'package', id), restrictToBranchIds)) {
       const err: any = new Error('Bạn không có quyền khôi phục gói vé này');
       err.statusCode = 403;
       throw err;
@@ -908,14 +640,6 @@ export async function restoreTicketPackageImpl(
   }
 }
 
-/** "Tất cả chi nhánh" for a package of every branch, else the names of its branches (unknown ids are skipped). */
-export function branchNamesLabel(rawBranchIds: string | null | undefined, namesById: Map<number, string>): string | null {
-  const ids = parseBranchIds(rawBranchIds ?? null);
-  if (ids === null) return 'Tất cả chi nhánh';
-  const names = ids.map((id) => namesById.get(id)).filter((name): name is string => Boolean(name));
-  return names.length ? names.join(', ') : null;
-}
-
 export async function listDeletedTicketPackagesImpl(
   anyDb: any,
   tables: { ticket_packages: any; staffs: any; branches?: any },
@@ -937,10 +661,10 @@ export async function listDeletedTicketPackagesImpl(
     conditions.push(like(ticket_packages.name, `%${search}%`));
   }
   if (branch_id) {
-    conditions.push(sqlBranchIdsMatchFilter(ticket_packages.branch_ids, ticket_packages.branch_id, branch_id));
+    conditions.push(sqlServesBranch('package', branch_id));
   }
-  if (restrictToBranchIds && restrictToBranchIds.length > 0) {
-    conditions.push(sqlBranchIdsStaffAccessFilter(ticket_packages.branch_ids, restrictToBranchIds));
+  if (restrictToBranchIds) {
+    conditions.push(sqlInStaffBranches('package', restrictToBranchIds));
   }
   conditions.push(isNotNull(ticket_packages.deleted_at));
 
@@ -955,7 +679,7 @@ export async function listDeletedTicketPackagesImpl(
       price: ticket_packages.price,
       type: ticket_packages.type,
       is_member_only: ticket_packages.is_member_only,
-      branch_ids: ticket_packages.branch_ids,
+      all_branches: ticket_packages.all_branches,
       deleted_at: ticket_packages.deleted_at,
       deleted_by_staff_name: staffs.fullname
     })
@@ -980,7 +704,10 @@ export async function listDeletedTicketPackagesImpl(
 
   return {
     status: 'success',
-    items: items.map(({ branch_ids, ...item }: any) => ({ ...item, branch_name: branchNamesLabel(branch_ids, namesById) })),
+    items: (await withBranchScope(anyDb, 'package', items)).map(({ all_branches, branch_ids, ...item }: any) => ({
+      ...item,
+      branch_name: branchScopeLabel({ all_branches, branch_ids }, namesById)
+    })),
     total: countResult?.count || 0,
     page,
     pageSize
@@ -1005,11 +732,7 @@ export async function toggleTicketStatusImpl(
     throw err;
   }
 
-  if (
-    restrictToBranchIds &&
-    restrictToBranchIds.length > 0 &&
-    !staffCanModifyBranchRecord(existing.branch_ids, restrictToBranchIds, false)
-  ) {
+  if (!staffMayModify(await readBranchScope(anyDb, 'package', id), restrictToBranchIds)) {
     const err: any = new Error('Bạn không có quyền thay đổi trạng thái gói vé này');
     err.statusCode = 403;
     throw err;

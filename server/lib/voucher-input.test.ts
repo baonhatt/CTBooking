@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateVoucherFields, readBranchIdsInput, checkVoucherBranches } from './voucher-input';
+import { validateVoucherFields } from './voucher-input';
 
 const GOOD = { discount_type: 'percent', discount_value: 10, scope: 'all' };
 
@@ -65,56 +65,5 @@ describe('validateVoucherFields', () => {
   it('allows one date alone', () => {
     expect(() => validateVoucherFields({ ...GOOD, valid_from: '2026-12-01' })).not.toThrow();
     expect(() => validateVoucherFields({ ...GOOD, valid_until: '2026-12-01' })).not.toThrow();
-  });
-});
-
-describe('readBranchIdsInput', () => {
-  it('passes undefined and null through, reads arrays and JSON text', () => {
-    expect(readBranchIdsInput(undefined)).toBeUndefined();
-    expect(readBranchIdsInput(null)).toBeNull();
-    expect(readBranchIdsInput([1, '2'])).toEqual([1, 2]);
-    expect(readBranchIdsInput('[1,2]')).toEqual([1, 2]);
-    expect(readBranchIdsInput('null')).toBeNull();
-    expect(readBranchIdsInput([])).toEqual([]);
-  });
-
-  it.each([['abc'], ['{"a":1}'], [5], [{}], [[0]], [[-1]], [[1.5]], [['x']], [[null]]])('refuses %p', (value) => {
-    expect(() => readBranchIdsInput(value)).toThrow(expect.objectContaining({ statusCode: 400 }));
-  });
-});
-
-describe('checkVoucherBranches', () => {
-  it('Super Admin: any list of branches, or all branches (null), but never an empty list', () => {
-    expect(checkVoucherBranches([1, 2], null, { required: true })).toEqual([1, 2]);
-    expect(checkVoucherBranches(null, null, { required: true })).toBeNull();
-    expect(checkVoucherBranches(undefined, null, { required: true })).toBeUndefined();
-    expect(() => checkVoucherBranches([], null, { required: true })).toThrow(expect.objectContaining({ statusCode: 400 }));
-  });
-
-  it('limited staff: only branches of their own', () => {
-    expect(checkVoucherBranches([2], [1, 2], { required: true })).toEqual([2]);
-    expect(checkVoucherBranches([1, 2], [1, 2], { required: true })).toEqual([1, 2]);
-    expect(() => checkVoucherBranches([3], [1, 2], { required: true })).toThrow(expect.objectContaining({ statusCode: 403 }));
-    expect(() => checkVoucherBranches([1, 3], [1, 2], { required: true })).toThrow(expect.objectContaining({ statusCode: 403 }));
-  });
-
-  it('limited staff cannot save "all branches" or an empty list, and must name branches on create', () => {
-    expect(() => checkVoucherBranches(null, [1, 2], { required: true })).toThrow(expect.objectContaining({ statusCode: 403 }));
-    expect(() => checkVoucherBranches([], [1, 2], { required: true })).toThrow(expect.objectContaining({ statusCode: 400 }));
-    expect(() => checkVoucherBranches(undefined, [1, 2], { required: true })).toThrow(expect.objectContaining({ statusCode: 400 }));
-  });
-
-  it('limited staff editing without sending branches keeps what is saved', () => {
-    expect(checkVoucherBranches(undefined, [1, 2], { required: false })).toBeUndefined();
-  });
-
-  it('a staff member with no branch at all can do nothing', () => {
-    for (const input of [[1], null, undefined, []]) {
-      expect(() => checkVoucherBranches(input as any, [], { required: false })).toThrow(expect.objectContaining({ statusCode: 403 }));
-    }
-  });
-
-  it('removes repeated ids', () => {
-    expect(checkVoucherBranches([2, 2, 1], [1, 2], { required: true })).toEqual([2, 1]);
   });
 });

@@ -2,7 +2,7 @@ import { eq, and, ne, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { logAuditAction } from '../../lib/audit-logger';
 import { formatDateForDb } from '../../lib/date-utils';
 import { isValidTime, normalizeTime } from '../../lib/showtime-utils';
-import { matchesBranchFilter } from '../../lib/branch-ids';
+import { moviesAtBranch, movieServesBranch } from '../../lib/catalog-scope';
 
 type StaffInfo = { id: number; email: string; fullname: string };
 
@@ -154,6 +154,10 @@ export async function createShowtimeImpl(
     .where(eq(tables.movies.id, movieId))
     .limit(1);
   if (!movie || movie.deleted_at) return { status: 'error', message: 'Không tìm thấy phim', statusCode: 404 };
+  // A showtime only for a movie that is active and shown at that branch
+  if (!(await movieServesBranch(db, movieId, branchId))) {
+    return { status: 'error', message: 'Phim không chiếu ở chi nhánh này hoặc đang ẩn', statusCode: 400 };
+  }
 
   const overlap = await findOverlappingShowtime(db, tables, branchId, startTime, endTime);
   if (overlap) {
@@ -226,6 +230,10 @@ export async function updateShowtimeImpl(
     .where(eq(tables.movies.id, movieId))
     .limit(1);
   if (!movie || movie.deleted_at) return { status: 'error', message: 'Không tìm thấy phim', statusCode: 404 };
+  // A showtime only for a movie that is active and shown at that branch
+  if (Number(movieId) !== Number(existing.movie_id) && !(await movieServesBranch(db, movieId, existing.branch_id))) {
+    return { status: 'error', message: 'Phim không chiếu ở chi nhánh này hoặc đang ẩn', statusCode: 400 };
+  }
 
   const overlap = await findOverlappingShowtime(db, tables, existing.branch_id, startTime, endTime, id);
   if (overlap) {
@@ -337,20 +345,9 @@ export async function copyShowtimesImpl(
     return { status: 'error', message: 'Chi nhánh nguồn chưa có lịch chiếu', statusCode: 400 };
   }
 
-  // Movies that can be shown at the target branch
-  let eligibleMovieIds: Set<number> | null = null;
-  if (tables.movies) {
-    const movieRows = await db
-      .select({ id: tables.movies.id, branch_ids: tables.movies.branch_ids, branch_id: tables.movies.branch_id })
-      .from(tables.movies)
-      .where(and(eq(tables.movies.is_active, true), isNull(tables.movies.deleted_at)));
-    eligibleMovieIds = new Set(
-      movieRows
-        .filter((movie: any) => matchesBranchFilter(movie.branch_ids, movie.branch_id, toBranchId))
-        .map((movie: any) => Number(movie.id))
-    );
-  }
-  const copyable = eligibleMovieIds ? source.filter((slot: any) => eligibleMovieIds!.has(Number(slot.movie_id))) : source;
+  // Only the movies shown at the target branch are copied
+  const eligibleMovieIds = new Set((await moviesAtBranch(db, toBranchId)).map((movie) => Number(movie.id)));
+  const copyable = source.filter((slot: any) => eligibleMovieIds.has(Number(slot.movie_id)));
   const skipped = source.length - copyable.length;
 
   if (!copyable.length) {

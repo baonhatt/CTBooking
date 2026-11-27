@@ -17,16 +17,30 @@ export function makeSqliteDb(tableNames: string[]) {
     raw.exec('CREATE TABLE "' + config.name + '" (' + columns + ')');
   }
 
+  const runOne = (sqlText: string, params: any[], method: string) => {
+    const statement = raw.prepare(sqlText);
+    if (method === 'run') {
+      statement.run(...params);
+      return { rows: [] };
+    }
+    statement.setReturnArrays(true);
+    const rows = statement.all(...params) as any[];
+    return { rows: method === 'get' ? rows[0] : rows };
+  };
+
+  // db.batch runs its statements in one transaction, like D1
   const db = drizzle(
-    async (sqlText: string, params: any[], method: string) => {
-      const statement = raw.prepare(sqlText);
-      if (method === 'run') {
-        statement.run(...params);
-        return { rows: [] };
+    async (sqlText: string, params: any[], method: string) => runOne(sqlText, params, method),
+    async (queries: Array<{ sql: string; params: any[]; method: string }>) => {
+      raw.exec('BEGIN');
+      try {
+        const results = queries.map((query) => runOne(query.sql, query.params, query.method));
+        raw.exec('COMMIT');
+        return results;
+      } catch (error) {
+        raw.exec('ROLLBACK');
+        throw error;
       }
-      statement.setReturnArrays(true);
-      const rows = statement.all(...params) as any[];
-      return { rows: method === 'get' ? rows[0] : rows };
     },
     { schema }
   );

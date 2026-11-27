@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import * as schema from '../../../shared/schema';
 import { makeSqliteDb, insertRows } from '../../test-utils/sqlite-db';
 import { listAdminMoviesImpl, listDeletedMoviesImpl, getMovieByIdImpl } from './movies';
-import { listDeletedTicketPackagesImpl } from './tickets';
+import { listDeletedTicketPackagesImpl, listTicketPackagesImpl, getTicketPackageImpl } from './tickets';
 import { listVouchersImpl, listDeletedVouchersImpl, listVoucherPackageOptionsImpl, getVoucherImpl } from './vouchers';
 import {
   listBranchesImpl,
@@ -12,21 +13,27 @@ import {
   listBranchOptionsImpl
 } from './branches';
 import { listToysImpl } from './toys';
-import { listSiteMediaImpl, isAllowedUploadFolder, staffCanModifySiteMedia } from './site-media';
+import { listSiteMediaImpl, isAllowedUploadFolder, staffCanModifySiteMedia, createSiteMediaImpl } from './site-media';
 
 // The admin list queries run on a real in-memory SQLite database, so the WHERE clauses (deleted rows, branch scope,
 // filters) are really exercised.
 
 const TABLES = [
   'movies',
+  'movie_branches',
   'ticket_packages',
+  'package_branches',
+  'package_movies',
   'bookings',
   'branches',
   'staffs',
   'vouchers',
+  'voucher_branches',
+  'voucher_packages',
   'voucher_redemption_logs',
   'toys',
   'site_media',
+  'site_media_branches',
   'auditLogs'
 ];
 
@@ -35,6 +42,15 @@ let db: any;
 let raw: any;
 
 const NOW = '2026-11-20T03:00:00.000Z';
+
+/** Link rows giving records of a kind their branches: [record id, branch id] pairs. */
+function linkBranches(tableName: string, keyColumn: string, pairs: Array<[number, number]>) {
+  insertRows(
+    raw,
+    tableName,
+    pairs.map(([recordId, branchId]) => ({ [keyColumn]: recordId, branch_id: branchId }))
+  );
+}
 
 function movie(id: number, overrides: Record<string, unknown> = {}) {
   return {
@@ -46,8 +62,7 @@ function movie(id: number, overrides: Record<string, unknown> = {}) {
     duration_min: 100,
     cover_image: `https://img/${id}.jpg`,
     detail_images: '[]',
-    branch_id: null,
-    branch_ids: null,
+    all_branches: 1,
     created_at: NOW,
     updated_at: NOW,
     is_active: 1,
@@ -72,12 +87,13 @@ describe('GET /api/admin/movies (listAdminMoviesImpl)', () => {
   beforeEach(() => {
     insertRows(raw, 'movies', [
       movie(1),
-      movie(2, { branch_ids: '[1]', branch_id: 1 }),
-      movie(3, { branch_ids: '[2]', branch_id: 2 }),
+      movie(2, { all_branches: 0 }),
+      movie(3, { all_branches: 0 }),
       movie(4, { is_active: 0 }),
       movie(5, { deleted_at: NOW, is_active: 0 }),
       movie(6, { deleted_at: NOW })
     ]);
+    linkBranches('movie_branches', 'movie_id', [[2, 1], [3, 2]]);
   });
 
   const list = (options: Record<string, unknown> = {}) =>
@@ -119,7 +135,7 @@ describe('GET /api/admin/movies (listAdminMoviesImpl)', () => {
     expect(page2.total).toBe(4);
   });
 
-  it('returns only the columns the screens read, genres and branch ids parsed', async () => {
+  it('returns only the columns the screens read, genres parsed and the branch scope', async () => {
     const r = await list({ q: 'movie 2' });
     expect(Object.keys(r.items[0]).sort()).toEqual(
       [
@@ -132,12 +148,15 @@ describe('GET /api/admin/movies (listAdminMoviesImpl)', () => {
         'updated_at',
         'rating',
         'is_active',
-        'branch_id',
+        'all_branches',
         'branch_ids'
       ].sort()
     );
     expect(r.items[0].genres).toEqual(['Action', 'Drama']);
+    expect(r.items[0].all_branches).toBe(false);
     expect(r.items[0].branch_ids).toEqual([1]);
+    const global = await list({ q: 'movie 1' });
+    expect(global.items[0]).toMatchObject({ all_branches: true, branch_ids: [] });
     expect(r.items[0]).not.toHaveProperty('branch');
     expect(r.items[0]).not.toHaveProperty('description');
   });
@@ -147,9 +166,17 @@ describe('movie detail and deleted movies', () => {
   beforeEach(() => {
     insertRows(raw, 'movies', [movie(1), movie(7, { deleted_at: NOW, genres: '["Horror"]' })]);
     insertRows(raw, 'ticket_packages', [
-      { id: 10, name: 'VIP', code: 'VIP1', price: 90000, combo: '[1]', is_active: 1, branch_ids: '[1]', branch_id: 1, description: 'x', features: '[]', created_at: NOW, updated_at: NOW },
-      { id: 11, name: 'Thường', code: 'STD', price: 50000, combo: '1|2', is_active: 1, created_at: NOW, updated_at: NOW },
-      { id: 12, name: 'Khác', code: 'OTH', price: 1, combo: '[2]', is_active: 1, created_at: NOW, updated_at: NOW }
+      { id: 10, name: 'VIP', code: 'VIP1', price: 90000, movie_scope: 'selected', is_active: 1, all_branches: 0, description: 'x', features: '[]', created_at: NOW, updated_at: NOW },
+      { id: 11, name: 'Thường', code: 'STD', price: 50000, movie_scope: 'selected', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW },
+      { id: 12, name: 'Khác', code: 'OTH', price: 1, movie_scope: 'selected', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW },
+      { id: 13, name: 'Mọi phim', code: 'ALLM', price: 2, movie_scope: 'all_at_branch', is_active: 1, all_branches: 0, created_at: NOW, updated_at: NOW }
+    ]);
+    linkBranches('package_branches', 'package_id', [[10, 1], [13, 2]]);
+    insertRows(raw, 'package_movies', [
+      { package_id: 10, movie_id: 1 },
+      { package_id: 11, movie_id: 1 },
+      { package_id: 11, movie_id: 2 },
+      { package_id: 12, movie_id: 2 }
     ]);
     insertRows(raw, 'bookings', [{ id: 1, movie_id: 1, payment_status: 'paid', total_price: 100, ticket_count: 1, created_at: NOW, updated_at: NOW }]);
   });
@@ -158,9 +185,11 @@ describe('movie detail and deleted movies', () => {
     const r: any = await getMovieByIdImpl(db, { movies: S.movies, ticket_packages: S.ticket_packages, auditLogs: S.auditLogs }, 1);
     expect(r).not.toHaveProperty('stats');
     expect(r).not.toHaveProperty('branch');
+    // Packages that select the movie, and packages of every movie of a branch the movie is shown at
     expect(r.applicable_packages).toEqual([
-      { id: 10, name: 'VIP', code: 'VIP1', price: 90000, branch_id: 1, branch_ids: [1] },
-      { id: 11, name: 'Thường', code: 'STD', price: 50000, branch_id: null, branch_ids: null }
+      { id: 10, name: 'VIP', code: 'VIP1', price: 90000, all_branches: false, branch_ids: [1] },
+      { id: 11, name: 'Thường', code: 'STD', price: 50000, all_branches: true, branch_ids: [] },
+      { id: 13, name: 'Mọi phim', code: 'ALLM', price: 2, all_branches: false, branch_ids: [2] }
     ]);
   });
 
@@ -174,13 +203,46 @@ describe('movie detail and deleted movies', () => {
   });
 });
 
+describe('staff with no branch see no movie and no package', () => {
+  // restrictToBranchIds = [] is a staff member with no branch: never the same as the Super Admin (null)
+  beforeEach(() => {
+    insertRows(raw, 'movies', [movie(1), movie(7, { deleted_at: NOW })]);
+    insertRows(raw, 'ticket_packages', [
+      { id: 1, name: 'All', code: 'A', price: 1, type: 'movie', movie_scope: 'all_at_branch', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW },
+      { id: 2, name: 'Old', code: 'O', price: 1, type: 'movie', movie_scope: 'selected', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW, deleted_at: NOW }
+    ]);
+  });
+
+  const movieTables = { movies: S.movies, staffs: S.staffs, ticket_packages: S.ticket_packages, auditLogs: S.auditLogs };
+  const packageTables = { ticket_packages: S.ticket_packages, movies: S.movies, staffs: S.staffs, branches: S.branches, auditLogs: S.auditLogs };
+
+  it('movie detail and deleted movies', async () => {
+    expect(await getMovieByIdImpl(db, movieTables, 1, [])).toBeNull();
+    expect(await getMovieByIdImpl(db, movieTables, 1, null)).not.toBeNull();
+    expect((await listDeletedMoviesImpl(db, movieTables, { restrictToBranchIds: [] })).items).toEqual([]);
+    expect((await listDeletedMoviesImpl(db, movieTables, { restrictToBranchIds: null })).items).toHaveLength(1);
+  });
+
+  it('package list, detail and deleted packages', async () => {
+    const list = (restrictToBranchIds: number[] | null) =>
+      listTicketPackagesImpl(db, packageTables, { page: 1, pageSize: 10, q: '', includeInactive: true, restrictToBranchIds });
+    expect((await list([])).items).toEqual([]);
+    expect((await list(null)).items.map((item: any) => item.id)).toEqual([1]);
+    expect(await getTicketPackageImpl(db, packageTables, 1, [])).toBeNull();
+    expect(await getTicketPackageImpl(db, packageTables, 1, null)).not.toBeNull();
+    expect((await listDeletedTicketPackagesImpl(db, packageTables, { restrictToBranchIds: [] })).items).toEqual([]);
+    expect((await listDeletedTicketPackagesImpl(db, packageTables, { restrictToBranchIds: null })).items).toHaveLength(1);
+  });
+});
+
 describe('deleted ticket packages', () => {
   it('returns the branch names the screen shows, and only the shown fields', async () => {
     insertRows(raw, 'ticket_packages', [
-      { id: 1, name: 'A', code: 'A', price: 1, type: 'movie', is_member_only: 0, branch_ids: '[1,2]', created_at: NOW, updated_at: NOW, deleted_at: '2026-11-02' },
-      { id: 2, name: 'B', code: 'B', price: 2, type: 'vr', is_member_only: 1, branch_ids: null, created_at: NOW, updated_at: NOW, deleted_at: '2026-11-01' },
-      { id: 3, name: 'C', code: 'C', price: 3, created_at: NOW, updated_at: NOW }
+      { id: 1, name: 'A', code: 'A', price: 1, type: 'movie', is_member_only: 0, all_branches: 0, created_at: NOW, updated_at: NOW, deleted_at: '2026-11-02' },
+      { id: 2, name: 'B', code: 'B', price: 2, type: 'vr', is_member_only: 1, all_branches: 1, created_at: NOW, updated_at: NOW, deleted_at: '2026-11-01' },
+      { id: 3, name: 'C', code: 'C', price: 3, all_branches: 1, created_at: NOW, updated_at: NOW }
     ]);
+    linkBranches('package_branches', 'package_id', [[1, 1], [1, 2]]);
     const r = await listDeletedTicketPackagesImpl(
       db,
       { ticket_packages: S.ticket_packages, staffs: S.staffs, branches: S.branches },
@@ -199,12 +261,13 @@ describe('deleted ticket packages', () => {
 describe('vouchers', () => {
   beforeEach(() => {
     insertRows(raw, 'vouchers', [
-      { id: 1, code: 'ALL', name: 'All', description: '{"note":"hello","sale_staff_id":9,"sale_name":"Lan","sale_email":"l@x"}', scope: 'all', discount_type: 'percent', discount_value: 10, used_count: 0, is_active: 1, branch_ids: null, excluded_ticket_package_ids: '[3]', applicable_user_ids: '[5]', created_at: '2026-11-03', updated_at: NOW },
-      { id: 2, code: 'HN', name: 'Hn', description: 'plain note', scope: 'vr', discount_type: 'fixed', discount_value: 5000, used_count: 0, is_active: 0, branch_ids: '[1]', created_at: '2026-11-02', updated_at: NOW },
-      { id: 3, code: 'SG', name: 'Sg', scope: 'vr', discount_type: 'fixed', discount_value: 5000, used_count: 0, is_active: 1, branch_ids: '[2]', created_at: '2026-11-01', updated_at: NOW },
-      { id: 4, code: 'DEL1', name: 'Del', scope: 'vr', discount_type: 'fixed', discount_value: 1, used_count: 0, is_active: 1, branch_ids: '[2]', created_at: NOW, updated_at: NOW, deleted_at: NOW },
-      { id: 5, code: 'DEL2', name: 'Del2', scope: 'vr', discount_type: 'fixed', discount_value: 1, used_count: 0, is_active: 0, branch_ids: '[1]', created_at: NOW, updated_at: NOW, deleted_at: NOW }
+      { id: 1, code: 'ALL', name: 'All', description: '{"note":"hello","sale_staff_id":9,"sale_name":"Lan","sale_email":"l@x"}', scope: 'all', discount_type: 'percent', discount_value: 10, used_count: 0, is_active: 1, all_branches: 1, all_packages: 1, created_at: '2026-11-03', updated_at: NOW },
+      { id: 2, code: 'HN', name: 'Hn', description: 'plain note', scope: 'vr', discount_type: 'fixed', discount_value: 5000, used_count: 0, is_active: 0, all_branches: 0, all_packages: 1, created_at: '2026-11-02', updated_at: NOW },
+      { id: 3, code: 'SG', name: 'Sg', scope: 'vr', discount_type: 'fixed', discount_value: 5000, used_count: 0, is_active: 1, all_branches: 0, all_packages: 1, created_at: '2026-11-01', updated_at: NOW },
+      { id: 4, code: 'DEL1', name: 'Del', scope: 'vr', discount_type: 'fixed', discount_value: 1, used_count: 0, is_active: 1, all_branches: 0, all_packages: 1, created_at: NOW, updated_at: NOW, deleted_at: NOW },
+      { id: 5, code: 'DEL2', name: 'Del2', scope: 'vr', discount_type: 'fixed', discount_value: 1, used_count: 0, is_active: 0, all_branches: 0, all_packages: 1, created_at: NOW, updated_at: NOW, deleted_at: NOW }
     ]);
+    linkBranches('voucher_branches', 'voucher_id', [[2, 1], [3, 2], [4, 2], [5, 1]]);
     insertRows(raw, 'bookings', [
       { id: 1, branch_id: 1, total_price: 100, created_at: NOW, updated_at: NOW },
       { id: 2, branch_id: 2, total_price: 200, created_at: NOW, updated_at: NOW }
@@ -218,15 +281,23 @@ describe('vouchers', () => {
   const tables = { vouchers: S.vouchers, voucher_redemption_logs: S.voucher_redemption_logs, bookings: S.bookings };
   const list = (args: Record<string, unknown> = {}) => listVouchersImpl(db, tables, { page: 1, pageSize: 20, q: '', ...args });
 
-  it('honours the branch filter (global vouchers included)', async () => {
-    expect((await list({ branch_id: 1 })).items.map((v: any) => v.id)).toEqual([1, 2]);
-    expect((await list({ branch_id: 2 })).items.map((v: any) => v.id)).toEqual([1, 3]);
+  it('without a branch filter lists every voucher that is not deleted', async () => {
     expect((await list()).items.map((v: any) => v.id)).toEqual([1, 2, 3]);
   });
 
-  it('revenue counts only the orders of the staff member branches; the Super Admin sees all', async () => {
+  // The branch filter also works inside drizzle relational queries (db.query.x.findMany)
+  it('honours the branch filter (global vouchers included)', async () => {
+    expect((await list({ branch_id: 1 })).items.map((v: any) => v.id)).toEqual([1, 2]);
+    expect((await list({ branch_id: 2 })).items.map((v: any) => v.id)).toEqual([1, 3]);
+  });
+
+  it('revenue: the Super Admin counts the orders of every branch', async () => {
     const all = await list();
     expect(all.items.find((v: any) => v.id === 1).total_revenue).toBe(300);
+  });
+
+  // The branch filter also works inside drizzle relational queries (db.query.x.findMany)
+  it('revenue counts only the orders of the staff member branches', async () => {
     const hanoi = await list({ restrictToBranchIds: [1] });
     expect(hanoi.items.find((v: any) => v.id === 1).total_revenue).toBe(100);
   });
@@ -241,10 +312,14 @@ describe('vouchers', () => {
     expect(r.items.find((v: any) => v.id === 2).note).toBe('plain note');
   });
 
-  it('deleted list honours branch_id and is_active, and sends the parsed note', async () => {
-    const deletedTables = { vouchers: S.vouchers };
-    const byBranch = await listDeletedVouchersImpl(db, deletedTables, { branch_id: 1 });
+  // The branch filter also works inside drizzle relational queries (db.query.x.findMany)
+  it('deleted list honours branch_id', async () => {
+    const byBranch = await listDeletedVouchersImpl(db, { vouchers: S.vouchers }, { branch_id: 1 });
     expect(byBranch.items.map((v: any) => v.id)).toEqual([5]);
+  });
+
+  it('deleted list honours is_active, and sends the parsed note', async () => {
+    const deletedTables = { vouchers: S.vouchers };
     const active = await listDeletedVouchersImpl(db, deletedTables, { is_active: 'true' });
     expect(active.items.map((v: any) => v.id)).toEqual([4]);
     expect(active.items[0]).not.toHaveProperty('description');
@@ -271,12 +346,13 @@ describe('vouchers', () => {
 
   it('package options: active and inactive, not deleted, scoped to the staff branches, only the form fields', async () => {
     insertRows(raw, 'ticket_packages', [
-      { id: 1, name: 'VR all', price: 1, type: 'vr', is_active: 1, branch_ids: null, description: 'x', combo: '[]', created_at: NOW, updated_at: NOW },
-      { id: 2, name: 'VR HN off', price: 2, type: 'vr', is_active: 0, branch_ids: '[1]', branch_id: 1, created_at: NOW, updated_at: NOW },
-      { id: 3, name: 'VR SG', price: 3, type: 'vr', is_active: 1, branch_ids: '[2]', branch_id: 2, created_at: NOW, updated_at: NOW },
-      { id: 4, name: 'Movie', price: 4, type: 'movie', is_active: 1, created_at: NOW, updated_at: NOW },
-      { id: 5, name: 'VR deleted', price: 5, type: 'vr', is_active: 1, created_at: NOW, updated_at: NOW, deleted_at: NOW }
+      { id: 1, name: 'VR all', price: 1, type: 'vr', is_active: 1, all_branches: 1, description: 'x', movie_scope: 'selected', created_at: NOW, updated_at: NOW },
+      { id: 2, name: 'VR HN off', price: 2, type: 'vr', is_active: 0, all_branches: 0, created_at: NOW, updated_at: NOW },
+      { id: 3, name: 'VR SG', price: 3, type: 'vr', is_active: 1, all_branches: 0, created_at: NOW, updated_at: NOW },
+      { id: 4, name: 'Movie', price: 4, type: 'movie', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW },
+      { id: 5, name: 'VR deleted', price: 5, type: 'vr', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW, deleted_at: NOW }
     ]);
+    linkBranches('package_branches', 'package_id', [[2, 1], [3, 2]]);
     const options = (args: Record<string, unknown>) => listVoucherPackageOptionsImpl(db, { ticket_packages: S.ticket_packages }, args);
     expect((await options({ type: 'vr' })).items.map((p: any) => p.id).sort()).toEqual([1, 2, 3]);
     expect((await options({ type: 'movie' })).items.map((p: any) => p.id)).toEqual([4]);
@@ -284,7 +360,8 @@ describe('vouchers', () => {
     const hanoi = await options({ type: 'vr', restrictToBranchIds: [1] });
     expect(hanoi.items.map((p: any) => p.id).sort()).toEqual([1, 2]);
     const off = hanoi.items.find((p: any) => p.id === 2);
-    expect(off).toEqual({ id: 2, name: 'VR HN off', price: 2, type: 'vr', branch_id: 1, branch_ids: [1], is_active: false });
+    expect(off).toEqual({ id: 2, name: 'VR HN off', price: 2, type: 'vr', all_branches: false, branch_ids: [1], is_active: false });
+    expect(hanoi.items.find((p: any) => p.id === 1)).toMatchObject({ all_branches: true, branch_ids: [] });
   });
 });
 
@@ -294,16 +371,18 @@ describe('branches', () => {
   it('movie and package counts: items for this branch plus items for all branches (as the customer site shows them)', async () => {
     insertRows(raw, 'movies', [
       movie(1),
-      movie(2, { branch_ids: '[1]', branch_id: 1 }),
-      movie(3, { branch_ids: '[1,2]', branch_id: 1 }),
-      movie(4, { branch_ids: '[2]', branch_id: 2, is_active: 0 }),
-      movie(5, { branch_ids: '[2]', branch_id: 2, deleted_at: NOW })
+      movie(2, { all_branches: 0 }),
+      movie(3, { all_branches: 0 }),
+      movie(4, { all_branches: 0, is_active: 0 }),
+      movie(5, { all_branches: 0, deleted_at: NOW })
     ]);
+    linkBranches('movie_branches', 'movie_id', [[2, 1], [3, 1], [3, 2], [4, 2], [5, 2]]);
     insertRows(raw, 'ticket_packages', [
-      { id: 1, name: 'All', price: 1, type: 'movie', is_active: 1, branch_ids: null, created_at: NOW, updated_at: NOW },
-      { id: 2, name: 'Old single branch 2', price: 1, type: 'movie', is_active: 1, branch_ids: '[2]', branch_id: 2, created_at: NOW, updated_at: NOW },
-      { id: 3, name: 'Not configured', price: 1, type: 'movie', is_active: 1, branch_ids: '[]', created_at: NOW, updated_at: NOW }
+      { id: 1, name: 'All', price: 1, type: 'movie', is_active: 1, all_branches: 1, created_at: NOW, updated_at: NOW },
+      { id: 2, name: 'Branch 2 only', price: 1, type: 'movie', is_active: 1, all_branches: 0, created_at: NOW, updated_at: NOW },
+      { id: 3, name: 'Offered nowhere', price: 1, type: 'movie', is_active: 1, all_branches: 0, created_at: NOW, updated_at: NOW }
     ]);
+    linkBranches('package_branches', 'package_id', [[2, 2]]);
     const r = await listBranchesImpl(db, branchTables, { page: 1, pageSize: 10, q: '', includeInactive: true });
     const counts = Object.fromEntries(r.items.map((b: any) => [b.id, [b.movie_count, b.package_count]]));
     expect(counts).toEqual({ 1: [3, 1], 2: [2, 2], 3: [1, 1] });
@@ -371,24 +450,39 @@ describe('toys', () => {
 });
 
 describe('site media', () => {
-  it('branch staff list global media and their own branches only', async () => {
+  function insertMedia() {
     insertRows(raw, 'site_media', [
-      { id: 1, section: 'hero_section', type: 'image', url: 'u1', branch_ids: null, display_order: 0, is_active: 1, created_at: NOW, updated_at: NOW },
-      { id: 2, section: 'hero_section', type: 'image', url: 'u2', branch_ids: '[1]', display_order: 1, is_active: 1, created_at: NOW, updated_at: NOW },
-      { id: 3, section: 'hero_section', type: 'image', url: 'u3', branch_ids: '[2]', display_order: 2, is_active: 1, created_at: NOW, updated_at: NOW }
+      { id: 1, section: 'hero_section', type: 'image', url: 'u1', all_branches: 1, display_order: 0, is_active: 1, created_at: NOW, updated_at: NOW },
+      { id: 2, section: 'hero_section', type: 'image', url: 'u2', all_branches: 0, display_order: 1, is_active: 1, created_at: NOW, updated_at: NOW },
+      { id: 3, section: 'hero_section', type: 'image', url: 'u3', all_branches: 0, display_order: 2, is_active: 1, created_at: NOW, updated_at: NOW }
     ]);
+    linkBranches('site_media_branches', 'media_id', [[2, 1], [3, 2]]);
+  }
+
+  it('the Super Admin lists every media', async () => {
+    insertMedia();
     const all = await listSiteMediaImpl(db, { site_media: S.site_media }, {});
     expect(all.items.map((m: any) => m.id)).toEqual([1, 2, 3]);
+  });
+
+  // The branch filter also works inside drizzle relational queries (db.query.x.findMany)
+  it('branch staff list global media and their own branches only', async () => {
+    insertMedia();
     const mine = await listSiteMediaImpl(db, { site_media: S.site_media }, { restrictToBranchIds: [1] });
     expect(mine.items.map((m: any) => m.id)).toEqual([1, 2]);
   });
 
   it('only the Super Admin changes global media; other staff only media fully inside their branches', () => {
-    expect(staffCanModifySiteMedia(null, null)).toBe(true);
+    const everyBranch = { all_branches: true, branch_ids: [] };
+    const branches = (...ids: number[]) => ({ all_branches: false, branch_ids: ids });
+    expect(staffCanModifySiteMedia(everyBranch, null)).toBe(true);
+    expect(staffCanModifySiteMedia(everyBranch, [1])).toBe(false);
+    expect(staffCanModifySiteMedia(branches(1), [1, 2])).toBe(true);
+    expect(staffCanModifySiteMedia(branches(1, 3), [1, 2])).toBe(false);
+    expect(staffCanModifySiteMedia(branches(3), [1])).toBe(false);
+    // Media offered nowhere, or a row that does not exist, is left to the Super Admin
+    expect(staffCanModifySiteMedia(branches(), [1])).toBe(false);
     expect(staffCanModifySiteMedia(null, [1])).toBe(false);
-    expect(staffCanModifySiteMedia('[1]', [1, 2])).toBe(true);
-    expect(staffCanModifySiteMedia('[1,3]', [1, 2])).toBe(false);
-    expect(staffCanModifySiteMedia('[3]', [1])).toBe(false);
   });
 
   it('signs only the folders the admin screens use, under the root of the resource type', () => {
@@ -400,5 +494,70 @@ describe('site media', () => {
     expect(isAllowedUploadFolder('ctbooking/images/../secrets', 'image')).toBe(false);
     expect(isAllowedUploadFolder('other/hero_section', 'image')).toBe(false);
     expect(isAllowedUploadFolder('ctbooking/images/hero_section', 'raw')).toBe(false);
+  });
+});
+
+describe('adding site media (createSiteMediaImpl)', () => {
+  const mediaTables = { site_media: S.site_media, auditLogs: S.auditLogs };
+  const FILE = { section: 'hero_section', type: 'image', url: 'https://cdn/new.jpg', public_id: 'new' };
+
+  beforeEach(() => {
+    // An INTEGER PRIMARY KEY so a new row receives an id
+    const columns = getTableConfig(S.site_media)
+      .columns.map((column: any) => '"' + column.name + '" ' + (column.name === 'id' ? 'INTEGER PRIMARY KEY' : column.getSQLType()))
+      .join(', ');
+    raw.exec('DROP TABLE "site_media"');
+    raw.exec('CREATE TABLE "site_media" (' + columns + ')');
+  });
+
+  const rows = () => raw.prepare('SELECT id, url, title, all_branches FROM site_media ORDER BY id').all().map((row: any) => ({ ...row }));
+  const links = () => raw.prepare('SELECT media_id, branch_id FROM site_media_branches ORDER BY media_id, branch_id').all().map((row: any) => ({ ...row }));
+  const create = (args: Record<string, unknown>, restrict: number[] | null) =>
+    createSiteMediaImpl(db, mediaTables, { ...FILE, ...args } as any, undefined, undefined, restrict);
+
+  it('refuses a missing branch choice with 400, for everyone', async () => {
+    for (const restrict of [null, [1]]) {
+      await expect(create({}, restrict)).rejects.toMatchObject({ statusCode: 400 });
+      await expect(create({ branch_ids: [1] }, restrict)).rejects.toMatchObject({ statusCode: 400 });
+    }
+    expect(rows()).toEqual([]);
+  });
+
+  it('branch staff add media for their own branches only, at least one', async () => {
+    for (const scope of [{ all_branches: true }, { all_branches: false, branch_ids: [] }, { all_branches: false, branch_ids: [2] }]) {
+      await expect(create(scope, [1])).rejects.toMatchObject({ statusCode: 403 });
+    }
+    expect(rows()).toEqual([]);
+    await create({ all_branches: false, branch_ids: [1] }, [1, 2]);
+    expect(rows()).toMatchObject([{ all_branches: 0 }]);
+    expect(links()).toEqual([{ media_id: rows()[0].id, branch_id: 1 }]);
+  });
+
+  it('the Super Admin may add media for every branch or for no branch yet', async () => {
+    await create({ all_branches: true }, null);
+    await create({ url: 'https://cdn/other.jpg', public_id: 'other', all_branches: false, branch_ids: [] }, null);
+    expect(rows().map((row: any) => row.all_branches)).toEqual([1, 0]);
+    expect(links()).toEqual([]);
+  });
+
+  describe('the same file again updates the existing row, which keeps its branches', () => {
+    beforeEach(() => {
+      insertRows(raw, 'site_media', [{ id: 10, ...FILE, title: 'old', all_branches: 0, is_active: 1, created_at: NOW, updated_at: NOW }]);
+      linkBranches('site_media_branches', 'media_id', [[10, 1]]);
+    });
+
+    it('the branches sent are ignored', async () => {
+      await create({ title: 'new', all_branches: true }, null);
+      expect(rows()).toEqual([{ id: 10, url: FILE.url, title: 'new', all_branches: 0 }]);
+      expect(links()).toEqual([{ media_id: 10, branch_id: 1 }]);
+
+      await create({ title: 'again', all_branches: false, branch_ids: [1] }, [1]);
+      expect(rows()).toEqual([{ id: 10, url: FILE.url, title: 'again', all_branches: 0 }]);
+    });
+
+    it('staff who may not change the existing row are refused with 403', async () => {
+      await expect(create({ title: 'x', all_branches: false, branch_ids: [2] }, [2])).rejects.toMatchObject({ statusCode: 403 });
+      expect(rows()).toEqual([{ id: 10, url: FILE.url, title: 'old', all_branches: 0 }]);
+    });
   });
 });

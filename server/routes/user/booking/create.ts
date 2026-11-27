@@ -161,7 +161,7 @@ export async function createPaymentImpl(
     // Insert line items into booking_vr_items with pro-rata discount allocation
     const insertedItemsArr: any[] = [];
     if (tables.booking_vr_items && hasVR && vrItemsDetails && vrItemsDetails.length > 0) {
-      const applicableIds = parseApplicableIds(voucherDetails?.applicable_ticket_package_ids);
+      const applicableIds = parseApplicableIds(voucherDetails?.applicable_ids);
       const allocatedVrItems = allocateVoucherDiscountToVrItems({
         vrItems: vrItemsDetails,
         movieItems: validation.movieItemsDetails || [],

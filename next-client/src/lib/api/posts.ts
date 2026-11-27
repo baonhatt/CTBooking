@@ -4,7 +4,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 /**
  * A post from the public API. The list (GET /api/posts) has only the card fields (id, title, slug, excerpt,
- * featured_image, status, is_featured, published_at, created_at, updated_at, branch_ids); the article
+ * featured_image, status, is_featured, published_at, created_at, updated_at, all_branches, branch_ids); the article
  * (GET /api/posts/:slug-id) also has the text, the SEO fields and the view count.
  */
 export type PostItem = {
@@ -26,8 +26,9 @@ export type PostItem = {
   og_image?: string;
   canonical_url?: string;
   schema_type?: string;
-  // Branches the post is limited to; null or empty means all branches
-  branch_ids?: number[] | null;
+  // Offered at every branch; when false, only at branch_ids (empty = offered nowhere)
+  all_branches?: boolean;
+  branch_ids?: number[];
 };
 
 export type PostsResponse = {

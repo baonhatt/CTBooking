@@ -7,6 +7,7 @@ import { buildPostHref, formatDate } from '@/lib/utils';
 import UserLayout from '@/layouts/UserLayout';
 import PostsSearchClient from '@/app/bai-viet/PostsSearchClient';
 import BranchScoped from '@/components/user/posts/BranchScoped';
+import { isPostAssigned } from '@/lib/post-branch';
 
 import { siteConfig } from '@/config/site';
 
@@ -47,7 +48,8 @@ export default async function PostsPage() {
   try {
     const res = await getPublicPosts({ page: 1, pageSize: 50 });
     posts = (res.items ?? [])
-      .filter((p) => p.status === 'published')
+      // A post not assigned to any branch yet is never listed
+      .filter((p) => p.status === 'published' && isPostAssigned(p))
       .sort((a, b) => {
         const fa = a.is_featured ? 1 : 0;
         const fb = b.is_featured ? 1 : 0;
@@ -72,6 +74,7 @@ export default async function PostsPage() {
     excerpt: post.excerpt,
     featured_image: post.featured_image,
     status: post.status,
+    all_branches: post.all_branches,
     branch_ids: post.branch_ids
   }));
 
@@ -120,7 +123,7 @@ export default async function PostsPage() {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 xl:gap-8">
               {/* Left Large Post */}
               {featured[0] && (
-                <BranchScoped branchIds={featured[0].branch_ids}>
+                <BranchScoped scope={featured[0]}>
                 <div className="xl:col-span-2 group block cursor-pointer">
                   <Link href={buildPostHref(featured[0])}>
                     <div className="relative aspect-[16/9] lg:aspect-[2/1] rounded-[1.25rem] overflow-hidden mb-6">
@@ -161,7 +164,7 @@ export default async function PostsPage() {
               {/* Right Stacked Posts */}
               <div className="xl:col-span-1 flex flex-col gap-8 justify-between">
                 {featured.slice(1, 3).map((post) => (
-                  <BranchScoped key={post.id} branchIds={post.branch_ids}>
+                  <BranchScoped key={post.id} scope={post}>
                   <div className="group block flex-1">
                     <Link href={buildPostHref(post)} className="flex flex-col h-full">
                       <div className="relative aspect-[16/9] xl:aspect-[4/3] 2xl:aspect-[16/9] rounded-2xl overflow-hidden mb-4">
@@ -203,7 +206,7 @@ export default async function PostsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
               {others.map((post) => (
-                <BranchScoped key={post.id} branchIds={post.branch_ids}>
+                <BranchScoped key={post.id} scope={post}>
                 <article className="group block">
                   <Link href={buildPostHref(post)} className="flex flex-col h-full">
                     <div className="relative aspect-[16/10] rounded-[1rem] overflow-hidden mb-4">

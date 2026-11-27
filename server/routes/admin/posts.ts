@@ -1,10 +1,18 @@
-import { sqlBranchIdsStaffAccessFilter } from '../../lib/branch-ids';
 import { eq, desc, asc, and, or, like, sql, inArray } from 'drizzle-orm';
 import { formatDateForDb } from '../../lib/date-utils';
 import { logAuditAction } from '../../lib/audit-logger';
 import { sanitizePostHtml } from '../../lib/sanitize-html';
 import { buildAuditPayload } from '../../lib/audit-utils';
-import { parseBranchIds, serializeBranchIds } from '../../lib/branch-ids';
+import {
+  branchScopeStatements,
+  readScopeChange,
+  readScopeInput,
+  runBatch,
+  sqlInStaffBranches,
+  withBranchScope,
+  type BranchScope
+} from '../../lib/catalog-scope';
+import { post_branches } from '../../../shared/schema';
 
 // Turns text into a url slug (no accents, lowercase, dashes)
 function make_slug(text: string): string {
@@ -29,26 +37,12 @@ function parse_publish_date(value: unknown): Date | null {
 }
 
 /**
- * The branches a post is meant for, as sent by the screen: undefined (not sent: keep as it is), null (all branches) or a
- * list of branch ids. An empty list is refused: "no branch" would hide the post from every branch.
+ * The branches a post is meant for, as sent by the screen: { all_branches: true }, or { all_branches: false,
+ * branch_ids } (an empty list = not shown anywhere yet). On create the choice is required; on an edit, a choice not
+ * sent (e.g. "Gỡ xuất bản" sends only the status) leaves the branches as they are.
  */
-export function readPostBranchIds(value: unknown): number[] | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (!Array.isArray(value)) throw Object.assign(new Error('Danh sách chi nhánh không hợp lệ'), { statusCode: 400 });
-  const ids = Array.from(new Set(value.map((id) => Number(id))));
-  if (ids.some((id) => !Number.isInteger(id) || id <= 0)) {
-    throw Object.assign(new Error('Danh sách chi nhánh không hợp lệ'), { statusCode: 400 });
-  }
-  if (ids.length === 0) {
-    throw Object.assign(new Error('Chọn ít nhất một chi nhánh hoặc chọn tất cả chi nhánh'), { statusCode: 400 });
-  }
-  return ids;
-}
-
-// The post as sent to screens: branch_ids is a list (or null for all branches), not the JSON text of the column
-function withBranchList(post: any) {
-  return { ...post, branch_ids: parseBranchIds(post?.branch_ids) };
+export function readPostScope(input: { all_branches?: unknown; branch_ids?: unknown }, mode: 'create' | 'edit'): BranchScope | undefined {
+  return mode === 'create' ? readScopeInput(input) : readScopeChange(input);
 }
 
 /**
@@ -107,7 +101,7 @@ export const POST_LIST_COLUMNS = {
   published_at: true,
   created_at: true,
   updated_at: true,
-  branch_ids: true
+  all_branches: true
 } as const;
 
 export async function listPostsImpl(
@@ -138,7 +132,7 @@ export async function listPostsImpl(
   }
 
   if (restrictToBranchIds) {
-    conditions.push(sqlBranchIdsStaffAccessFilter(tables.posts.branch_ids, restrictToBranchIds));
+    conditions.push(sqlInStaffBranches('post', restrictToBranchIds));
   }
 
   if (conditions.length > 0) {
@@ -180,8 +174,8 @@ export async function listPostsImpl(
     : null;
 
   return {
-    items: items.map((post: any) => ({
-      ...withBranchList(post),
+    items: (await withBranchScope(anyDb, 'post', items)).map((post: any) => ({
+      ...post,
       ...(staffNames
         ? staffNames.get(post.id) || { created_by_staff_name: null, updated_by_staff_name: null }
         : {})
@@ -255,8 +249,9 @@ export async function getPostImpl(
     .orderBy(desc(tables.auditLogs.createdAt))
     .limit(1);
 
+  const [scopedPost] = await withBranchScope(anyDb, 'post', [post]);
   return {
-    ...withBranchList(post),
+    ...scopedPost,
     created_by_staff_name: createLog?.staffFullname || null,
     updated_by_staff_name: updateLog?.staffFullname || null
   };
@@ -270,7 +265,8 @@ export async function createPostImpl(
     slug?: string;
     published_at?: string | null;
     // null or missing = all branches
-    branch_ids?: number[] | null;
+    all_branches?: boolean;
+    branch_ids?: number[];
     content: string;
     excerpt?: string;
     featured_image?: string;
@@ -307,7 +303,7 @@ export async function createPostImpl(
   } = args;
 
   // Checked first, so a refused branch list never leaves an uploaded image behind
-  const branchIds = readPostBranchIds(args.branch_ids);
+  const postScope = readPostScope(args, 'create');
 
   let savedImage = featured_image;
 
@@ -338,7 +334,7 @@ export async function createPostImpl(
   const insertData: any = {
     title,
     slug,
-    branch_ids: serializeBranchIds(branchIds ?? null),
+    all_branches: postScope!.all_branches,
     // The HTML is cleaned before it is saved (scripts, event handlers and the like are removed)
     content: sanitizePostHtml(content),
     excerpt: excerpt || null,
@@ -369,6 +365,8 @@ export async function createPostImpl(
 
   let post: any = Array.isArray(inserted) ? inserted[0] : inserted;
   if (!post) return null;
+  await runBatch(anyDb, await branchScopeStatements(anyDb, 'post', post.id, postScope!));
+  [post] = await withBranchScope(anyDb, 'post', [post]);
 
   const auditNew = buildAuditPayload(post);
 
@@ -401,7 +399,8 @@ export async function updatePostImpl(
     slug?: string;
     published_at?: string | null;
     // undefined = unchanged, null = all branches
-    branch_ids?: number[] | null;
+    all_branches?: boolean;
+    branch_ids?: number[];
     content?: string;
     excerpt?: string;
     featured_image?: string;
@@ -425,7 +424,7 @@ export async function updatePostImpl(
   });
   if (!existing) return null;
 
-  const branchIds = readPostBranchIds(args.branch_ids);
+  const postScope = readPostScope(args, 'edit');
 
   const {
     title,
@@ -460,7 +459,6 @@ export async function updatePostImpl(
       data.slug = newSlug;
     }
   }
-  if (branchIds !== undefined) data.branch_ids = serializeBranchIds(branchIds);
   if (content !== undefined) data.content = sanitizePostHtml(content);
   if (excerpt !== undefined) data.excerpt = excerpt;
   if (featured_image !== undefined) data.featured_image = featured_image;
@@ -494,12 +492,14 @@ export async function updatePostImpl(
     }
   }
 
-  const updatedRes = await anyDb.update(tables.posts).set(data).where(eq(tables.posts.id, id)).returning();
-
-  let post: any = Array.isArray(updatedRes) ? updatedRes[0] : updatedRes;
-  if (!post) {
-    post = await anyDb.query.posts.findFirst({ where: eq(tables.posts.id, id) });
-  }
+  // The row and its branches change together
+  const oldScope = (await withBranchScope(anyDb, 'post', [existing]))[0];
+  await runBatch(anyDb, [
+    anyDb.update(tables.posts).set(data).where(eq(tables.posts.id, id)),
+    ...(postScope ? await branchScopeStatements(anyDb, 'post', id, postScope) : [])
+  ]);
+  const updatedRow: any = await anyDb.query.posts.findFirst({ where: eq(tables.posts.id, id) });
+  const post: any = updatedRow ? (await withBranchScope(anyDb, 'post', [updatedRow]))[0] : null;
 
   if (
     existing &&
@@ -515,7 +515,7 @@ export async function updatePostImpl(
     deleter(existing.og_image).catch((e) => console.error('Failed to delete old post OG image:', e));
   }
 
-  const auditOld = buildAuditPayload(existing);
+  const auditOld = buildAuditPayload(oldScope);
   const auditNew = buildAuditPayload(post);
 
   // Log audit action
@@ -567,7 +567,11 @@ export async function deletePostImpl(
       deleter(existing.featured_image).catch((e) => console.error('Failed to delete post image:', e));
     }
 
-    await anyDb.delete(tables.posts).where(eq(tables.posts.id, id));
+    // The post and its branch links go together
+    await runBatch(anyDb, [
+      anyDb.delete(post_branches).where(eq(post_branches.post_id, id)),
+      anyDb.delete(tables.posts).where(eq(tables.posts.id, id))
+    ]);
   } else {
     // Soft delete: change status to archived
     await anyDb

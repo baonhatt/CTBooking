@@ -10,6 +10,7 @@ import { buildPostHref, formatDate } from '@/lib/utils';
 import PostSidebar from './PostSidebar';
 import PostViewIncrementor from './PostViewIncrementor';
 import BranchScoped from '@/components/user/posts/BranchScoped';
+import { isPostAssigned } from '@/lib/post-branch';
 
 import { siteConfig } from '@/config/site';
 
@@ -38,7 +39,7 @@ export async function generateStaticParams() {
     do {
       const res = await getPublicPosts({ page, pageSize });
       const fetchedItems = res.items ?? [];
-      const filtered = fetchedItems.filter((p) => p.status === 'published');
+      const filtered = fetchedItems.filter((p) => p.status === 'published' && isPostAssigned(p));
       posts = [...posts, ...filtered];
       total = res.total;
       page += 1;
@@ -54,7 +55,7 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await getPostBySlugId(params.slug).catch(() => null);
 
-  if (!post || post.status !== 'published') {
+  if (!post || post.status !== 'published' || !isPostAssigned(post)) {
     return {
       title: 'Bài Viết Không Tồn Tại',
       robots: { index: false, follow: false }
@@ -100,7 +101,8 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
     getPublicPosts({ page: 1, pageSize: RELATED_POSTS + 1 }).catch(() => null)
   ]);
 
-  if (!post || post.status !== 'published') {
+  // A post not assigned to any branch yet is not available anywhere
+  if (!post || post.status !== 'published' || !isPostAssigned(post)) {
     notFound();
   }
 
@@ -118,7 +120,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
   }
 
   const relatedPosts = (allPostsRes?.items ?? [])
-    .filter((p) => p.status === 'published' && p.id !== post.id)
+    .filter((p) => p.status === 'published' && isPostAssigned(p) && p.id !== post.id)
     .slice(0, RELATED_POSTS);
 
   const postUrl = `${SITE_URL}${buildPostHref(post)}`;
@@ -254,7 +256,7 @@ export default async function PostDetailPage({ params }: { params: { slug: strin
               <h3 className="text-white text-2xl font-black">Bài viết liên quan</h3>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                 {relatedPosts.map((item) => (
-                  <BranchScoped key={item.id} branchIds={item.branch_ids}>
+                  <BranchScoped key={item.id} scope={item}>
                   <Link
                     href={buildPostHref(item)}
                     className="block h-full rounded-2xl neon-border bg-white/5 hover:bg-white/[0.1] transition-colors p-4"
